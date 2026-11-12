@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from apps.api.core.database import get_db
-from apps.api.models.schema import ParentMonthlyRecord, Student
+from core.database import get_db
+from models.schema import ParentMonthlyRecord, Student
 
 router = APIRouter(prefix="/parent", tags=["Parent Screens"])
 

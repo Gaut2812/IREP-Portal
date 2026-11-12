@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 import datetime
 
-from apps.api.core.database import get_db
-from apps.api.core.security import get_current_user, TokenPayload
-from apps.api.models.schema import (
+from core.database import get_db
+from core.security import get_current_user, TokenPayload
+from models.schema import (
     Student, CodingProblem, CodingSubmission, PracticeTest,
     PracticeQuestion, VirtualLabItem, SprintTask, MockInterview,
     SessionItem, DiscussionGroup, GroupMessage

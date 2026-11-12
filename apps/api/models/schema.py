@@ -2,7 +2,7 @@ import datetime
 from typing import Optional, List
 from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from apps.api.core.database import TenantModel
+from core.database import TenantModel
 
 class College(TenantModel):
     __tablename__ = "colleges"

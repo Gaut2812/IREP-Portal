@@ -1,7 +1,7 @@
 import datetime
 from sqlalchemy import create_engine, DateTime, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
-from apps.api.core.config import settings
+from core.config import settings
 
 # Format database URL for sync engine if sqlite+aiosqlite was specified
 db_url = settings.DATABASE_URL.replace("sqlite+aiosqlite:///", "sqlite:///")

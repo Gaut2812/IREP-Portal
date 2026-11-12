@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from apps.api.core.database import get_db
+from core.database import get_db
 
 router = APIRouter(prefix="/college", tags=["College Screens"])
 

@@ -1,16 +1,7 @@
-import os
-import sys
-from pathlib import Path
-
-# Ensure root repository is in sys.path
-root_dir = str(Path(__file__).resolve().parent.parent.parent)
-if root_dir not in sys.path:
-    sys.path.insert(0, root_dir)
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from apps.api.core.config import settings
-from apps.api.routers import auth, student, trainer, college, parent, live
+from core.config import settings
+from routers import auth, student, trainer, college, parent, live
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -50,5 +41,5 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("apps.api.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 

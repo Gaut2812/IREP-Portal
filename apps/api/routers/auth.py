@@ -3,9 +3,9 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from apps.api.core.database import get_db
-from apps.api.core.security import verify_password, create_access_token, get_current_user, TokenPayload
-from apps.api.models.schema import User, Student
+from core.database import get_db
+from core.security import verify_password, create_access_token, get_current_user, TokenPayload
+from models.schema import User, Student
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

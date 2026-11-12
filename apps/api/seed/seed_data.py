@@ -1,8 +1,8 @@
 import datetime
 from sqlalchemy import select
-from apps.api.core.database import SessionLocal, engine, Base
-from apps.api.core.security import get_password_hash
-from apps.api.models.schema import (
+from core.database import SessionLocal, engine, Base
+from core.security import get_password_hash
+from models.schema import (
     College, User, Student, Trainer, ParentStudent,
     SessionItem, SessionAttendance, CodingProblem, CodingSubmission,
     PracticeTest, PracticeQuestion, VirtualLabItem, SprintTask,

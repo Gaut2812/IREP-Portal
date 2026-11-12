@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  --sidebar-navy: #14284B;
+  --page-bg: #F1F5F9;
+  --card-white: #FFFFFF;
+  --card-border: #E2E8F0;
+  --heading-text: #0F1F3A;
+  --muted-text: #64748B;
+  --primary-blue: #2B5CD0;
+  --teal-accent: #2BB3A0;
+  --purple-tag: #7C5CE0;
+  --amber-warn: #F59E0B;
+  --red-destruct: #D93636;
+  --dark-surface: #1B2236;
+}
+
+body {
+  background-color: var(--page-bg);
+  color: var(--heading-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom design token utility classes */
+.bg-sidebar { background-color: var(--sidebar-navy); }
+.bg-page { background-color: var(--page-bg); }
+.bg-dark-surface { background-color: var(--dark-surface); }
+.text-heading { color: var(--heading-text); }
+.text-muted-custom { color: var(--muted-text); }
+.text-primary-blue { color: var(--primary-blue); }
+.bg-primary-blue { background-color: var(--primary-blue); }
+.text-teal-accent { color: var(--teal-accent); }
+.bg-teal-accent { background-color: var(--teal-accent); }
+
+/* Common chips */
+.chip-green {
+  background-color: #DCFCE7;
+  color: #15803D;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-amber {
+  background-color: #FEF3C7;
+  color: #B45309;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-red {
+  background-color: #FDE8E8;
+  color: #D93636;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-blue {
+  background-color: #DBEAFE;
+  color: #1D4ED8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-purple {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

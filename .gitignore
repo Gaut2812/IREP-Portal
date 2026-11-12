@@ -1,0 +1,38 @@
+# Node & pnpm
+node_modules/
+.next/
+out/
+build/
+dist/
+.pnpm-store/
+
+# Python & venv
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# SQLite
+*.db
+*.sqlite3
+

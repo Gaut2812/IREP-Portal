@@ -1,0 +1,12 @@
+{
+  "name": "irep-portal-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter @irep/web dev",
+    "build:web": "pnpm --filter @irep/web build",
+    "start:web": "pnpm --filter @irep/web start",
+    "dev:api": "cd apps/api && python -m uvicorn main:app --reload --port 8000"
+  }
+}
+

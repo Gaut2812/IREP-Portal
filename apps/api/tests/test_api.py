@@ -65,3 +65,4 @@ def test_live_classroom():
     assert response.status_code == 200
     data = response.json()
     assert "LLM APIs & RAG" in data["title"]
+

@@ -46,3 +46,4 @@ def get_college_dashboard(db: Session = Depends(get_db)):
             {"title": "Placement readiness analysis", "type": "PDF", "size": "1.8 MB"}
         ]
     }
+

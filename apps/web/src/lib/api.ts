@@ -25,3 +25,4 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     throw error;
   }
 }
+

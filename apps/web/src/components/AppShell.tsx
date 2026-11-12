@@ -225,3 +225,4 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     </div>
   );
 };
+

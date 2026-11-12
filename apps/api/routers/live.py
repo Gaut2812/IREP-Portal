@@ -91,3 +91,4 @@ print(response)""",
 @router.post("/{session_id}/poll/vote")
 def vote_live_poll(session_id: str, req: PollVoteRequest):
     return {"success": True, "message": "Vote recorded."}
+

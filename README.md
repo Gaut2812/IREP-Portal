@@ -46,3 +46,4 @@ Frontend runs at `http://localhost:3000`.
 - **College Admin**: `admin@demo.edu` / `password123` → lands on `/college`
 - **Parent**: Mobile `9876543210` / Demo OTP `123456` → lands on `/parent`
 - Use the **"View as"** role switcher pill in the top navigation bar to jump between views instantly.
+

@@ -75,3 +75,4 @@ def submit_rsvp(req: RSVPRequest):
         "success": True,
         "message": f"RSVP saved for {req.event_id}. Thank you!"
     }
+

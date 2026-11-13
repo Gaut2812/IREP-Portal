@@ -90,33 +90,107 @@ class CodingProblem(TenantModel):
     __tablename__ = "coding_problems"
     
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    slug: Mapped[Optional[str]] = mapped_column(String(128), index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    difficulty: Mapped[str] = mapped_column(String(32), default="Medium")
-    topic: Mapped[str] = mapped_column(String(64), default="Union-Find")
+    difficulty: Mapped[str] = mapped_column(String(32), default="Medium", index=True)
+    topic: Mapped[str] = mapped_column(String(64), default="Union-Find", index=True)
     company_tags: Mapped[str] = mapped_column(String(255), default="Product cos.")
     week_info: Mapped[str] = mapped_column(String(128), default="Week 8 · Pattern drill · 3 of 6 solved")
     statement: Mapped[str] = mapped_column(Text, nullable=False)
-    example_input: Mapped[str] = mapped_column(Text)
-    example_output: Mapped[str] = mapped_column(Text)
-    constraints: Mapped[str] = mapped_column(Text)
-    starter_code: Mapped[str] = mapped_column(Text)
+    example_input: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    example_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    constraints: Mapped[str] = mapped_column(Text, nullable=False)
+    time_limit_ms: Mapped[int] = mapped_column(Integer, default=2000)
+    memory_limit_mb: Mapped[int] = mapped_column(Integer, default=256)
+    starter_codes: Mapped[dict] = mapped_column(JSON, default=dict)
+    starter_code: Mapped[str] = mapped_column(Text, default="")
     trainer_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     trainer_author: Mapped[str] = mapped_column(String(128), default="Arun K.")
+
+    # Relationships
+    test_cases: Mapped[List["TestCase"]] = relationship(
+        "TestCase", back_populates="problem", cascade="all, delete-orphan", order_by="TestCase.test_order"
+    )
+    submissions: Mapped[List["CodingSubmission"]] = relationship(
+        "CodingSubmission", back_populates="problem", cascade="all, delete-orphan"
+    )
+
+class TestCase(TenantModel):
+    __tablename__ = "test_cases"
+    __test__ = False
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    problem_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("coding_problems.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    test_order: Mapped[int] = mapped_column(Integer, default=1)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    input_data: Mapped[str] = mapped_column(Text, nullable=False)
+    expected_output: Mapped[str] = mapped_column(Text, nullable=False)
+    explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    problem: Mapped["CodingProblem"] = relationship("CodingProblem", back_populates="test_cases")
+    submission_results: Mapped[List["SubmissionResult"]] = relationship(
+        "SubmissionResult", back_populates="test_case", cascade="all, delete-orphan"
+    )
 
 class CodingSubmission(TenantModel):
     __tablename__ = "coding_submissions"
     
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    problem_id: Mapped[str] = mapped_column(String(64), ForeignKey("coding_problems.id"))
-    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"))
+    problem_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("coding_problems.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    student_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("students.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     language: Mapped[str] = mapped_column(String(32), default="python")
     code: Mapped[str] = mapped_column(Text, nullable=False)
-    runtime_ms: Mapped[int] = mapped_column(Integer, default=42)
-    memory_mb: Mapped[float] = mapped_column(Float, default=16.1)
-    status: Mapped[str] = mapped_column(String(32), default="Passed")
-    tests_passed: Mapped[int] = mapped_column(Integer, default=18)
-    tests_total: Mapped[int] = mapped_column(Integer, default=18)
-    hints_used: Mapped[int] = mapped_column(Integer, default=1)
+    runtime_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=42)
+    memory_mb: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=16.1)
+    status: Mapped[str] = mapped_column(String(32), default="Pending", index=True)
+    tests_passed: Mapped[int] = mapped_column(Integer, default=0)
+    tests_total: Mapped[int] = mapped_column(Integer, default=0)
+    hints_used: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    problem: Mapped["CodingProblem"] = relationship("CodingProblem", back_populates="submissions")
+    student: Mapped["Student"] = relationship("Student")
+    results: Mapped[List["SubmissionResult"]] = relationship(
+        "SubmissionResult", back_populates="submission", cascade="all, delete-orphan"
+    )
+
+class SubmissionResult(TenantModel):
+    __tablename__ = "submission_results"
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    submission_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("coding_submissions.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    test_case_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("test_cases.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    runtime_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    memory_mb: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    actual_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    submission: Mapped["CodingSubmission"] = relationship("CodingSubmission", back_populates="results")
+    test_case: Mapped["TestCase"] = relationship("TestCase", back_populates="submission_results")
+
+class CodingHintUsage(TenantModel):
+    __tablename__ = "coding_hint_usages"
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    problem_id: Mapped[str] = mapped_column(String(64), ForeignKey("coding_problems.id", ondelete="CASCADE"))
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", ondelete="CASCADE"))
+    hint_number: Mapped[int] = mapped_column(Integer, default=1)
+    hint_text: Mapped[str] = mapped_column(Text)
 
 # Screen 23: Practice Tests
 class PracticeTest(TenantModel):

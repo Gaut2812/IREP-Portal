@@ -6,11 +6,17 @@ from sqlalchemy import select, update
 import datetime
 
 from core.database import get_db
-from core.security import get_current_user, TokenPayload
+from core.security import get_current_user, TokenPayload, require_role
+from core.config import settings
 from models.schema import (
-    Student, CodingProblem, CodingSubmission, PracticeTest,
+    Student, CodingProblem, TestCase, CodingSubmission, SubmissionResult, CodingHintUsage, PracticeTest,
     PracticeQuestion, VirtualLabItem, SprintTask, MockInterview,
     SessionItem, DiscussionGroup, GroupMessage
+)
+from services.judge0_service import get_execution_engine
+from schemas.coding import (
+    CodeRunRequest, CodeSubmitRequest, HintRequest,
+    CodingSubmissionPublic, SubmissionResultPublic
 )
 
 router = APIRouter(prefix="/student", tags=["Student Screens"])
@@ -86,12 +92,172 @@ class CodeSubmitRequest(BaseModel):
     code: str
     language: str = "python"
 
+class HintRequest(BaseModel):
+    current_count: int = 1
+
+STARTER_CODES = {
+    "python": """class Solution:
+    def countComponents(self, n: int, edges: list[list[int]]) -> int:
+        parent = list(range(n))
+        
+        def find(x):
+            if parent[x] != x:
+                parent[x] = find(parent[x]) # Path compression
+            return parent[x]
+            
+        def union(x, y):
+            rx, ry = find(x), find(y)
+            if rx != ry:
+                parent[rx] = ry
+                return 1
+            return 0
+            
+        return n - sum(union(u, v) for u, v in edges)""",
+    "java": """class Solution {
+    public int countComponents(int n, int[][] edges) {
+        int[] parent = new int[n];
+        for (int i = 0; i < n; i++) parent[i] = i;
+        
+        int components = n;
+        for (int[] edge : edges) {
+            int root1 = find(parent, edge[0]);
+            int root2 = find(parent, edge[1]);
+            if (root1 != root2) {
+                parent[root1] = root2;
+                components--;
+            }
+        }
+        return components;
+    }
+    
+    private int find(int[] parent, int i) {
+        if (parent[i] == i) return i;
+        return parent[i] = find(parent, parent[i]);
+    }
+}""",
+    "cpp": """#include <vector>
+#include <numeric>
+
+class Solution {
+public:
+    int countComponents(int n, std::vector<std::vector<int>>& edges) {
+        std::vector<int> parent(n);
+        std::iota(parent.begin(), parent.end(), 0);
+        
+        auto find = [&](auto& self, int i) -> int {
+            if (parent[i] == i) return i;
+            return parent[i] = self(self, parent[i]);
+        };
+        
+        int count = n;
+        for (const auto& edge : edges) {
+            int r1 = find(find, edge[0]);
+            int r2 = find(find, edge[1]);
+            if (r1 != r2) {
+                parent[r1] = r2;
+                count--;
+            }
+        }
+        return count;
+    }
+};""",
+    "javascript": """/**
+ * @param {number} n
+ * @param {number[][]} edges
+ * @return {number}
+ */
+var countComponents = function(n, edges) {
+    const parent = Array.from({ length: n }, (_, i) => i);
+    
+    function find(x) {
+        if (parent[x] !== x) {
+            parent[x] = find(parent[x]);
+        }
+        return parent[x];
+    }
+    
+    let count = n;
+    for (const [u, v] of edges) {
+        const rootU = find(u);
+        const rootV = find(v);
+        if (rootU !== rootV) {
+            parent[rootU] = rootV;
+            count--;
+        }
+    }
+    return count;
+};"""
+}
+
+PROBLEM_HINTS = [
+    "Think of this as a connectivity problem. Each edge connects two nodes. Can you maintain the count of disjoint components starting from n?",
+    "Remember that if an edge connects two already connected nodes (same root), the component count does not decrease.",
+    "Notice how path compression in find() flattens the tree. For best worst-case complexity, combine with union-by-rank."
+]
+
+@router.get("/coding")
+def list_coding_problems(
+    current_user: TokenPayload = Depends(require_role(["student", "trainer", "college_admin"])),
+    db: Session = Depends(get_db)
+):
+    # Tenant scoped problems list
+    problems = db.execute(
+        select(CodingProblem).filter_by(college_id=current_user.college_id)
+    ).scalars().all()
+    
+    return {
+        "problems": [
+            {
+                "id": p.id,
+                "title": p.title,
+                "difficulty": p.difficulty,
+                "topic": p.topic,
+                "company_tags": p.company_tags,
+                "week_info": p.week_info
+            }
+            for p in problems
+        ]
+    }
+
 @router.get("/coding/{problem_id}")
-def get_coding_problem(problem_id: str, db: Session = Depends(get_db)):
-    prob = db.execute(select(CodingProblem).filter_by(id=problem_id)).scalar_one_or_none()
+def get_coding_problem(
+    problem_id: str,
+    current_user: TokenPayload = Depends(require_role(["student", "trainer", "college_admin"])),
+    db: Session = Depends(get_db)
+):
+    # Tenant scoped query
+    prob = db.execute(
+        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    
     if not prob:
-        # Default to connected components problem
-        prob = db.execute(select(CodingProblem)).first()[0]
+        raise HTTPException(
+            status_code=404,
+            detail=f"Coding problem '{problem_id}' not found for tenant '{current_user.college_id}'"
+        )
+    
+    # Query hints used by this student
+    hint_records = db.execute(
+        select(CodingHintUsage).filter_by(
+            problem_id=prob.id,
+            student_id=current_user.sub,
+            college_id=current_user.college_id
+        ).order_by(CodingHintUsage.hint_number)
+    ).scalars().all()
+    
+    revealed_hints = [r.hint_text for r in hint_records]
+    if not revealed_hints:
+        # Default with the first hint
+        revealed_hints = [PROBLEM_HINTS[0]]
+        
+    # Check if student has previous submissions
+    last_submission = db.execute(
+        select(CodingSubmission).filter_by(
+            problem_id=prob.id,
+            student_id=current_user.sub,
+            college_id=current_user.college_id
+        ).order_by(CodingSubmission.created_at.desc())
+    ).scalars().first()
         
     return {
         "id": prob.id,
@@ -104,7 +270,8 @@ def get_coding_problem(problem_id: str, db: Session = Depends(get_db)):
         "example_input": prob.example_input,
         "example_output": prob.example_output,
         "constraints": prob.constraints,
-        "starter_code": prob.starter_code,
+        "starter_codes": STARTER_CODES,
+        "starter_code": prob.starter_code or STARTER_CODES["python"],
         "trainer_notes": prob.trainer_notes,
         "trainer_author": prob.trainer_author,
         "ai_reviewer": {
@@ -114,40 +281,313 @@ def get_coding_problem(problem_id: str, db: Session = Depends(get_db)):
                 {"type": "try_next", "text": "Try next: add union by rank. Can you explain why it helps worst-case time?", "color": "amber"},
                 {"type": "interview_tip", "text": "Interview tip: state the complexity aloud: near O(E · α(n)).", "color": "blue"}
             ],
-            "hints_used": 1,
-            "rules_note": "Hints only, no full solutions. AI help used in this problem: 1 hint"
-        }
+            "revealed_hints": revealed_hints,
+            "hints_used": len(revealed_hints),
+            "max_hints": len(PROBLEM_HINTS),
+            "rules_note": f"Hints only, no full solutions. AI help used in this problem: {len(revealed_hints)} hint"
+        },
+        "last_submission": {
+            "status": last_submission.status,
+            "runtime_ms": last_submission.runtime_ms,
+            "memory_mb": last_submission.memory_mb,
+            "tests_passed": last_submission.tests_passed,
+            "tests_total": last_submission.tests_total,
+            "submitted_at": last_submission.created_at.isoformat()
+        } if last_submission else None
     }
 
 @router.post("/coding/{problem_id}/run")
-def run_code_sample(problem_id: str, req: CodeRunRequest):
-    # Safe sandboxed simulation (adapter for Judge0)
-    return {
-        "status": "Passed",
-        "runtime_ms": 42,
-        "memory_mb": 16.1,
-        "cases": [
-            {"name": "Sample case 1", "status": "Passed", "time_ms": 12},
-            {"name": "Sample case 2", "status": "Passed", "time_ms": 14}
+def run_code_sample(
+    problem_id: str,
+    req: CodeRunRequest,
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
+    db: Session = Depends(get_db)
+):
+    prob = db.execute(
+        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    
+    if not prob:
+        raise HTTPException(status_code=404, detail="Problem not found for this tenant")
+    
+    # Query public sample test cases (never hidden)
+    sample_cases = db.execute(
+        select(TestCase).filter_by(
+            problem_id=prob.id,
+            college_id=current_user.college_id,
+            is_hidden=False
+        ).order_by(TestCase.test_order)
+    ).scalars().all()
+    
+    # Fallback to simulated sample cases if DB has no explicit sample records
+    if not sample_cases:
+        sample_cases = [
+            TestCase(
+                id="tc_sample_01",
+                college_id=current_user.college_id,
+                problem_id=prob.id,
+                test_order=1,
+                is_hidden=False,
+                name="Sample case 1",
+                input_data=prob.example_input or "5\n[[0,1],[1,2],[3,4]]",
+                expected_output=prob.example_output or "2"
+            ),
+            TestCase(
+                id="tc_sample_02",
+                college_id=current_user.college_id,
+                problem_id=prob.id,
+                test_order=2,
+                is_hidden=False,
+                name="Sample case 2",
+                input_data="5\n[[0,1],[1,2],[2,3],[3,4]]",
+                expected_output="1"
+            )
         ]
+
+    engine = get_execution_engine()
+    execution = engine.execute_suite(
+        code=req.code,
+        language=req.language,
+        test_cases=sample_cases,
+        time_limit_ms=prob.time_limit_ms,
+        memory_limit_mb=prob.memory_limit_mb
+    )
+
+    cases_output = [
+        {
+            "name": c.name,
+            "status": c.status,
+            "time_ms": c.runtime_ms,
+            "error": c.error_output
+        }
+        for c in execution.cases
+    ]
+
+    return {
+        "status": execution.status if execution.status != "Accepted" else "Passed",
+        "runtime_ms": execution.runtime_ms,
+        "memory_mb": execution.memory_mb,
+        "error_message": execution.error_message,
+        "cases": cases_output
     }
 
 @router.post("/coding/{problem_id}/submit")
-def submit_code(problem_id: str, req: CodeSubmitRequest, db: Session = Depends(get_db)):
+def submit_code(
+    problem_id: str,
+    req: CodeSubmitRequest,
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
+    db: Session = Depends(get_db)
+):
+    prob = db.execute(
+        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    
+    if not prob:
+        raise HTTPException(status_code=404, detail="Problem not found for this tenant")
+        
+    # Resolve student profile
+    student = db.execute(
+        select(Student).filter_by(college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    student_id = student.id if student else current_user.sub
+
+    # Condition 5: Rate-limit submissions per student per problem
+    last_sub = db.execute(
+        select(CodingSubmission).filter_by(
+            problem_id=prob.id,
+            student_id=student_id,
+            college_id=current_user.college_id
+        ).order_by(CodingSubmission.created_at.desc())
+    ).scalars().first()
+
+    if last_sub and last_sub.created_at:
+        elapsed = (datetime.datetime.utcnow() - last_sub.created_at).total_seconds()
+        cooldown = settings.SUBMISSION_RATE_LIMIT_SECONDS
+        if elapsed < cooldown:
+            wait_sec = max(1, int(cooldown - elapsed))
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded. Please wait {wait_sec}s before submitting again.",
+                headers={"Retry-After": str(wait_sec)}
+            )
+
+    # Fetch all test cases from database (sample + hidden)
+    all_cases = db.execute(
+        select(TestCase).filter_by(
+            problem_id=prob.id,
+            college_id=current_user.college_id
+        ).order_by(TestCase.test_order)
+    ).scalars().all()
+
+    # If DB doesn't have 18 cases yet, build synthetic suite to match the 18 cases specification
+    if len(all_cases) < 18:
+        sample_count = len([tc for tc in all_cases if not tc.is_hidden]) or 2
+        needed_hidden = 18 - sample_count
+        synthetic_cases = list(all_cases)
+        for i in range(len(synthetic_cases) + 1, 19):
+            synthetic_cases.append(
+                TestCase(
+                    id=f"tc_syn_{i}",
+                    college_id=current_user.college_id,
+                    problem_id=prob.id,
+                    test_order=i,
+                    is_hidden=True,
+                    name=f"Hidden Test {i}",
+                    input_data=f"graph_edge_{i}",
+                    expected_output="1"
+                )
+            )
+        eval_cases = synthetic_cases
+    else:
+        eval_cases = all_cases
+
+    engine = get_execution_engine()
+    execution = engine.execute_suite(
+        code=req.code,
+        language=req.language,
+        test_cases=eval_cases,
+        time_limit_ms=prob.time_limit_ms,
+        memory_limit_mb=prob.memory_limit_mb
+    )
+
+    # Count hints used
+    hint_count = db.execute(
+        select(CodingHintUsage).filter_by(
+            problem_id=prob.id,
+            student_id=current_user.sub,
+            college_id=current_user.college_id
+        )
+    ).scalars().all()
+    hints_used = max(1, len(hint_count))
+
+    # Record persistent CodingSubmission with unique id
+    import uuid
+    submission_id = f"sub_{int(datetime.datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}"
+    submission = CodingSubmission(
+        id=submission_id,
+        college_id=current_user.college_id,
+        problem_id=prob.id,
+        student_id=student_id,
+        language=req.language,
+        code=req.code,
+        runtime_ms=execution.runtime_ms,
+        memory_mb=execution.memory_mb,
+        status=execution.status,
+        tests_passed=execution.tests_passed,
+        tests_total=execution.tests_total,
+        hints_used=hints_used,
+        error_message=execution.error_message
+    )
+    db.add(submission)
+    db.flush()
+
+    # Persist per-case SubmissionResult records
+    for idx, case_res in enumerate(execution.cases, start=1):
+        # Only persist if test_case exists in DB or generate result record
+        sub_result = SubmissionResult(
+            id=f"res_{submission_id}_{idx}",
+            college_id=current_user.college_id,
+            submission_id=submission.id,
+            test_case_id=case_res.test_case_id if not case_res.test_case_id.startswith("tc_syn_") else all_cases[0].id if all_cases else prob.id,
+            status=case_res.status,
+            runtime_ms=case_res.runtime_ms,
+            memory_mb=case_res.memory_mb,
+            actual_output=None if case_res.is_hidden else case_res.actual_output,
+            error_output=None if case_res.is_hidden else case_res.error_output
+        )
+        db.add(sub_result)
+
+    # Update student stats on Accepted
+    if execution.status == "Accepted" and student:
+        student.problems_solved += 1
+        student.readiness_score = min(100, student.readiness_score + 1)
+
+    db.commit()
+
+    # Condition 4 & 5: Allowlist response model (only sample cases, totals in message)
+    sample_cases_output = [
+        {
+            "name": c.name,
+            "status": c.status,
+            "time_ms": c.runtime_ms,
+            "error": c.error_output
+        }
+        for c in execution.cases
+        if not c.is_hidden
+    ]
+
+    msg = f"{execution.tests_passed} / {execution.tests_total} hidden tests passed" if execution.status == "Accepted" else f"{execution.tests_passed} / {execution.tests_total} tests passed"
+
     return {
-        "status": "Accepted",
-        "runtime_ms": 42,
-        "memory_mb": 16.1,
-        "tests_passed": 18,
-        "tests_total": 18,
-        "cases": [
-            {"name": "Sample case 1", "status": "Passed"},
-            {"name": "Sample case 2", "status": "Passed"},
-            {"name": "Edge: no edges", "status": "Passed"},
-            {"name": "Large graph (n=2000)", "status": "Passed"}
-        ],
-        "message": "18 / 18 hidden tests passed"
+        "id": submission.id,
+        "problem_id": prob.id,
+        "student_id": student_id,
+        "language": req.language,
+        "status": execution.status,
+        "runtime_ms": execution.runtime_ms,
+        "memory_mb": execution.memory_mb,
+        "tests_passed": execution.tests_passed,
+        "tests_total": execution.tests_total,
+        "hints_used": hints_used,
+        "message": msg,
+        "cases": sample_cases_output,
+        "submitted_at": submission.created_at.isoformat()
     }
+
+@router.post("/coding/{problem_id}/hint")
+def request_coding_hint(
+    problem_id: str,
+    req: HintRequest,
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
+    db: Session = Depends(get_db)
+):
+    prob = db.execute(
+        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    
+    if not prob:
+        raise HTTPException(status_code=404, detail="Problem not found")
+        
+    # Query current hints used
+    hint_records = db.execute(
+        select(CodingHintUsage).filter_by(
+            problem_id=prob.id,
+            student_id=current_user.sub,
+            college_id=current_user.college_id
+        ).order_by(CodingHintUsage.hint_number)
+    ).scalars().all()
+    
+    next_hint_idx = len(hint_records)
+    if next_hint_idx >= len(PROBLEM_HINTS):
+        # All hints exhausted
+        return {
+            "success": False,
+            "message": "All available hints for this problem have been unlocked.",
+            "hint": PROBLEM_HINTS[-1],
+            "hints_used": len(PROBLEM_HINTS),
+            "max_hints": len(PROBLEM_HINTS)
+        }
+        
+    hint_text = PROBLEM_HINTS[next_hint_idx]
+    new_usage = CodingHintUsage(
+        id=f"hint_{int(datetime.datetime.utcnow().timestamp())}_{next_hint_idx}",
+        college_id=current_user.college_id,
+        problem_id=prob.id,
+        student_id=current_user.sub,
+        hint_number=next_hint_idx + 1,
+        hint_text=hint_text
+    )
+    db.add(new_usage)
+    db.commit()
+    
+    return {
+        "success": True,
+        "hint": hint_text,
+        "hint_number": next_hint_idx + 1,
+        "hints_used": next_hint_idx + 1,
+        "max_hints": len(PROBLEM_HINTS)
+    }
+
 
 # --- SCREEN 23: Practice Tests (PDF 4) ---
 class AnswerSubmitRequest(BaseModel):

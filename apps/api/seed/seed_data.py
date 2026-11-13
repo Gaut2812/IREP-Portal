@@ -4,11 +4,70 @@ from core.database import SessionLocal, engine, Base
 from core.security import get_password_hash
 from models.schema import (
     College, User, Student, Trainer, ParentStudent,
-    SessionItem, SessionAttendance, CodingProblem, CodingSubmission,
+    SessionItem, SessionAttendance, CodingProblem, TestCase, CodingSubmission, SubmissionResult,
     PracticeTest, PracticeQuestion, VirtualLabItem, SprintTask,
     MockInterview, DiscussionGroup, GroupMessage, TrainerDirectThread,
     DirectMessage, ParentMonthlyRecord
 )
+
+def get_screen24_test_cases():
+    cases = [
+        TestCase(
+            id="tc_demo_01",
+            college_id="col_demo_001",
+            problem_id="prob_connected_components",
+            test_order=1,
+            is_hidden=False,
+            name="Sample Case 1",
+            input_data="5\n[[0,1],[1,2],[3,4]]",
+            expected_output="2",
+            explanation="Nodes 0, 1, 2 form one component and nodes 3, 4 form another component."
+        ),
+        TestCase(
+            id="tc_demo_02",
+            college_id="col_demo_001",
+            problem_id="prob_connected_components",
+            test_order=2,
+            is_hidden=False,
+            name="Sample Case 2",
+            input_data="5\n[[0,1],[1,2],[2,3],[3,4]]",
+            expected_output="1",
+            explanation="All nodes are connected in a single component."
+        ),
+    ]
+    hidden_specs = [
+        (3, "Hidden Boundary: Disconnected Singletons", "5\n[]", "5", "No edges."),
+        (4, "Hidden Edge: Large Component Cycle", "4\n[[2,3],[1,2],[1,3]]", "2", "1 isolated, 3 cyclic."),
+        (5, "Hidden Stress: Single Node", "1\n[]", "1", "Trivial 1-node graph."),
+        (6, "Hidden Pair: 2 Nodes Connected", "2\n[[0,1]]", "1", "Simple pair connected."),
+        (7, "Hidden Pair: 2 Nodes Disconnected", "2\n[]", "2", "Simple pair disconnected."),
+        (8, "Hidden Star: Hub and Spokes", "6\n[[0,1],[0,2],[0,3],[0,4],[0,5]]", "1", "Star graph."),
+        (9, "Hidden Multi-cycle: Two Separate Triangles", "6\n[[0,1],[1,2],[2,0],[3,4],[4,5],[5,3]]", "2", "Two triangles."),
+        (10, "Hidden Chain: Linear Line", "7\n[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6]]", "1", "Linear line."),
+        (11, "Hidden Forest: 3 Trees", "9\n[[0,1],[2,3],[4,5],[6,7]]", "5", "4 pairs + 1 isolated."),
+        (12, "Hidden Complete: K4", "4\n[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]]", "1", "Fully connected."),
+        (13, "Hidden Bipartite", "6\n[[0,3],[0,4],[1,3],[1,5],[2,4],[2,5]]", "1", "Bipartite graph."),
+        (14, "Hidden Dense with Redundant Edges", "5\n[[0,1],[1,0],[0,2],[2,0],[1,2]]", "3", "Redundant edges."),
+        (15, "Hidden Permutation Sequence", "8\n[[7,6],[6,5],[5,4],[3,2],[2,1]]", "3", "2 chains + 1 isolated."),
+        (16, "Hidden Large Sparse", "10\n[[0,9],[1,8],[2,7]]", "7", "3 pairs + 4 isolated."),
+        (17, "Hidden Wheel Graph", "5\n[[0,1],[1,2],[2,3],[3,0],[4,0],[4,1],[4,2],[4,3]]", "1", "Wheel."),
+        (18, "Hidden Scale Test (n=2000)", "2000\n[[0,1],[1,2]]", "1998", "Max constraints boundary.")
+    ]
+    for order, name, inp, exp, expl in hidden_specs:
+        cases.append(
+            TestCase(
+                id=f"tc_demo_{order:02d}",
+                college_id="col_demo_001",
+                problem_id="prob_connected_components",
+                test_order=order,
+                is_hidden=True,
+                name=name,
+                input_data=inp,
+                expected_output=exp,
+                explanation=expl
+            )
+        )
+    return cases
 
 def init_db_and_seed():
     print("Creating tables...", flush=True)
@@ -19,6 +78,16 @@ def init_db_and_seed():
         # Check if already seeded
         result = db.execute(select(College).filter_by(id="col_demo_001")).scalar_one_or_none()
         if result:
+            # Check if all 18 TestCases are present for the problem
+            tc_existing = db.execute(select(TestCase).filter_by(problem_id="prob_connected_components")).scalars().all()
+            if len(tc_existing) < 18:
+                print("Seeding full suite of 18 TestCases for Screen 24 Coding Lab...", flush=True)
+                existing_ids = {tc.id for tc in tc_existing}
+                for tc in get_screen24_test_cases():
+                    if tc.id not in existing_ids:
+                        db.add(tc)
+                db.commit()
+                print("18 TestCases verified and committed.", flush=True)
             print("Database already seeded.", flush=True)
             return
 
@@ -118,20 +187,71 @@ def init_db_and_seed():
         problem = CodingProblem(
             id="prob_connected_components",
             college_id="col_demo_001",
+            slug="connected-components",
             title="Number of Connected Components in an Undirected Graph",
             difficulty="Medium",
             topic="Union-Find",
             company_tags="Product cos.",
             week_info="Week 8 · Pattern drill · 3 of 6 solved",
             statement="You have a graph of n nodes. You are given an integer n and an array edges where edges[i] = [ai, bi] indicates that there is an edge between ai and bi in the graph.\n\nReturn the number of connected components in the graph.",
-            example_input="n = 5, edges = [[0,1],[1,2],[3,4]]",
-            example_output="2",
             constraints="1 <= n <= 2000\n0 <= edges.length <= 5000\nedges[i].length == 2\n0 <= ai <= bi < n\nai != bi\nThere are no repeated edges.",
+            time_limit_ms=2000,
+            memory_limit_mb=256,
             starter_code="class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        parent = list(range(n))\n        \n        def find(x):\n            if parent[x] != x:\n                parent[x] = find(parent[x])\n            return parent[x]\n            \n        def union(x, y):\n            rx, ry = find(x), find(y)\n            if rx != ry:\n                parent[rx] = ry\n                return 1\n            return 0\n            \n        return n - sum(union(u, v) for u, v in edges)",
             trainer_notes="Notice how path compression in find() flattens the tree. For best worst-case complexity, add union-by-rank.",
             trainer_author="Arun K."
         )
         db.add(problem)
+        db.flush()
+        
+        # 4b. Test Cases (Sample + Hidden)
+        test_cases = [
+            TestCase(
+                id="tc_demo_01",
+                college_id="col_demo_001",
+                problem_id="prob_connected_components",
+                test_order=1,
+                is_hidden=False,
+                name="Sample Case 1",
+                input_data="5\n[[0,1],[1,2],[3,4]]",
+                expected_output="2",
+                explanation="Nodes 0, 1, 2 form one component and nodes 3, 4 form another component."
+            ),
+            TestCase(
+                id="tc_demo_02",
+                college_id="col_demo_001",
+                problem_id="prob_connected_components",
+                test_order=2,
+                is_hidden=False,
+                name="Sample Case 2",
+                input_data="5\n[[0,1],[1,2],[2,3],[3,4]]",
+                expected_output="1",
+                explanation="All nodes are connected in a single component."
+            ),
+            TestCase(
+                id="tc_demo_03",
+                college_id="col_demo_001",
+                problem_id="prob_connected_components",
+                test_order=3,
+                is_hidden=True,
+                name="Hidden Boundary: Disconnected Singletons",
+                input_data="5\n[]",
+                expected_output="5",
+                explanation="Graph has no edges; all nodes are separate components."
+            ),
+            TestCase(
+                id="tc_demo_04",
+                college_id="col_demo_001",
+                problem_id="prob_connected_components",
+                test_order=4,
+                is_hidden=True,
+                name="Hidden Edge: Large Component Cycle",
+                input_data="4\n[[2,3],[1,2],[1,3]]",
+                expected_output="2",
+                explanation="Node 0 is isolated, nodes 1, 2, 3 form a cyclic component."
+            )
+        ]
+        db.add_all(test_cases)
         
         # 5. Practice Test (Screen 23 - PDF 4)
         test = PracticeTest(

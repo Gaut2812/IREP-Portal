@@ -219,6 +219,56 @@ class PracticeQuestion(TenantModel):
     correct_option: Mapped[str] = mapped_column(String(8), default="B")
     explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+class TestAttempt(TenantModel):
+    __tablename__ = "test_attempts"
+    __test__ = False
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    test_id: Mapped[str] = mapped_column(String(64), ForeignKey("practice_tests.id"), index=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="in_progress") # in_progress, submitted, expired
+    started_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    ends_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    submitted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    total_questions: Mapped[int] = mapped_column(Integer, default=30)
+    accuracy_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    time_taken_sec: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+class AttemptAnswer(TenantModel):
+    __tablename__ = "attempt_answers"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(String(64), ForeignKey("test_attempts.id"), index=True)
+    question_id: Mapped[str] = mapped_column(String(64), ForeignKey("practice_questions.id"))
+    question_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    selected_option: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    is_marked_for_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_correct: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    saved_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+class ProctorEvent(TenantModel):
+    __tablename__ = "proctor_events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(String(64), ForeignKey("test_attempts.id"), index=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"))
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False) # tab_switch, fullscreen_exit, copy_paste_attempt
+    details: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    timestamp: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+class TopicScore(TenantModel):
+    __tablename__ = "topic_scores"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(String(64), ForeignKey("test_attempts.id"), index=True)
+    section_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    topic: Mapped[str] = mapped_column(String(64), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    total: Mapped[int] = mapped_column(Integer, default=0)
+    accuracy_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    status_band: Mapped[str] = mapped_column(String(32), default="Good") # Strong, Good, Needs Support
+
 # Screen 29: Virtual Labs
 class VirtualLabItem(TenantModel):
     __tablename__ = "virtual_labs"

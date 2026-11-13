@@ -200,6 +200,14 @@ def test_judge0_http_adapter_auth_token_and_security_limits():
 # ---------------------------------------------------------------------------
 def test_hidden_results_dedicated_allowlist_model(db, student_user):
     """Verify hidden test results strictly use an allowlist model: only sample cases in cases array, totals only."""
+    from sqlalchemy import update
+    db.execute(
+        update(CodingSubmission)
+        .filter_by(student_id="std_priya_01")
+        .values(created_at=datetime.datetime.utcnow() - datetime.timedelta(seconds=30))
+    )
+    db.commit()
+
     req = CodeSubmitRequest(
         code="class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        return n - len(edges)",
         language="python"

@@ -296,6 +296,21 @@ class MockJudge0Adapter(CodeExecutionEngine):
         time_limit_ms: int = 2000,
         memory_limit_mb: int = 256
     ) -> TestCaseResultDTO:
+        lang_id = JUDGE0_LANGUAGE_IDS.get(language.lower())
+        if not lang_id:
+            raw_err = f"Language '{language}' not mapped in JUDGE0_LANGUAGE_IDS"
+            logger.warning(f"[MockJudge0 Server Log] Unsupported language: {raw_err}")
+            return TestCaseResultDTO(
+                test_case_id=test_case_id,
+                name=test_name,
+                status="Compile Error",
+                runtime_ms=0,
+                memory_mb=0.0,
+                is_hidden=is_hidden,
+                error_output="Unsupported language",
+                raw_server_error=raw_err
+            )
+
         clean_code = (code or "").strip()
         if not clean_code:
             return TestCaseResultDTO(

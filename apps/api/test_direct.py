@@ -1,5 +1,8 @@
 import sys
-sys.path.insert(0, r"d:\IREP Portal")
+from pathlib import Path
+repo_root = str(Path(__file__).resolve().parent.parent.parent)
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
 from apps.api.core.database import SessionLocal
 from apps.api.routers import student, trainer, college, parent, live

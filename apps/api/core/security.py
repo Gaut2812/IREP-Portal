@@ -49,23 +49,26 @@ def decode_access_token(token: str) -> Optional[TokenPayload]:
         return None
 
 async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> TokenPayload:
+    # Default demo student used when no token or an undecodable demo token is provided
+    _demo_fallback = TokenPayload(
+        sub="usr_priya_01",
+        email="priya.r@demo.edu",
+        role="student",
+        college_id=settings.DEFAULT_COLLEGE_ID,
+        name="Priya R",
+        avatar="PR"
+    )
+
     if not token:
-        # Return default student for development/inspection if token is missing
-        return TokenPayload(
-            sub="usr_priya_01",
-            email="priya.r@demo.edu",
-            role="student",
-            college_id=settings.DEFAULT_COLLEGE_ID,
-            name="Priya R",
-            avatar="PR"
-        )
+        return _demo_fallback
+
     payload = decode_access_token(token)
     if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # In development the frontend sends a mock token ("mock_jwt_token_demo")
+        # that is not a real JWT.  Fall back to the demo student so the UI works
+        # without requiring a real login flow.
+        # In production, swap this block for a hard 401.
+        return _demo_fallback
     return payload
 
 def require_role(allowed_roles: List[str]):

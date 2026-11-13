@@ -7,7 +7,8 @@ from models.schema import (
     SessionItem, SessionAttendance, CodingProblem, TestCase, CodingSubmission, SubmissionResult,
     PracticeTest, PracticeQuestion, VirtualLabItem, SprintTask,
     MockInterview, DiscussionGroup, GroupMessage, TrainerDirectThread,
-    DirectMessage, ParentMonthlyRecord
+    DirectMessage, ParentMonthlyRecord, TestAttempt, AttemptAnswer,
+    ProctorEvent, TopicScore
 )
 
 def get_screen24_test_cases():
@@ -304,6 +305,46 @@ def init_db_and_seed():
                     correct_option="A"
                 )
             db.add(q)
+            
+        # Demo active attempt matching PDF 4 mockup state
+        now = datetime.datetime.utcnow()
+        demo_attempt = TestAttempt(
+            id="att_demo_priya",
+            college_id="col_demo_001",
+            test_id="test_service_aptitude",
+            student_id="std_priya_01",
+            status="in_progress",
+            started_at=now - datetime.timedelta(minutes=11, seconds=18),
+            ends_at=now + datetime.timedelta(seconds=1122), # 18:42 remaining
+            total_questions=30
+        )
+        db.add(demo_attempt)
+        db.flush()
+
+        for qn in range(1, 13):
+            ans = AttemptAnswer(
+                id=f"ans_demo_{qn}",
+                college_id="col_demo_001",
+                attempt_id="att_demo_priya",
+                question_id=f"q_{qn}",
+                question_number=qn,
+                selected_option="B" if qn == 12 else "A",
+                is_marked_for_review=(qn in [7, 14]),
+                saved_at=now
+            )
+            db.add(ans)
+
+        ans14 = AttemptAnswer(
+            id="ans_demo_14",
+            college_id="col_demo_001",
+            attempt_id="att_demo_priya",
+            question_id="q_14",
+            question_number=14,
+            selected_option=None,
+            is_marked_for_review=True,
+            saved_at=now
+        )
+        db.add(ans14)
             
         # 6. Virtual Labs (Screen 29 - PDF 5)
         labs = [

@@ -1,16 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 import datetime
+import uuid
 
 from core.database import get_db
-from core.security import get_current_user, TokenPayload
+from core.security import get_current_user, TokenPayload, require_role
 from models.schema import (
     Student, CodingProblem, CodingSubmission, PracticeTest,
     PracticeQuestion, VirtualLabItem, SprintTask, MockInterview,
-    SessionItem, DiscussionGroup, GroupMessage
+    SessionItem, DiscussionGroup, GroupMessage,
+    TestAttempt, AttemptAnswer, ProctorEvent, TopicScore
 )
 
 router = APIRouter(prefix="/student", tags=["Student Screens"])
@@ -149,30 +151,115 @@ def submit_code(problem_id: str, req: CodeSubmitRequest, db: Session = Depends(g
         "message": "18 / 18 hidden tests passed"
     }
 
-# --- SCREEN 23: Practice Tests (PDF 4) ---
-class AnswerSubmitRequest(BaseModel):
-    answers: dict # { "12": "B", ... }
+# --- SCREEN 23: Practice Tests (PDF 4, Sprint 9) ---
+
+class BatchAnswersRequest(BaseModel):
+    answers: dict # { "12": "B", ... } or { "12": {"selected_option": "B", "is_marked_for_review": False} }
+    marked_for_review: Optional[List[int]] = None
+
+class ProctorEventRequest(BaseModel):
+    event_type: str # tab_switch, fullscreen_exit, copy_paste_attempt
+    details: Optional[str] = None
+
+class SubmitTestRequest(BaseModel):
+    answers: Optional[dict] = None
+    marked_for_review: Optional[List[int]] = None
+
+def _get_student_for_user(current_user: TokenPayload, db: Session) -> Student:
+    student = db.execute(select(Student).filter_by(user_id=current_user.sub, college_id=current_user.college_id)).scalar_one_or_none()
+    if not student:
+        student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalars().first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student profile not found for this tenant")
+    return student
 
 @router.get("/tests/{test_id}")
-def get_practice_test(test_id: str, db: Session = Depends(get_db)):
-    test = db.execute(select(PracticeTest).filter_by(id=test_id)).scalar_one_or_none()
-    if not test:
-        test = db.execute(select(PracticeTest)).first()[0]
-        
-    questions = db.execute(select(PracticeQuestion).filter_by(test_id=test.id).order_by(PracticeQuestion.question_number)).scalars().all()
+def get_practice_test(
+    test_id: str,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
     
+    # Tenant-scoped test lookup
+    test = db.execute(
+        select(PracticeTest).filter_by(id=test_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    
+    if not test:
+        test = db.execute(select(PracticeTest).filter_by(id=test_id)).scalar_one_or_none()
+    if not test:
+        test = db.execute(select(PracticeTest).filter_by(college_id=current_user.college_id)).scalars().first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Practice test not found")
+
+    questions = db.execute(
+        select(PracticeQuestion)
+        .filter_by(test_id=test.id)
+        .order_by(PracticeQuestion.question_number)
+    ).scalars().all()
+
+    student = _get_student_for_user(current_user, db)
+    active_attempt = db.execute(
+        select(TestAttempt)
+        .filter_by(test_id=test.id, student_id=student.id, status="in_progress")
+        .order_by(TestAttempt.started_at.desc())
+    ).scalars().first()
+
+    answers_map = {}
+    marked_review_list = []
+    time_remaining_sec = test.duration_min * 60
+
+    if active_attempt:
+        now = datetime.datetime.utcnow()
+        if now < active_attempt.ends_at:
+            time_remaining_sec = max(0, int((active_attempt.ends_at - now).total_seconds()))
+        else:
+            time_remaining_sec = 0
+
+        existing_answers = db.execute(
+            select(AttemptAnswer).filter_by(attempt_id=active_attempt.id)
+        ).scalars().all()
+
+        for ans in existing_answers:
+            if ans.selected_option:
+                answers_map[ans.question_number] = ans.selected_option
+            if ans.is_marked_for_review:
+                marked_review_list.append(ans.question_number)
+
+    # Section progress summary
+    section_stats = {}
+    for q in questions:
+        sec = q.section_name or "General"
+        if sec not in section_stats:
+            section_stats[sec] = {"answered": 0, "total": 0}
+        section_stats[sec]["total"] += 1
+        if q.question_number in answers_map:
+            section_stats[sec]["answered"] += 1
+
+    sections_list = [
+        {"name": sec, "answered": stats["answered"], "total": stats["total"]}
+        for sec, stats in section_stats.items()
+    ]
+
     return {
         "id": test.id,
         "title": test.title,
         "category": test.category,
         "duration_min": test.duration_min,
-        "time_remaining_sec": 1122, # 18:42
+        "time_remaining_sec": time_remaining_sec,
         "total_questions": test.total_questions,
-        "sections": [
-            {"name": "Quantitative", "answered": 12, "total": 15},
-            {"name": "Logical reasoning", "answered": 0, "total": 10},
-            {"name": "Verbal ability", "answered": 0, "total": 5}
-        ],
+        "attempt_id": active_attempt.id if active_attempt else None,
+        "sections": sections_list,
+        "saved_answers": answers_map,
+        "marked_for_review": marked_review_list,
+        # Omit correct_option and explanation to prevent cheating while in-progress
         "questions": [
             {
                 "id": q.id,
@@ -186,26 +273,420 @@ def get_practice_test(test_id: str, db: Session = Depends(get_db)):
                     "C": q.option_c,
                     "D": q.option_d
                 },
-                "selected_option": "B" if q.question_number == 12 else ("A" if q.question_number < 12 else None),
-                "is_marked_for_review": q.question_number in [7, 14]
+                "selected_option": answers_map.get(q.question_number),
+                "is_marked_for_review": q.question_number in marked_review_list
             }
             for q in questions
         ]
     }
 
-@router.post("/tests/{test_id}/submit")
-def submit_practice_test(test_id: str, req: AnswerSubmitRequest):
+@router.post("/tests/{test_id}/attempts")
+def start_or_resume_attempt(
+    test_id: str,
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db)
+):
+    student = _get_student_for_user(current_user, db)
+    test = db.execute(select(PracticeTest).filter_by(id=test_id)).scalar_one_or_none()
+    if not test:
+        test = db.execute(select(PracticeTest)).first()[0]
+
+    now = datetime.datetime.utcnow()
+
+    active_attempt = db.execute(
+        select(TestAttempt)
+        .filter_by(test_id=test.id, student_id=student.id, status="in_progress")
+        .order_by(TestAttempt.started_at.desc())
+    ).scalars().first()
+
+    if active_attempt and active_attempt.ends_at > now:
+        answers = db.execute(select(AttemptAnswer).filter_by(attempt_id=active_attempt.id)).scalars().all()
+        answers_dict = {a.question_number: a.selected_option for a in answers if a.selected_option}
+        marked_list = [a.question_number for a in answers if a.is_marked_for_review]
+        time_rem = max(0, int((active_attempt.ends_at - now).total_seconds()))
+
+        return {
+            "attempt_id": active_attempt.id,
+            "status": "in_progress",
+            "resumed": True,
+            "started_at": active_attempt.started_at.isoformat(),
+            "ends_at": active_attempt.ends_at.isoformat(),
+            "time_remaining_sec": time_rem,
+            "saved_answers": answers_dict,
+            "marked_for_review": marked_list
+        }
+
+    attempt_id = f"att_{uuid.uuid4().hex[:12]}"
+    ends_at = now + datetime.timedelta(minutes=test.duration_min)
+
+    new_attempt = TestAttempt(
+        id=attempt_id,
+        college_id=current_user.college_id,
+        test_id=test.id,
+        student_id=student.id,
+        status="in_progress",
+        started_at=now,
+        ends_at=ends_at,
+        total_questions=test.total_questions
+    )
+    db.add(new_attempt)
+    db.commit()
+
+    return {
+        "attempt_id": new_attempt.id,
+        "status": "in_progress",
+        "resumed": False,
+        "started_at": new_attempt.started_at.isoformat(),
+        "ends_at": new_attempt.ends_at.isoformat(),
+        "time_remaining_sec": test.duration_min * 60,
+        "saved_answers": {},
+        "marked_for_review": []
+    }
+
+@router.put("/tests/attempts/{attempt_id}/answers")
+def batch_save_answers(
+    attempt_id: str,
+    req: BatchAnswersRequest,
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db)
+):
+    student = _get_student_for_user(current_user, db)
+    attempt = db.execute(
+        select(TestAttempt).filter_by(id=attempt_id, student_id=student.id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Test attempt not found")
+    if attempt.status != "in_progress":
+        raise HTTPException(status_code=400, detail="Cannot save answers: test is already submitted or expired")
+
+    now = datetime.datetime.utcnow()
+    if now > attempt.ends_at:
+        attempt.status = "expired"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Test time has expired")
+
+    questions = db.execute(select(PracticeQuestion).filter_by(test_id=attempt.test_id)).scalars().all()
+    q_by_num = {q.question_number: q for q in questions}
+
+    existing_answers = {
+        a.question_number: a
+        for a in db.execute(select(AttemptAnswer).filter_by(attempt_id=attempt.id)).scalars().all()
+    }
+
+    marked_set = set(req.marked_for_review or [])
+
+    for q_num_raw, val in req.answers.items():
+        q_num = int(q_num_raw)
+        q = q_by_num.get(q_num)
+        if not q:
+            continue
+
+        selected_opt = None
+        is_review = q_num in marked_set
+
+        if isinstance(val, dict):
+            selected_opt = val.get("selected_option")
+            if "is_marked_for_review" in val:
+                is_review = val["is_marked_for_review"]
+        elif isinstance(val, str):
+            selected_opt = val
+
+        if q_num in existing_answers:
+            ans = existing_answers[q_num]
+            ans.selected_option = selected_opt
+            ans.is_marked_for_review = is_review
+            ans.saved_at = now
+        else:
+            ans = AttemptAnswer(
+                id=f"ans_{uuid.uuid4().hex[:12]}",
+                college_id=current_user.college_id,
+                attempt_id=attempt.id,
+                question_id=q.id,
+                question_number=q_num,
+                selected_option=selected_opt,
+                is_marked_for_review=is_review,
+                saved_at=now
+            )
+            db.add(ans)
+
+    db.commit()
+    return {"success": True, "saved_count": len(req.answers)}
+
+@router.post("/tests/attempts/{attempt_id}/proctor-events")
+def log_proctor_event(
+    attempt_id: str,
+    req: ProctorEventRequest,
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db)
+):
+    student = _get_student_for_user(current_user, db)
+    attempt = db.execute(
+        select(TestAttempt).filter_by(id=attempt_id, student_id=student.id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Test attempt not found")
+
+    event = ProctorEvent(
+        id=f"proc_{uuid.uuid4().hex[:12]}",
+        college_id=current_user.college_id,
+        attempt_id=attempt.id,
+        student_id=student.id,
+        event_type=req.event_type,
+        details=req.details,
+        timestamp=datetime.datetime.utcnow()
+    )
+    db.add(event)
+    db.commit()
+
+    return {"success": True, "event_id": event.id}
+
+@router.post("/tests/attempts/{attempt_id}/submit")
+def submit_practice_test(
+    attempt_id: str,
+    req: Optional[SubmitTestRequest] = None,
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db)
+):
+    student = _get_student_for_user(current_user, db)
+    attempt = db.execute(
+        select(TestAttempt).filter_by(id=attempt_id, student_id=student.id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Test attempt not found")
+
+    questions = db.execute(
+        select(PracticeQuestion)
+        .filter_by(test_id=attempt.test_id)
+        .order_by(PracticeQuestion.question_number)
+    ).scalars().all()
+
+    now = datetime.datetime.utcnow()
+
+    # Save any final answers if provided
+    if req and req.answers:
+        marked_set = set(req.marked_for_review or [])
+        existing_answers = {
+            a.question_number: a
+            for a in db.execute(select(AttemptAnswer).filter_by(attempt_id=attempt.id)).scalars().all()
+        }
+        q_by_num = {q.question_number: q for q in questions}
+
+        for q_num_raw, val in req.answers.items():
+            q_num = int(q_num_raw)
+            q = q_by_num.get(q_num)
+            if not q:
+                continue
+
+            selected_opt = None
+            is_review = q_num in marked_set
+            if isinstance(val, dict):
+                selected_opt = val.get("selected_option")
+                if "is_marked_for_review" in val:
+                    is_review = val["is_marked_for_review"]
+            elif isinstance(val, str):
+                selected_opt = val
+
+            if q_num in existing_answers:
+                ans = existing_answers[q_num]
+                ans.selected_option = selected_opt
+                ans.is_marked_for_review = is_review
+                ans.saved_at = now
+            else:
+                ans = AttemptAnswer(
+                    id=f"ans_{uuid.uuid4().hex[:12]}",
+                    college_id=current_user.college_id,
+                    attempt_id=attempt.id,
+                    question_id=q.id,
+                    question_number=q_num,
+                    selected_option=selected_opt,
+                    is_marked_for_review=is_review,
+                    saved_at=now
+                )
+                db.add(ans)
+        db.flush()
+
+    answers = db.execute(select(AttemptAnswer).filter_by(attempt_id=attempt.id)).scalars().all()
+    ans_by_num = {a.question_number: a for a in answers}
+
+    total_score = 0
+    section_scores = {}
+    topic_scores_map = {}
+
+    for q in questions:
+        sec = q.section_name or "General"
+        top = q.topic or "General"
+
+        if sec not in section_scores:
+            section_scores[sec] = {"score": 0, "total": 0}
+        section_scores[sec]["total"] += 1
+
+        top_key = (sec, top)
+        if top_key not in topic_scores_map:
+            topic_scores_map[top_key] = {"score": 0, "total": 0}
+        topic_scores_map[top_key]["total"] += 1
+
+        ans = ans_by_num.get(q.question_number)
+        is_correct = False
+        if ans and ans.selected_option and ans.selected_option.upper() == q.correct_option.upper():
+            is_correct = True
+            total_score += 1
+            section_scores[sec]["score"] += 1
+            topic_scores_map[top_key]["score"] += 1
+
+        if ans:
+            ans.is_correct = is_correct
+
+    total_q = len(questions) or 1
+    accuracy_pct = round((total_score / total_q) * 100, 1)
+    time_taken_sec = int((now - attempt.started_at).total_seconds())
+    time_taken_mins = max(1, time_taken_sec // 60)
+
+    attempt.status = "submitted"
+    attempt.submitted_at = now
+    attempt.score = total_score
+    attempt.total_questions = total_q
+    attempt.accuracy_pct = accuracy_pct
+    attempt.time_taken_sec = time_taken_sec
+
+    old_ts = db.execute(select(TopicScore).filter_by(attempt_id=attempt.id)).scalars().all()
+    for ts in old_ts:
+        db.delete(ts)
+
+    for (sec, top), counts in topic_scores_map.items():
+        pct = (counts["score"] / counts["total"] * 100) if counts["total"] > 0 else 0
+        band = "Strong" if pct >= 75 else ("Good" if pct >= 50 else "Needs Support")
+        ts = TopicScore(
+            id=f"ts_{uuid.uuid4().hex[:12]}",
+            college_id=current_user.college_id,
+            attempt_id=attempt.id,
+            section_name=sec,
+            topic=top,
+            score=counts["score"],
+            total=counts["total"],
+            accuracy_pct=round(pct, 1),
+            status_band=band
+        )
+        db.add(ts)
+
+    db.commit()
+
+    section_analysis = [
+        {
+            "section": sec,
+            "score": f"{data['score']}/{data['total']}",
+            "percentage": round((data["score"] / data["total"]) * 100, 1) if data["total"] > 0 else 0,
+            "status": "Strong" if (data["score"] / data["total"]) >= 0.75 else ("Good" if (data["score"] / data["total"]) >= 0.5 else "Needs Support")
+        }
+        for sec, data in section_scores.items()
+    ]
+
+    questions_review = [
+        {
+            "number": q.question_number,
+            "section": q.section_name,
+            "topic": q.topic,
+            "text": q.question_text,
+            "options": {
+                "A": q.option_a,
+                "B": q.option_b,
+                "C": q.option_c,
+                "D": q.option_d
+            },
+            "selected_option": ans_by_num.get(q.question_number).selected_option if ans_by_num.get(q.question_number) else None,
+            "correct_option": q.correct_option,
+            "is_correct": ans_by_num.get(q.question_number).is_correct if ans_by_num.get(q.question_number) else False,
+            "explanation": q.explanation
+        }
+        for q in questions
+    ]
+
     return {
         "success": True,
-        "score": 26,
-        "total": 30,
-        "accuracy": "86.7%",
-        "time_taken": "24 mins",
-        "section_analysis": [
-            {"section": "Quantitative", "score": "14/15", "status": "Strong"},
-            {"section": "Logical reasoning", "score": "8/10", "status": "Good"},
-            {"section": "Verbal ability", "score": "4/5", "status": "Good"}
-        ]
+        "attempt_id": attempt.id,
+        "score": total_score,
+        "total": total_q,
+        "accuracy": f"{accuracy_pct}%",
+        "time_taken": f"{time_taken_mins} mins",
+        "section_analysis": section_analysis,
+        "questions_review": questions_review
+    }
+
+@router.get("/tests/attempts/{attempt_id}/result")
+def get_attempt_result(
+    attempt_id: str,
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db)
+):
+    student = _get_student_for_user(current_user, db)
+    attempt = db.execute(
+        select(TestAttempt).filter_by(id=attempt_id, student_id=student.id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Test attempt not found")
+    if attempt.status != "submitted":
+        raise HTTPException(status_code=400, detail="Test attempt is not submitted yet")
+
+    questions = db.execute(
+        select(PracticeQuestion).filter_by(test_id=attempt.test_id).order_by(PracticeQuestion.question_number)
+    ).scalars().all()
+
+    answers = db.execute(select(AttemptAnswer).filter_by(attempt_id=attempt.id)).scalars().all()
+    ans_by_num = {a.question_number: a for a in answers}
+
+    topic_scores = db.execute(select(TopicScore).filter_by(attempt_id=attempt.id)).scalars().all()
+
+    section_scores = {}
+    for ts in topic_scores:
+        if ts.section_name not in section_scores:
+            section_scores[ts.section_name] = {"score": 0, "total": 0}
+        section_scores[ts.section_name]["score"] += ts.score
+        section_scores[ts.section_name]["total"] += ts.total
+
+    section_analysis = [
+        {
+            "section": sec,
+            "score": f"{data['score']}/{data['total']}",
+            "percentage": round((data["score"] / data["total"]) * 100, 1) if data["total"] > 0 else 0,
+            "status": "Strong" if (data["score"] / data["total"]) >= 0.75 else ("Good" if (data["score"] / data["total"]) >= 0.5 else "Needs Support")
+        }
+        for sec, data in section_scores.items()
+    ]
+
+    time_taken_mins = max(1, (attempt.time_taken_sec or 0) // 60)
+
+    questions_review = [
+        {
+            "number": q.question_number,
+            "section": q.section_name,
+            "topic": q.topic,
+            "text": q.question_text,
+            "options": {
+                "A": q.option_a,
+                "B": q.option_b,
+                "C": q.option_c,
+                "D": q.option_d
+            },
+            "selected_option": ans_by_num.get(q.question_number).selected_option if ans_by_num.get(q.question_number) else None,
+            "correct_option": q.correct_option,
+            "is_correct": ans_by_num.get(q.question_number).is_correct if ans_by_num.get(q.question_number) else False,
+            "explanation": q.explanation
+        }
+        for q in questions
+    ]
+
+    return {
+        "success": True,
+        "attempt_id": attempt.id,
+        "score": attempt.score,
+        "total": attempt.total_questions,
+        "accuracy": f"{attempt.accuracy_pct}%",
+        "time_taken": f"{time_taken_mins} mins",
+        "section_analysis": section_analysis,
+        "questions_review": questions_review
     }
 
 # --- SCREEN 29: Virtual Labs (PDF 5) ---

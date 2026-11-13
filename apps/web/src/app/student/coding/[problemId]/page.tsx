@@ -3,6 +3,7 @@
 import React, { useState, useEffect, use } from "react";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
+import { MonacoEditorWrapper } from "@/components/MonacoEditorWrapper";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import {
@@ -420,13 +421,12 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   </div>
                 </div>
 
-                {/* Code Input Area */}
-                <div className="flex-1 p-3 font-mono text-xs overflow-auto">
-                  <textarea
+                {/* Monaco Code Editor Area */}
+                <div className="flex-1 overflow-hidden relative">
+                  <MonacoEditorWrapper
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    className="w-full h-full bg-transparent text-[#E2E8F0] resize-none focus:outline-none font-mono leading-relaxed selection:bg-[#2B5CD0]"
-                    spellCheck={false}
+                    language={language}
+                    onChange={setCode}
                   />
                 </div>
               </div>

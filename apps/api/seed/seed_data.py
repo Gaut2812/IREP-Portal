@@ -8,7 +8,8 @@ from models.schema import (
     PracticeTest, PracticeQuestion, VirtualLabItem, SprintTask,
     MockInterview, DiscussionGroup, GroupMessage, TrainerDirectThread,
     DirectMessage, ParentMonthlyRecord, TestAttempt, AttemptAnswer,
-    ProctorEvent, TopicScore
+    ProctorEvent, TopicScore,
+    Course, Module, Lesson, LessonProgress
 )
 
 def init_db_and_seed():
@@ -503,7 +504,98 @@ def init_db_and_seed():
             ParentMonthlyRecord(id="pmr_04", college_id="col_demo_001", student_id="std_priya_01", month_name="October", area="Communication", prev_month_val="3/5", curr_month_val="3/5", status_text="Needs practice", status_color="amber")
         ]
         db.add_all(parent_cards)
-        
+
+        # 13. Courses, Modules, Lessons, Progress (Screen 11)
+        courses_data = [
+            Course(
+                id="crs_dsa_patterns", college_id="col_demo_001",
+                title="DSA Patterns & Problem Solving",
+                title_ta="DSA வடிவங்கள் & சிக்கல் தீர்வு",
+                track="DSA", semester_min=3,
+                thumbnail_color="blue", total_lessons=12, is_active=True
+            ),
+            Course(
+                id="crs_ai_ml", college_id="col_demo_001",
+                title="AI & Machine Learning Fundamentals",
+                title_ta="செயற்கை நுண்ணறிவு & இயந்திர கற்றல் அடிப்படைகள்",
+                track="AI & DS", semester_min=4,
+                thumbnail_color="teal", total_lessons=10, is_active=True
+            ),
+            Course(
+                id="crs_cloud_devops", college_id="col_demo_001",
+                title="Cloud & DevOps Essentials",
+                title_ta="கிளவுட் & DevOps அடிப்படைகள்",
+                track="Cloud & DevOps", semester_min=5,
+                thumbnail_color="purple", total_lessons=8, is_active=True
+            ),
+        ]
+        db.add_all(courses_data)
+
+        modules_data = [
+            # DSA course modules
+            Module(id="mod_dsa_01", college_id="col_demo_001", course_id="crs_dsa_patterns", order_index=1, title="Arrays & Sliding Window"),
+            Module(id="mod_dsa_02", college_id="col_demo_001", course_id="crs_dsa_patterns", order_index=2, title="Trees & Graphs"),
+            Module(id="mod_dsa_03", college_id="col_demo_001", course_id="crs_dsa_patterns", order_index=3, title="Union-Find & Advanced"),
+            # AI course modules
+            Module(id="mod_ai_01", college_id="col_demo_001", course_id="crs_ai_ml", order_index=1, title="Python for ML"),
+            Module(id="mod_ai_02", college_id="col_demo_001", course_id="crs_ai_ml", order_index=2, title="Supervised Learning"),
+            # Cloud course modules
+            Module(id="mod_cloud_01", college_id="col_demo_001", course_id="crs_cloud_devops", order_index=1, title="AWS Core Services"),
+            Module(id="mod_cloud_02", college_id="col_demo_001", course_id="crs_cloud_devops", order_index=2, title="CI/CD Pipelines"),
+        ]
+        db.add_all(modules_data)
+
+        lessons_data = [
+            # DSA – mod_dsa_01
+            Lesson(id="les_dsa_01_01", college_id="col_demo_001", module_id="mod_dsa_01", order_index=1, title="Sliding window intro", type="video", duration_min=18),
+            Lesson(id="les_dsa_01_02", college_id="col_demo_001", module_id="mod_dsa_01", order_index=2, title="Two-pointer technique", type="video", duration_min=22),
+            Lesson(id="les_dsa_01_03", college_id="col_demo_001", module_id="mod_dsa_01", order_index=3, title="Practice sheet", type="notes"),
+            Lesson(id="les_dsa_01_04", college_id="col_demo_001", module_id="mod_dsa_01", order_index=4, title="Assignment 1", type="assignment"),
+            # DSA – mod_dsa_02
+            Lesson(id="les_dsa_02_01", college_id="col_demo_001", module_id="mod_dsa_02", order_index=1, title="BFS & DFS walkthrough", type="video", duration_min=25),
+            Lesson(id="les_dsa_02_02", college_id="col_demo_001", module_id="mod_dsa_02", order_index=2, title="Tree traversal slides", type="slides"),
+            Lesson(id="les_dsa_02_03", college_id="col_demo_001", module_id="mod_dsa_02", order_index=3, title="Graph problems lab", type="assignment"),
+            # DSA – mod_dsa_03
+            Lesson(id="les_dsa_03_01", college_id="col_demo_001", module_id="mod_dsa_03", order_index=1, title="Union-Find theory", type="video", duration_min=20),
+            Lesson(id="les_dsa_03_02", college_id="col_demo_001", module_id="mod_dsa_03", order_index=2, title="Path compression notes", type="notes"),
+            Lesson(id="les_dsa_03_03", college_id="col_demo_001", module_id="mod_dsa_03", order_index=3, title="Connected components – slides", type="slides"),
+            Lesson(id="les_dsa_03_04", college_id="col_demo_001", module_id="mod_dsa_03", order_index=4, title="Final assignment", type="assignment"),
+            Lesson(id="les_dsa_03_05", college_id="col_demo_001", module_id="mod_dsa_03", order_index=5, title="Quiz – week 8", type="assignment"),
+            # AI – mod_ai_01
+            Lesson(id="les_ai_01_01", college_id="col_demo_001", module_id="mod_ai_01", order_index=1, title="NumPy & Pandas essentials", type="video", duration_min=30),
+            Lesson(id="les_ai_01_02", college_id="col_demo_001", module_id="mod_ai_01", order_index=2, title="Data wrangling notebook", type="notes"),
+            Lesson(id="les_ai_01_03", college_id="col_demo_001", module_id="mod_ai_01", order_index=3, title="EDA mini-project", type="assignment"),
+            Lesson(id="les_ai_01_04", college_id="col_demo_001", module_id="mod_ai_01", order_index=4, title="Matplotlib & Seaborn slides", type="slides"),
+            # AI – mod_ai_02
+            Lesson(id="les_ai_02_01", college_id="col_demo_001", module_id="mod_ai_02", order_index=1, title="Linear regression video", type="video", duration_min=28),
+            Lesson(id="les_ai_02_02", college_id="col_demo_001", module_id="mod_ai_02", order_index=2, title="Model evaluation lab", type="assignment"),
+            Lesson(id="les_ai_02_03", college_id="col_demo_001", module_id="mod_ai_02", order_index=3, title="Classification notes", type="notes"),
+            Lesson(id="les_ai_02_04", college_id="col_demo_001", module_id="mod_ai_02", order_index=4, title="Crop price predictor project kick-off", type="assignment"),
+            # Cloud – mod_cloud_01
+            Lesson(id="les_cloud_01_01", college_id="col_demo_001", module_id="mod_cloud_01", order_index=1, title="IAM & VPC fundamentals", type="video", duration_min=20),
+            Lesson(id="les_cloud_01_02", college_id="col_demo_001", module_id="mod_cloud_01", order_index=2, title="EC2 & S3 hands-on slides", type="slides"),
+            Lesson(id="les_cloud_01_03", college_id="col_demo_001", module_id="mod_cloud_01", order_index=3, title="Cloud Practitioner prep notes", type="notes"),
+            Lesson(id="les_cloud_01_04", college_id="col_demo_001", module_id="mod_cloud_01", order_index=4, title="Deploy a static site – assignment", type="assignment"),
+            # Cloud – mod_cloud_02
+            Lesson(id="les_cloud_02_01", college_id="col_demo_001", module_id="mod_cloud_02", order_index=1, title="GitHub Actions basics", type="video", duration_min=18),
+            Lesson(id="les_cloud_02_02", college_id="col_demo_001", module_id="mod_cloud_02", order_index=2, title="Docker & containers", type="video", duration_min=22),
+            Lesson(id="les_cloud_02_03", college_id="col_demo_001", module_id="mod_cloud_02", order_index=3, title="CI/CD pipeline assignment", type="assignment"),
+            Lesson(id="les_cloud_02_04", college_id="col_demo_001", module_id="mod_cloud_02", order_index=4, title="Kubernetes intro notes", type="notes"),
+        ]
+        db.add_all(lessons_data)
+
+        # Seed some completed lessons for Priya (std_priya_01) so progress bars are non-zero
+        progress_seed = [
+            LessonProgress(id="lp_01", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_01_01", completed=True, completed_at=datetime.datetime(2026, 10, 1)),
+            LessonProgress(id="lp_02", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_01_02", completed=True, completed_at=datetime.datetime(2026, 10, 2)),
+            LessonProgress(id="lp_03", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_01_03", completed=True, completed_at=datetime.datetime(2026, 10, 3)),
+            LessonProgress(id="lp_04", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_01_04", completed=True, completed_at=datetime.datetime(2026, 10, 4)),
+            LessonProgress(id="lp_05", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_02_01", completed=True, completed_at=datetime.datetime(2026, 10, 5)),
+            LessonProgress(id="lp_06", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_ai_01_01", completed=True, completed_at=datetime.datetime(2026, 10, 6)),
+            LessonProgress(id="lp_07", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_ai_01_02", completed=True, completed_at=datetime.datetime(2026, 10, 7)),
+        ]
+        db.add_all(progress_seed)
+
         db.commit()
         print("Database seeded successfully with all mockup data.", flush=True)
     finally:

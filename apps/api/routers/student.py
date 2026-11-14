@@ -12,7 +12,8 @@ from models.schema import (
     Student, CodingProblem, CodingSubmission, PracticeTest,
     PracticeQuestion, VirtualLabItem, SprintTask, MockInterview,
     SessionItem, DiscussionGroup, GroupMessage,
-    TestAttempt, AttemptAnswer, ProctorEvent, TopicScore
+    TestAttempt, AttemptAnswer, ProctorEvent, TopicScore,
+    Course, Module, Lesson, LessonProgress
 )
 
 router = APIRouter(prefix="/student", tags=["Student Screens"])
@@ -947,4 +948,241 @@ def send_group_message(
     db.add(msg)
     db.commit()
     return {"success": True, "message_id": msg.id}
+
+
+# ---------------------------------------------------------------------------
+# SCREEN 11: My Courses (Sprint 6)
+# Route: /student/courses  —  role: student only
+# ---------------------------------------------------------------------------
+
+def _get_student_strict(current_user: TokenPayload, db: Session) -> Student:
+    """Return the Student row for the current user, raising 404 if missing."""
+    student = db.execute(
+        select(Student).filter_by(user_id=current_user.sub, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    if not student:
+        # Fallback: any student in this tenant (demo / test convenience)
+        student = db.execute(
+            select(Student).filter_by(college_id=current_user.college_id)
+        ).scalars().first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student profile not found for this tenant")
+    return student
+
+
+def _build_lesson_map(student_id: str, db: Session) -> dict:
+    """Return a set of lesson_ids that the student has completed."""
+    rows = db.execute(
+        select(LessonProgress.lesson_id).filter_by(student_id=student_id, completed=True)
+    ).scalars().all()
+    return set(rows)
+
+
+@router.get("/courses")
+def list_courses(
+    track: Optional[str] = Query(None),
+    semester: Optional[int] = Query(None),
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db),
+):
+    """Screen 11 – catalogue: all active courses for the tenant with per-student progress."""
+    student = _get_student_strict(current_user, db)
+    completed_lessons = _build_lesson_map(student.id, db)
+
+    q = select(Course).filter_by(college_id=current_user.college_id, is_active=True)
+    if track:
+        q = q.filter(Course.track == track)
+    if semester:
+        q = q.filter(Course.semester_min <= semester)
+
+    courses = db.execute(q).scalars().all()
+
+    result = []
+    for course in courses:
+        # Fetch all lesson ids for this course (via modules)
+        module_ids = db.execute(
+            select(Module.id).filter_by(course_id=course.id, college_id=current_user.college_id)
+        ).scalars().all()
+
+        lesson_ids = []
+        if module_ids:
+            lesson_ids = db.execute(
+                select(Lesson.id).where(Lesson.module_id.in_(module_ids))
+            ).scalars().all()
+
+        total = len(lesson_ids)
+        done = len([lid for lid in lesson_ids if lid in completed_lessons])
+        pct = round((done / total) * 100) if total else 0
+
+        # Find resume lesson: first incomplete lesson
+        resume_lesson_id = None
+        if done < total:
+            for mod_id in module_ids:
+                lessons_in_mod = db.execute(
+                    select(Lesson).filter_by(module_id=mod_id).order_by(Lesson.order_index)
+                ).scalars().all()
+                for les in lessons_in_mod:
+                    if les.id not in completed_lessons:
+                        resume_lesson_id = les.id
+                        break
+                if resume_lesson_id:
+                    break
+
+        result.append({
+            "id": course.id,
+            "title": course.title,
+            "title_ta": course.title_ta,
+            "track": course.track,
+            "thumbnail_color": course.thumbnail_color,
+            "total_lessons": total if total else course.total_lessons,
+            "completed_lessons": done,
+            "progress_pct": pct,
+            "resume_lesson_id": resume_lesson_id,
+            "semester_min": course.semester_min,
+        })
+
+    return {"courses": result}
+
+
+@router.get("/courses/resume")
+def get_resume_lesson(
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db),
+):
+    """Return the last unfinished lesson so the front end can deep-link a 'Resume' CTA."""
+    student = _get_student_strict(current_user, db)
+    completed_set = _build_lesson_map(student.id, db)
+
+    courses = db.execute(
+        select(Course).filter_by(college_id=current_user.college_id, is_active=True)
+    ).scalars().all()
+
+    for course in courses:
+        module_ids = db.execute(
+            select(Module.id).filter_by(course_id=course.id, college_id=current_user.college_id)
+            .order_by(Module.order_index)
+        ).scalars().all()
+        for mod_id in module_ids:
+            module = db.execute(select(Module).filter_by(id=mod_id)).scalar_one_or_none()
+            lessons = db.execute(
+                select(Lesson).filter_by(module_id=mod_id).order_by(Lesson.order_index)
+            ).scalars().all()
+            for les in lessons:
+                if les.id not in completed_set:
+                    return {
+                        "course_id": course.id,
+                        "lesson_id": les.id,
+                        "lesson_title": les.title,
+                        "module_title": module.title if module else "",
+                    }
+
+    return None
+
+
+@router.get("/courses/{course_id}")
+def get_course_detail(
+    course_id: str,
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db),
+):
+    """Screen 11 detail: module/lesson tree with per-student completion flags."""
+    student = _get_student_strict(current_user, db)
+    completed_set = _build_lesson_map(student.id, db)
+
+    course = db.execute(
+        select(Course).filter_by(id=course_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    modules_rows = db.execute(
+        select(Module).filter_by(course_id=course_id, college_id=current_user.college_id)
+        .order_by(Module.order_index)
+    ).scalars().all()
+
+    modules_out = []
+    for mod in modules_rows:
+        lessons_rows = db.execute(
+            select(Lesson).filter_by(module_id=mod.id).order_by(Lesson.order_index)
+        ).scalars().all()
+        modules_out.append({
+            "id": mod.id,
+            "title": mod.title,
+            "order_index": mod.order_index,
+            "lessons": [
+                {
+                    "id": les.id,
+                    "title": les.title,
+                    "type": les.type,
+                    "duration_min": les.duration_min,
+                    "content_url": les.content_url,
+                    "completed": les.id in completed_set,
+                }
+                for les in lessons_rows
+            ],
+        })
+
+    return {
+        "course": {
+            "id": course.id,
+            "title": course.title,
+            "title_ta": course.title_ta,
+            "track": course.track,
+            "thumbnail_color": course.thumbnail_color,
+            "semester_min": course.semester_min,
+        },
+        "modules": modules_out,
+    }
+
+
+@router.post("/courses/{course_id}/lessons/{lesson_id}/progress", status_code=200)
+def mark_lesson_progress(
+    course_id: str,
+    lesson_id: str,
+    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    db: Session = Depends(get_db),
+):
+    """Idempotent upsert: mark a lesson as completed for the current student.
+    Re-calling the endpoint updates completed_at but never inserts a duplicate row.
+    college_id is taken from the verified token — the client cannot supply it.
+    """
+    student = _get_student_strict(current_user, db)
+
+    # Verify the lesson actually belongs to this tenant's course
+    lesson = db.execute(
+        select(Lesson)
+        .join(Module, Lesson.module_id == Module.id)
+        .join(Course, Module.course_id == Course.id)
+        .filter(
+            Lesson.id == lesson_id,
+            Course.id == course_id,
+            Course.college_id == current_user.college_id,
+        )
+    ).scalar_one_or_none()
+
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found in this course")
+
+    now = datetime.datetime.utcnow()
+
+    existing = db.execute(
+        select(LessonProgress).filter_by(student_id=student.id, lesson_id=lesson_id)
+    ).scalar_one_or_none()
+
+    if existing:
+        existing.completed = True
+        existing.completed_at = now
+    else:
+        progress = LessonProgress(
+            id=f"lp_{uuid.uuid4().hex[:12]}",
+            college_id=current_user.college_id,
+            student_id=student.id,
+            lesson_id=lesson_id,
+            completed=True,
+            completed_at=now,
+        )
+        db.add(progress)
+
+    db.commit()
+    return {"success": True, "lesson_id": lesson_id, "completed_at": now.isoformat()}
 

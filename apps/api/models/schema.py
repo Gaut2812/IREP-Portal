@@ -301,6 +301,50 @@ class DirectMessage(TenantModel):
     text_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     timestamp_str: Mapped[str] = mapped_column(String(32), default="10:45 AM")
 
+# Screen 11: My Courses
+class Course(TenantModel):
+    __tablename__ = "courses"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    track: Mapped[str] = mapped_column(String(64), default="DSA")
+    semester_min: Mapped[int] = mapped_column(Integer, default=2)
+    thumbnail_color: Mapped[str] = mapped_column(String(32), default="blue")
+    total_lessons: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+class Module(TenantModel):
+    __tablename__ = "modules"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    course_id: Mapped[str] = mapped_column(String(64), ForeignKey("courses.id"))
+    order_index: Mapped[int] = mapped_column(Integer, default=1)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+
+class Lesson(TenantModel):
+    __tablename__ = "lessons"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    module_id: Mapped[str] = mapped_column(String(64), ForeignKey("modules.id"))
+    order_index: Mapped[int] = mapped_column(Integer, default=1)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    type: Mapped[str] = mapped_column(String(32), default="video")  # video, slides, notes, assignment
+    duration_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    content_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+
+class LessonProgress(TenantModel):
+    __tablename__ = "lesson_progress"
+    __table_args__ = (
+        {"sqlite_autoincrement": False},
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    lesson_id: Mapped[str] = mapped_column(String(64), ForeignKey("lessons.id"), index=True)
+    completed: Mapped[bool] = mapped_column(Boolean, default=True)
+    completed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
 # Screen 15: Parent View Monthly Cards
 class ParentMonthlyRecord(TenantModel):
     __tablename__ = "parent_monthly_records"

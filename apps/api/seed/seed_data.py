@@ -1,3 +1,5 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import datetime
 from sqlalchemy import select
 from core.database import SessionLocal, engine, Base
@@ -89,6 +91,11 @@ def init_db_and_seed():
                         db.add(tc)
                 db.commit()
                 print("18 TestCases verified and committed.", flush=True)
+            # Ensure weekly DSA problems are seeded
+            from seed.seed_weekly_dsa import seed_weekly_problems
+            seeded_w = seed_weekly_problems(db, college_id="col_demo_001")
+            if seeded_w > 0:
+                print(f"Seeded {seeded_w} weekly DSA problems.", flush=True)
             print("Database already seeded.", flush=True)
             return
 
@@ -624,8 +631,11 @@ def init_db_and_seed():
         ]
         db.add_all(parent_cards)
         
+        # 13. Seed Weekly DSA Problems (Weeks 1-8)
+        from seed.seed_weekly_dsa import seed_weekly_problems
+        seed_weekly_problems(db, college_id="col_demo_001")
+
         db.commit()
-        print("Database seeded successfully with all mockup data.", flush=True)
     finally:
         db.close()
 

@@ -6,8 +6,8 @@ from sqlalchemy import select
 import datetime
 
 from core.database import get_db
-from core.security import get_current_user, TokenPayload
-from models.schema import TrainerDirectThread, DirectMessage
+from core.security import get_current_user, require_role, TokenPayload
+from models.schema import TrainerDirectThread, DirectMessage, CodingProblem, CodingSubmission
 
 router = APIRouter(prefix="/trainer", tags=["Trainer Screens"])
 
@@ -48,6 +48,35 @@ def get_trainer_dashboard(db: Session = Depends(get_db)):
             {"label": "Monthly report", "type": "primary", "variant": "teal"}
         ]
     }
+
+@router.get("/coding-problems")
+def list_trainer_coding_problems(
+    current_user: TokenPayload = Depends(require_role(["trainer", "college_admin"])),
+    db: Session = Depends(get_db)
+):
+    problems = db.execute(
+        select(CodingProblem).filter_by(college_id=current_user.college_id).order_by(CodingProblem.created_at.asc())
+    ).scalars().all()
+    
+    result = []
+    for p in problems:
+        total_subs = db.execute(
+            select(CodingSubmission).filter_by(problem_id=p.id, college_id=current_user.college_id)
+        ).scalars().all()
+        accepted = len([s for s in total_subs if s.status == "Accepted"])
+        result.append({
+            "id": p.id,
+            "title": p.title,
+            "difficulty": p.difficulty,
+            "topic": p.topic,
+            "company_tags": p.company_tags,
+            "week_info": p.week_info,
+            "trainer_author": p.trainer_author or "Arun K.",
+            "total_submissions": len(total_subs),
+            "accepted_submissions": accepted,
+            "solved_percentage": round((accepted / max(1, len(total_subs))) * 100) if total_subs else 0
+        })
+    return {"problems": result, "total": len(result)}
 
 # --- SCREEN 35: Trainer Message Hub (PDF 12) ---
 class TrainerReplyRequest(BaseModel):

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -38,5 +39,9 @@ class Settings(BaseSettings):
     # BigBlueButton / Live class service
     BBB_URL: str = os.getenv("BBB_URL", "http://localhost:8080/bigbluebutton")
     BBB_SECRET: str = os.getenv("BBB_SECRET", "bbb_demo_secret_2026")
+    
+    # AI Reviewer
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
+    GEMINI_TIMEOUT_SECONDS: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "5.0"))
 
 settings = Settings()

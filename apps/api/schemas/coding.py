@@ -216,6 +216,12 @@ class HintRequest(BaseModel):
     current_count: int = Field(default=1, ge=1, le=3)
 
 
+class CodeReviewRequest(BaseModel):
+    """Payload sent by student to request AI Code Review."""
+    code: str = Field(default="", max_length=65536)
+    language: str = Field(default="python", pattern="^(python|java|cpp|javascript)$")
+
+
 class CodeRunResponse(BaseModel):
     """Student response when running against sample test cases."""
     model_config = ConfigDict(from_attributes=True)

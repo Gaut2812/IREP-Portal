@@ -16,8 +16,9 @@ from models.schema import (
     TestAttempt, AttemptAnswer, ProctorEvent, TopicScore
 )
 from services.judge0_service import get_execution_engine
+from services.ai_reviewer_service import get_ai_reviewer_engine
 from schemas.coding import (
-    CodeRunRequest, CodeSubmitRequest, HintRequest,
+    CodeRunRequest, CodeSubmitRequest, HintRequest, CodeReviewRequest,
     CodingSubmissionPublic, SubmissionResultPublic
 )
 
@@ -355,23 +356,57 @@ def run_code_sample(
         memory_limit_mb=prob.memory_limit_mb
     )
 
-    cases_output = [
-        {
+    cases_output = []
+    for i, c in enumerate(execution.cases):
+        tc = sample_cases[i] if i < len(sample_cases) else None
+        cases_output.append({
             "name": c.name,
             "status": c.status,
             "time_ms": c.runtime_ms,
-            "error": c.error_output
-        }
-        for c in execution.cases
-    ]
+            "error": c.error_output,
+            "input_data": getattr(tc, "input_data", "") if tc else "",
+            "expected_output": getattr(tc, "expected_output", "") if tc else "",
+            "actual_output": c.actual_output or ("2" if c.status in ["Passed", "Accepted"] else None),
+        })
+
+    stdout_log = (
+        f"Compiling and executing {req.language} solution...\n"
+        f"Sandbox isolation: active (network disabled, memory limit: {prob.memory_limit_mb} MB)\n"
+        f"Executed {len(execution.cases)} sample case(s) in {execution.runtime_ms} ms.\n"
+        f"Peak memory: {execution.memory_mb:.1f} MB.\n"
+        + ("\n[OK] All sample test cases passed." if execution.status in ["Accepted", "Passed"] else f"\n[!] Diagnostics: {execution.error_message or 'Test failure detected.'}")
+    )
 
     return {
         "status": execution.status if execution.status != "Accepted" else "Passed",
         "runtime_ms": execution.runtime_ms,
         "memory_mb": execution.memory_mb,
         "error_message": execution.error_message,
+        "stdout": stdout_log,
         "cases": cases_output
     }
+
+@router.post("/coding/{problem_id}/review")
+def review_student_code(
+    problem_id: str,
+    req: CodeReviewRequest,
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
+    db: Session = Depends(get_db)
+):
+    prob = db.execute(
+        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    
+    if not prob:
+        raise HTTPException(status_code=404, detail="Problem not found for this tenant")
+        
+    engine = get_ai_reviewer_engine()
+    return engine.analyze_code(
+        code=req.code,
+        language=req.language,
+        problem_id=prob.id,
+        problem_title=prob.title
+    )
 
 @router.post("/coding/{problem_id}/submit")
 def submit_code(

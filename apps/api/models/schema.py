@@ -388,3 +388,52 @@ class ParentMonthlyRecord(TenantModel):
     status_text: Mapped[str] = mapped_column(String(64))
     status_color: Mapped[str] = mapped_column(String(32), default="green") # green, amber, blue
 
+# Screen 32: Student Portfolio Projects
+class StudentProject(TenantModel):
+    __tablename__ = "student_projects"
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"))
+    title: Mapped[str] = mapped_column(String(128), nullable=False)
+    tagline: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    category: Mapped[str] = mapped_column(String(64), default="machine_learning") # machine_learning, fullstack, iot, cloud
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    parent_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    role_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    team_size: Mapped[int] = mapped_column(Integer, default=1)
+    team_name: Mapped[str] = mapped_column(String(64), default="Team Phoenix")
+    tech_stack: Mapped[str] = mapped_column(Text, default="[]") # JSON list of strings
+    github_url: Mapped[str] = mapped_column(String(255), nullable=False)
+    live_demo_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="deployed") # deployed, completed, in_progress, review
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
+    trainer_verified: Mapped[bool] = mapped_column(Boolean, default=True)
+    trainer_name: Mapped[str] = mapped_column(String(128), default="Arun Kumar")
+    trainer_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    score_percent: Mapped[int] = mapped_column(Integer, default=92)
+
+# Screen 32: Verified Skills & Badges
+class StudentSkill(TenantModel):
+    __tablename__ = "student_skills"
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"))
+    skill_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    category: Mapped[str] = mapped_column(String(32), default="Core CS")
+    level: Mapped[str] = mapped_column(String(32), default="Gold") # Gold, Silver, Advanced, Proficient
+    problems_solved: Mapped[int] = mapped_column(Integer, default=0)
+    verified_by: Mapped[str] = mapped_column(String(128), default="Arun Kumar")
+
+# Screen 33: Parent Project Demo Day Event
+class ProjectDemoEvent(TenantModel):
+    __tablename__ = "project_demo_events"
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(128), nullable=False)
+    event_date: Mapped[str] = mapped_column(String(64), nullable=False)
+    venue: Mapped[str] = mapped_column(String(128), default="Auditorium A & Live Stream")
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    rsvp_status: Mapped[str] = mapped_column(String(32), default="none") # none, attending, declined
+    guest_count: Mapped[int] = mapped_column(Integer, default=1)
+
+

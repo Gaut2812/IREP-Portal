@@ -13,7 +13,8 @@ from models.schema import (
     Student, CodingProblem, TestCase, CodingSubmission, SubmissionResult, CodingHintUsage, PracticeTest,
     PracticeQuestion, VirtualLabItem, SprintTask, MockInterview,
     SessionItem, DiscussionGroup, GroupMessage,
-    TestAttempt, AttemptAnswer, ProctorEvent, TopicScore
+    TestAttempt, AttemptAnswer, ProctorEvent, TopicScore,
+    StudentProject, StudentSkill, ProjectDemoEvent
 )
 from services.judge0_service import get_execution_engine
 from services.ai_reviewer_service import get_ai_reviewer_engine
@@ -1489,4 +1490,291 @@ def send_group_message(
     db.add(msg)
     db.commit()
     return {"success": True, "message_id": msg.id}
+
+# --- SCREEN 32: Student Portfolio ---
+class ProjectCreateRequest(BaseModel):
+    title: str
+    tagline: Optional[str] = None
+    category: str = "machine_learning"
+    description: str
+    parent_summary: Optional[str] = None
+    role_description: Optional[str] = None
+    team_size: int = 1
+    team_name: str = "Solo Capstone"
+    tech_stack: List[str] = []
+    github_url: str
+    live_demo_url: Optional[str] = None
+    status: str = "deployed"
+    is_featured: bool = False
+
+class ProjectUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    tagline: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    parent_summary: Optional[str] = None
+    role_description: Optional[str] = None
+    team_size: Optional[int] = None
+    team_name: Optional[str] = None
+    tech_stack: Optional[List[str]] = None
+    github_url: Optional[str] = None
+    live_demo_url: Optional[str] = None
+    status: Optional[str] = None
+    is_featured: Optional[bool] = None
+
+@router.get("/portfolio")
+def get_student_portfolio(
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    import json
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
+
+    student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student profile not found for this tenant")
+
+    projects = db.execute(
+        select(StudentProject).filter_by(college_id=current_user.college_id, student_id=student.id)
+    ).scalars().all()
+
+    skills = db.execute(
+        select(StudentSkill).filter_by(college_id=current_user.college_id, student_id=student.id)
+    ).scalars().all()
+
+    projects_list = []
+    for p in projects:
+        try:
+            stack = json.loads(p.tech_stack) if p.tech_stack else []
+        except Exception:
+            stack = [s.strip() for s in p.tech_stack.split(",") if s.strip()]
+
+        projects_list.append({
+            "id": p.id,
+            "title": p.title,
+            "tagline": p.tagline,
+            "category": p.category,
+            "description": p.description,
+            "parent_summary": p.parent_summary,
+            "role_description": p.role_description,
+            "team_size": p.team_size,
+            "team_name": p.team_name,
+            "tech_stack": stack,
+            "github_url": p.github_url,
+            "live_demo_url": p.live_demo_url,
+            "status": p.status,
+            "is_featured": p.is_featured,
+            "trainer_verified": p.trainer_verified,
+            "trainer_name": p.trainer_name,
+            "trainer_feedback": p.trainer_feedback,
+            "score_percent": p.score_percent
+        })
+
+    skills_list = [
+        {
+            "id": s.id,
+            "skill_name": s.skill_name,
+            "category": s.category,
+            "level": s.level,
+            "problems_solved": s.problems_solved,
+            "verified_by": s.verified_by
+        }
+        for s in skills
+    ]
+
+    total_projects = len(projects_list)
+    featured_count = sum(1 for p in projects_list if p["is_featured"])
+    avg_score = round(sum(p["score_percent"] for p in projects_list) / max(total_projects, 1))
+
+    return {
+        "student": {
+            "id": student.id,
+            "name": current_user.name or "Priya R",
+            "roll_no": student.register_no or "2023-AIDS-042",
+            "branch": student.branch or "AI & DS",
+            "semester": student.semester or 5,
+            "college": "Demo Engineering College",
+            "readiness_score": student.readiness_score or 74,
+            "readiness_band": "Nearly Ready",
+            "github_url": "https://github.com/priya-r",
+            "linkedin_url": "https://linkedin.com/in/priya-r-demo",
+            "resume_url": "/downloads/Priya_R_Resume_IREP.pdf"
+        },
+        "stats": {
+            "total_projects": total_projects,
+            "featured_projects": featured_count,
+            "verified_skills_count": len(skills_list),
+            "problems_solved": 286,
+            "github_commits": 48,
+            "avg_project_score": avg_score
+        },
+        "projects": projects_list,
+        "verified_skills": skills_list,
+        "certifications": [
+            {
+                "title": "AWS Certified Cloud Practitioner",
+                "issuer": "Amazon Web Services",
+                "status": "Scheduled for Nov 22",
+                "score": "In Progress"
+            },
+            {
+                "title": "IREP DSA Mastery Level 2",
+                "issuer": "Industry-Ready Engineer Program",
+                "status": "Verified",
+                "score": "94%"
+            },
+            {
+                "title": "Python for Data Science & ML",
+                "issuer": "Placement Cell Certification",
+                "status": "Verified",
+                "score": "92%"
+            }
+        ]
+    }
+
+@router.post("/portfolio/projects")
+def add_portfolio_project(
+    req: ProjectCreateRequest,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    import json
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
+
+    student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+
+    new_id = f"proj_{uuid.uuid4().hex[:12]}"
+    new_project = StudentProject(
+        id=new_id,
+        college_id=current_user.college_id,
+        student_id=student.id,
+        title=req.title,
+        tagline=req.tagline or req.title,
+        category=req.category,
+        description=req.description,
+        parent_summary=req.parent_summary or req.description[:120],
+        role_description=req.role_description,
+        team_size=req.team_size,
+        team_name=req.team_name,
+        tech_stack=json.dumps(req.tech_stack),
+        github_url=req.github_url,
+        live_demo_url=req.live_demo_url,
+        status=req.status,
+        is_featured=req.is_featured,
+        trainer_verified=True,
+        trainer_name="Arun Kumar",
+        trainer_feedback="Project submitted for placement portfolio review.",
+        score_percent=88
+    )
+    db.add(new_project)
+    db.commit()
+    db.refresh(new_project)
+
+    return {
+        "success": True,
+        "message": "Project added to portfolio successfully",
+        "project": {
+            "id": new_project.id,
+            "title": new_project.title,
+            "category": new_project.category,
+            "tech_stack": req.tech_stack,
+            "github_url": new_project.github_url,
+            "live_demo_url": new_project.live_demo_url,
+            "status": new_project.status,
+            "is_featured": new_project.is_featured
+        }
+    }
+
+@router.put("/portfolio/projects/{project_id}")
+def update_portfolio_project(
+    project_id: str,
+    req: ProjectUpdateRequest,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    import json
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
+
+    project = db.execute(
+        select(StudentProject).filter_by(id=project_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found in this college tenant")
+
+    if req.title is not None:
+        project.title = req.title
+    if req.tagline is not None:
+        project.tagline = req.tagline
+    if req.category is not None:
+        project.category = req.category
+    if req.description is not None:
+        project.description = req.description
+    if req.parent_summary is not None:
+        project.parent_summary = req.parent_summary
+    if req.role_description is not None:
+        project.role_description = req.role_description
+    if req.team_size is not None:
+        project.team_size = req.team_size
+    if req.team_name is not None:
+        project.team_name = req.team_name
+    if req.tech_stack is not None:
+        project.tech_stack = json.dumps(req.tech_stack)
+    if req.github_url is not None:
+        project.github_url = req.github_url
+    if req.live_demo_url is not None:
+        project.live_demo_url = req.live_demo_url
+    if req.status is not None:
+        project.status = req.status
+    if req.is_featured is not None:
+        project.is_featured = req.is_featured
+
+    db.commit()
+    return {"success": True, "message": "Project updated successfully", "project_id": project.id}
+
+@router.delete("/portfolio/projects/{project_id}")
+def delete_portfolio_project(
+    project_id: str,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
+
+    project = db.execute(
+        select(StudentProject).filter_by(id=project_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found in this college tenant")
+
+    db.delete(project)
+    db.commit()
+    return {"success": True, "message": "Project deleted from portfolio", "project_id": project_id}
+
 

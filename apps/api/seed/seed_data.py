@@ -10,7 +10,7 @@ from models.schema import (
     PracticeTest, PracticeQuestion, VirtualLabItem, SprintTask,
     MockInterview, DiscussionGroup, GroupMessage, TrainerDirectThread,
     DirectMessage, ParentMonthlyRecord, TestAttempt, AttemptAnswer,
-    ProctorEvent, TopicScore
+    ProctorEvent, TopicScore, StudentProject, StudentSkill, ProjectDemoEvent
 )
 
 def get_screen24_test_cases():
@@ -72,6 +72,189 @@ def get_screen24_test_cases():
         )
     return cases
 
+def seed_portfolio_data(db, college_id="col_demo_001"):
+    import json
+    projects_seed = [
+        StudentProject(
+            id="proj_crop_01",
+            college_id=college_id,
+            student_id="std_priya_01",
+            title="Crop Price Predictor",
+            tagline="Machine learning system for forecasting agricultural market prices using climate & mandi trade data",
+            category="machine_learning",
+            description="Built an end-to-end predictive analytics web platform that estimates wholesale crop prices across Tamil Nadu mandis. Leveraged random forests and gradient boosted regressors trained on 5 years of historical agmarknet and rainfall data to achieve 92% forecasting accuracy.",
+            parent_summary="Priya led the machine learning forecasting model for this farming tool, helping farmers predict market selling prices before harvesting.",
+            role_description="Led ML pipeline development, feature engineering on rainfall/temperature trends, and developed FastAPI prediction endpoints.",
+            team_size=3,
+            team_name="Team AgriVision",
+            tech_stack=json.dumps(["Python", "Scikit-Learn", "FastAPI", "Pandas", "Streamlit", "PostgreSQL"]),
+            github_url="https://github.com/priya-r/crop-price-predictor",
+            live_demo_url="https://crop-price-demo.demo.edu",
+            status="deployed",
+            is_featured=True,
+            trainer_verified=True,
+            trainer_name="Arun Kumar",
+            trainer_feedback="Exceptional model validation and clear modular structure. Priya demonstrated deep grasp of cross-validation and productionizing ML endpoints.",
+            score_percent=94
+        ),
+        StudentProject(
+            id="proj_clinic_02",
+            college_id=college_id,
+            student_id="std_priya_01",
+            title="Clinic Appointment & Token System",
+            tagline="Real-time multi-tenant patient scheduling and digital queue management portal",
+            category="fullstack",
+            description="Full-stack healthcare coordination system supporting doctor schedules, token generation, automated SMS reminders, and real-time waiting room monitors. Designed with atomic database transactions and role-based access control.",
+            parent_summary="Priya developed the secure patient appointment engine and doctor availability schedule.",
+            role_description="Architected the backend REST APIs, PostgreSQL schemas with ACID transactions, and Next.js patient booking UI.",
+            team_size=4,
+            team_name="Team Phoenix",
+            tech_stack=json.dumps(["React", "Next.js", "FastAPI", "PostgreSQL", "Tailwind CSS", "Docker"]),
+            github_url="https://github.com/priya-r/clinic-appointment-portal",
+            live_demo_url="https://clinic-demo.demo.edu",
+            status="in_progress",
+            is_featured=True,
+            trainer_verified=True,
+            trainer_name="Arun Kumar",
+            trainer_feedback="Clean separation of concerns between appointment scheduling and notification queues. Sprint 2 deliverables met ahead of time.",
+            score_percent=88
+        ),
+        StudentProject(
+            id="proj_irrigation_03",
+            college_id=college_id,
+            student_id="std_priya_01",
+            title="IoT Smart Irrigation Controller",
+            tagline="Automated soil moisture sensing and solar pump controller via MQTT telemetry",
+            category="iot",
+            description="Hardware and cloud monitoring rig deploying ESP32 microcontrollers with capacitive soil moisture sensors. Publishes sensor readings to an MQTT broker and triggers automated drip irrigation valves with water conservation analytics.",
+            parent_summary="Priya created the automated water sensor dashboard that helps reduce farm water usage.",
+            role_description="Wrote micro-controller telemetry firmware in C++ and built the telemetry ingestion listener in Python with real-time alerting.",
+            team_size=2,
+            team_name="Team GreenIoT",
+            tech_stack=json.dumps(["ESP32", "C++", "MQTT", "Python", "InfluxDB", "Grafana"]),
+            github_url="https://github.com/priya-r/smart-irrigation-iot",
+            live_demo_url="https://iot-irrigation-demo.demo.edu",
+            status="completed",
+            is_featured=False,
+            trainer_verified=True,
+            trainer_name="Arun Kumar",
+            trainer_feedback="Robust failover logic when network disconnects. Telemetry ingestion loop is well-optimized for low-power edge nodes.",
+            score_percent=90
+        ),
+        StudentProject(
+            id="proj_screener_04",
+            college_id=college_id,
+            student_id="std_priya_01",
+            title="AI Resume Screener & Skill Matcher",
+            tagline="Contextual vector search engine matching candidate resumes to job descriptions",
+            category="machine_learning",
+            description="Natural language processing microservice converting PDF resumes into dense vector embeddings and computing semantic cosine similarity against candidate requirements. Highlights missing skill gaps and suggests syllabus modules.",
+            parent_summary="Priya built an AI tool that scans resumes and scores job qualification matches.",
+            role_description="Implemented PDF text parsing, semantic chunking, vector embedding generation, and candidate ranking algorithms.",
+            team_size=1,
+            team_name="Solo Capstone",
+            tech_stack=json.dumps(["Python", "LangChain", "Gemini API", "ChromaDB", "FastAPI"]),
+            github_url="https://github.com/priya-r/ai-resume-screener",
+            live_demo_url="https://resume-screener-demo.demo.edu",
+            status="completed",
+            is_featured=False,
+            trainer_verified=True,
+            trainer_name="Arun Kumar",
+            trainer_feedback="Great utilization of vector embeddings and semantic search. Evaluation rubrics show strong precision across technical skill keywords.",
+            score_percent=92
+        )
+    ]
+    for p in projects_seed:
+        existing = db.execute(select(StudentProject).where(StudentProject.id == p.id)).scalars().first()
+        if not existing:
+            db.add(p)
+
+    skills_seed = [
+        StudentSkill(
+            id="skill_dsa_01",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Data Structures & Algorithms",
+            category="Core CS",
+            level="Gold",
+            problems_solved=286,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_ml_02",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Machine Learning & Scikit-Learn",
+            category="Core CS",
+            level="Advanced",
+            problems_solved=42,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_fastapi_03",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Python Backend & FastAPI",
+            category="Framework",
+            level="Proficient",
+            problems_solved=38,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_react_04",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="React & Modern Frontend",
+            category="Framework",
+            level="Proficient",
+            problems_solved=30,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_db_05",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Database Design & SQL",
+            category="Core CS",
+            level="Intermediate",
+            problems_solved=54,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_docker_06",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Docker & Linux Systems",
+            category="Cloud",
+            level="Intermediate",
+            problems_solved=18,
+            verified_by="Arun Kumar"
+        )
+    ]
+    for s in skills_seed:
+        existing = db.execute(select(StudentSkill).where(StudentSkill.id == s.id)).scalars().first()
+        if not existing:
+            db.add(s)
+
+    event_seed = [
+        ProjectDemoEvent(
+            id="event_demo_day_nov",
+            college_id=college_id,
+            title="Project Demo Day – Capstone Showcase",
+            event_date="Sat, Nov 8 · 10:00 AM – 1:00 PM",
+            venue="Auditorium A & Live Stream",
+            description="Annual Industry-Ready Engineer Program Capstone Presentation. Parents and industry mentors are invited to watch students present live working software applications.",
+            rsvp_status="none",
+            guest_count=1
+        )
+    ]
+    for ev in event_seed:
+        existing = db.execute(select(ProjectDemoEvent).where(ProjectDemoEvent.id == ev.id)).scalars().first()
+        if not existing:
+            db.add(ev)
+
+    db.commit()
+
 def init_db_and_seed():
     print("Creating tables...", flush=True)
     Base.metadata.create_all(engine)
@@ -96,6 +279,13 @@ def init_db_and_seed():
             seeded_w = seed_weekly_problems(db, college_id="col_demo_001")
             if seeded_w > 0:
                 print(f"Seeded {seeded_w} weekly DSA problems.", flush=True)
+
+            # Ensure Screen 32 & 33 portfolio and demo day data are seeded
+            existing_p = db.execute(select(StudentProject)).scalars().first()
+            if not existing_p:
+                seed_portfolio_data(db, college_id="col_demo_001")
+                print("Seeded Screen 32/33 portfolio and demo day data.", flush=True)
+
             print("Database already seeded.", flush=True)
             return
 
@@ -634,6 +824,9 @@ def init_db_and_seed():
         # 13. Seed Weekly DSA Problems (Weeks 1-8)
         from seed.seed_weekly_dsa import seed_weekly_problems
         seed_weekly_problems(db, college_id="col_demo_001")
+
+        # 14. Screen 32 & 33: Student Portfolio Projects, Skills, and Parent Demo Day Event
+        seed_portfolio_data(db, college_id="col_demo_001")
 
         db.commit()
     finally:

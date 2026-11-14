@@ -198,17 +198,55 @@ PROBLEM_HINTS = [
     "Notice how path compression in find() flattens the tree. For best worst-case complexity, combine with union-by-rank."
 ]
 
+CURRICULUM_ORDER = [
+    "prob_two_sum",
+    "prob_container_water",
+    "prob_3sum",
+    "prob_longest_substring",
+    "prob_subarray_sum_k",
+    "prob_valid_parentheses",
+    "prob_daily_temperatures",
+    "prob_min_stack",
+    "prob_reverse_linked_list",
+    "prob_linked_list_cycle",
+    "prob_search_rotated",
+    "prob_find_peak_element",
+    "prob_max_depth_tree",
+    "prob_lowest_common_ancestor",
+    "prob_climbing_stairs",
+    "prob_coin_change",
+    "prob_longest_increasing_subsequence",
+    "prob_connected_components",
+    "prob_redundant_connection",
+    "prob_course_schedule"
+]
+
+def _get_ordered_problems(db: Session, college_id: str):
+    all_probs = db.execute(
+        select(CodingProblem).filter_by(college_id=college_id)
+    ).scalars().all()
+    order_map = {pid: i for i, pid in enumerate(CURRICULUM_ORDER)}
+    return sorted(all_probs, key=lambda p: order_map.get(p.id, 999))
+
 @router.get("/coding")
 def list_coding_problems(
     current_user: TokenPayload = Depends(require_role(["student", "trainer", "college_admin"])),
     db: Session = Depends(get_db)
 ):
-    # Tenant scoped problems list
-    problems = db.execute(
-        select(CodingProblem).filter_by(college_id=current_user.college_id)
+    ordered_probs = _get_ordered_problems(db, current_user.college_id)
+    
+    # Query solved problems for this student
+    accepted_submissions = db.execute(
+        select(CodingSubmission.problem_id).filter_by(
+            student_id=current_user.sub,
+            college_id=current_user.college_id,
+            status="Accepted"
+        )
     ).scalars().all()
+    solved_set = set(accepted_submissions)
     
     return {
+        "total": len(ordered_probs),
         "problems": [
             {
                 "id": p.id,
@@ -216,9 +254,11 @@ def list_coding_problems(
                 "difficulty": p.difficulty,
                 "topic": p.topic,
                 "company_tags": p.company_tags,
-                "week_info": p.week_info
+                "week_info": p.week_info,
+                "is_solved": p.id in solved_set,
+                "curriculum_index": idx + 1
             }
-            for p in problems
+            for idx, p in enumerate(ordered_probs)
         ]
     }
 
@@ -239,6 +279,11 @@ def get_coding_problem(
             detail=f"Coding problem '{problem_id}' not found for tenant '{current_user.college_id}'"
         )
     
+    ordered_all = _get_ordered_problems(db, current_user.college_id)
+    curr_idx = next((i for i, p in enumerate(ordered_all) if p.id == prob.id), -1)
+    prev_prob = ordered_all[curr_idx - 1] if curr_idx > 0 else None
+    next_prob = ordered_all[curr_idx + 1] if 0 <= curr_idx < len(ordered_all) - 1 else None
+
     # Query hints used by this student
     hint_records = db.execute(
         select(CodingHintUsage).filter_by(
@@ -273,10 +318,16 @@ def get_coding_problem(
         "example_input": prob.example_input,
         "example_output": prob.example_output,
         "constraints": prob.constraints,
-        "starter_codes": STARTER_CODES,
+        "starter_codes": prob.starter_codes if (prob.starter_codes and isinstance(prob.starter_codes, dict) and len(prob.starter_codes) > 1) else (
+            {**STARTER_CODES, "python": prob.starter_code} if prob.starter_code else STARTER_CODES
+        ),
         "starter_code": prob.starter_code or STARTER_CODES["python"],
         "trainer_notes": prob.trainer_notes,
         "trainer_author": prob.trainer_author,
+        "prev_problem": {"id": prev_prob.id, "title": prev_prob.title, "week_info": prev_prob.week_info} if prev_prob else None,
+        "next_problem": {"id": next_prob.id, "title": next_prob.title, "week_info": next_prob.week_info} if next_prob else None,
+        "curriculum_index": curr_idx + 1 if curr_idx >= 0 else 1,
+        "total_problems": len(ordered_all),
         "ai_reviewer": {
             "tag": "Future Skills",
             "hints": [
@@ -555,6 +606,11 @@ def submit_code(
 
     msg = f"{execution.tests_passed} / {execution.tests_total} hidden tests passed" if execution.status == "Accepted" else f"{execution.tests_passed} / {execution.tests_total} tests passed"
 
+    # Next problem in sequence
+    ordered_all = _get_ordered_problems(db, current_user.college_id)
+    curr_idx = next((i for i, p in enumerate(ordered_all) if p.id == prob.id), -1)
+    next_prob = ordered_all[curr_idx + 1] if 0 <= curr_idx < len(ordered_all) - 1 else None
+
     return {
         "id": submission.id,
         "problem_id": prob.id,
@@ -568,7 +624,12 @@ def submit_code(
         "hints_used": hints_used,
         "message": msg,
         "cases": sample_cases_output,
-        "submitted_at": submission.created_at.isoformat()
+        "submitted_at": submission.created_at.isoformat(),
+        "next_problem": {
+            "id": next_prob.id,
+            "title": next_prob.title,
+            "week_info": next_prob.week_info
+        } if next_prob and execution.status == "Accepted" else None
     }
 
 @router.post("/coding/{problem_id}/hint")

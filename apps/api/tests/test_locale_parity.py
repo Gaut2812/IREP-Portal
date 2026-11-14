@@ -56,3 +56,4 @@ def test_en_and_ta_locales_have_identical_key_sets():
     assert not missing_in_ta, f"Keys in en.json but missing in ta.json: {sorted(missing_in_ta)}"
     assert not missing_in_en, f"Keys in ta.json but missing in en.json: {sorted(missing_in_en)}"
     assert en_keys == ta_keys, "en.json and ta.json keys must be identical"
+

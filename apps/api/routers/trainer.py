@@ -7,7 +7,10 @@ import datetime
 
 from core.database import get_db
 from core.security import get_current_user, require_role, TokenPayload
-from models.schema import TrainerDirectThread, DirectMessage, CodingProblem, CodingSubmission
+from models.schema import (
+    TrainerDirectThread, DirectMessage, CodingProblem, CodingSubmission,
+    PullRequest, PullRequestFile, PullRequestComment, SprintTask, StudentProject
+)
 
 router = APIRouter(prefix="/trainer", tags=["Trainer Screens"])
 
@@ -174,4 +177,326 @@ def send_broadcast_announcement(req: BroadcastRequest):
 def handle_moderation(item_id: str, action: str):
     # action: keep or remove
     return {"success": True, "action": action, "item_id": item_id}
+
+# --- SCREEN 31: Trainer Code Reviews ---
+class ReviewActionRequest(BaseModel):
+    action: str  # "approve" | "request_changes"
+    review_feedback: str
+    code_quality_score: Optional[int] = 5
+    test_coverage_score: Optional[int] = 5
+    modularity_score: Optional[int] = 4
+    score_percent: Optional[int] = 92
+
+class InlineCommentRequest(BaseModel):
+    file_id: Optional[str] = None
+    line_number: Optional[int] = None
+    comment_text: str
+
+@router.get("/reviews")
+def list_code_reviews(
+    status: Optional[str] = "all",
+    team: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
+    
+    query = select(PullRequest).filter_by(college_id=college_id)
+    all_prs = db.execute(query).scalars().all()
+
+    # Calculate status counts across all PRs for this tenant
+    total_count = len(all_prs)
+    pending_count = sum(1 for p in all_prs if p.status == "pending")
+    approved_count = sum(1 for p in all_prs if p.status == "approved")
+    changes_requested_count = sum(1 for p in all_prs if p.status == "changes_requested")
+
+    # Filter
+    filtered = all_prs
+    if status and status != "all":
+        filtered = [p for p in filtered if p.status == status]
+    if team:
+        filtered = [p for p in filtered if team.lower() in p.team_name.lower()]
+    if search:
+        s_lower = search.lower()
+        filtered = [
+            p for p in filtered
+            if s_lower in p.title.lower() or s_lower in p.author_name.lower() or s_lower in p.pr_number.lower()
+        ]
+
+    prs_list = [
+        {
+            "id": p.id,
+            "pr_number": p.pr_number,
+            "title": p.title,
+            "project_id": p.project_id,
+            "project_name": p.project_name,
+            "team_name": p.team_name,
+            "task_id": p.task_id,
+            "author_id": p.author_id,
+            "author_name": p.author_name,
+            "author_initials": p.author_initials,
+            "source_branch": p.source_branch,
+            "target_branch": p.target_branch,
+            "status": p.status,
+            "story_points": p.story_points,
+            "automated_checks_passed": p.automated_checks_passed,
+            "automated_checks_summary": p.automated_checks_summary,
+            "diff_summary": p.diff_summary,
+            "review_feedback": p.review_feedback,
+            "code_quality_score": p.code_quality_score,
+            "test_coverage_score": p.test_coverage_score,
+            "modularity_score": p.modularity_score,
+            "reviewed_by": p.reviewed_by,
+            "reviewed_at": p.reviewed_at.isoformat() if p.reviewed_at else None,
+            "created_at": p.created_at.strftime("%b %d · %I:%M %p") if p.created_at else "Today"
+        }
+        for p in filtered
+    ]
+
+    return {
+        "prs": prs_list,
+        "counts": {
+            "total": total_count,
+            "pending": pending_count,
+            "approved": approved_count,
+            "changes_requested": changes_requested_count
+        }
+    }
+
+@router.get("/reviews/{pr_id}")
+def get_code_review_detail(
+    pr_id: str,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
+
+    pr = db.execute(
+        select(PullRequest).filter_by(id=pr_id, college_id=college_id)
+    ).scalar_one_or_none()
+
+    if not pr:
+        raise HTTPException(status_code=404, detail="Pull request not found for this tenant")
+
+    files = db.execute(
+        select(PullRequestFile).filter_by(pr_id=pr.id, college_id=college_id)
+    ).scalars().all()
+
+    comments = db.execute(
+        select(PullRequestComment).filter_by(pr_id=pr.id, college_id=college_id).order_by(PullRequestComment.created_at.asc())
+    ).scalars().all()
+
+    files_list = [
+        {
+            "id": f.id,
+            "filename": f.filename,
+            "change_type": f.change_type,
+            "additions": f.additions,
+            "deletions": f.deletions,
+            "diff_content": f.diff_content
+        }
+        for f in files
+    ]
+
+    comments_list = [
+        {
+            "id": c.id,
+            "file_id": c.file_id,
+            "line_number": c.line_number,
+            "author_name": c.author_name,
+            "author_role": c.author_role,
+            "comment_text": c.comment_text,
+            "created_at": c.created_at.strftime("%b %d, %I:%M %p") if c.created_at else "Just now"
+        }
+        for c in comments
+    ]
+
+    # Task info if associated with sprint board
+    task_info = None
+    if pr.task_id:
+        task = db.execute(select(SprintTask).filter_by(id=pr.task_id, college_id=college_id)).scalar_one_or_none()
+        if task:
+            task_info = {
+                "id": task.id,
+                "title": task.title,
+                "column_name": task.column_name,
+                "story_points": task.story_points,
+                "assignee_name": task.assignee_name
+            }
+
+    return {
+        "pr": {
+            "id": pr.id,
+            "pr_number": pr.pr_number,
+            "title": pr.title,
+            "project_id": pr.project_id,
+            "project_name": pr.project_name,
+            "team_name": pr.team_name,
+            "task_id": pr.task_id,
+            "author_id": pr.author_id,
+            "author_name": pr.author_name,
+            "author_initials": pr.author_initials,
+            "source_branch": pr.source_branch,
+            "target_branch": pr.target_branch,
+            "status": pr.status,
+            "story_points": pr.story_points,
+            "automated_checks_passed": pr.automated_checks_passed,
+            "automated_checks_summary": pr.automated_checks_summary,
+            "diff_summary": pr.diff_summary,
+            "review_feedback": pr.review_feedback,
+            "code_quality_score": pr.code_quality_score or 5,
+            "test_coverage_score": pr.test_coverage_score or 5,
+            "modularity_score": pr.modularity_score or 4,
+            "reviewed_by": pr.reviewed_by,
+            "reviewed_at": pr.reviewed_at.isoformat() if pr.reviewed_at else None,
+            "created_at": pr.created_at.strftime("%b %d · %I:%M %p") if pr.created_at else "Today"
+        },
+        "task": task_info,
+        "files": files_list,
+        "comments": comments_list,
+        "automated_checks": {
+            "all_passed": pr.automated_checks_passed,
+            "tests_run": 14,
+            "tests_passed": 14 if pr.automated_checks_passed else 13,
+            "tests_failed": 0 if pr.automated_checks_passed else 1,
+            "cyclomatic_complexity": "3.2 (Low)",
+            "lint_errors": 0,
+            "security_alerts": 0,
+            "maintainability_rating": "A (96/100)"
+        }
+    }
+
+@router.post("/reviews/{pr_id}/action")
+def submit_review_action(
+    pr_id: str,
+    req: ReviewActionRequest,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
+    trainer_name = current_user.name if isinstance(current_user, TokenPayload) and current_user.name else "Arun Kumar"
+
+    pr = db.execute(
+        select(PullRequest).filter_by(id=pr_id, college_id=college_id)
+    ).scalar_one_or_none()
+
+    if not pr:
+        raise HTTPException(status_code=404, detail="Pull request not found for this tenant")
+
+    now = datetime.datetime.utcnow()
+
+    if req.action == "approve":
+        pr.status = "approved"
+        pr.review_feedback = req.review_feedback
+        pr.code_quality_score = req.code_quality_score
+        pr.test_coverage_score = req.test_coverage_score
+        pr.modularity_score = req.modularity_score
+        pr.reviewed_by = trainer_name
+        pr.reviewed_at = now
+
+        # Auto-advance task on Sprint Board from 'code_review' to 'done'
+        if pr.task_id:
+            task = db.execute(
+                select(SprintTask).filter_by(id=pr.task_id, college_id=college_id)
+            ).scalar_one_or_none()
+            if task:
+                task.column_name = "done"
+
+        # Auto-verify student project in Portfolio
+        if pr.project_id:
+            project = db.execute(
+                select(StudentProject).filter_by(id=pr.project_id, college_id=college_id)
+            ).scalar_one_or_none()
+            if project:
+                project.trainer_verified = True
+                project.trainer_name = trainer_name
+                project.trainer_feedback = req.review_feedback
+                if req.score_percent:
+                    project.score_percent = req.score_percent
+
+        db.commit()
+        return {
+            "success": True,
+            "message": "Pull Request approved! Sprint task moved to 'Done' and Student Portfolio verified.",
+            "status": "approved",
+            "pr_id": pr.id
+        }
+
+    elif req.action == "request_changes":
+        pr.status = "changes_requested"
+        pr.review_feedback = req.review_feedback
+        pr.code_quality_score = req.code_quality_score
+        pr.test_coverage_score = req.test_coverage_score
+        pr.modularity_score = req.modularity_score
+        pr.reviewed_by = trainer_name
+        pr.reviewed_at = now
+
+        # Move task back to 'in_progress' for adjustments
+        if pr.task_id:
+            task = db.execute(
+                select(SprintTask).filter_by(id=pr.task_id, college_id=college_id)
+            ).scalar_one_or_none()
+            if task:
+                task.column_name = "in_progress"
+
+        db.commit()
+        return {
+            "success": True,
+            "message": "Changes requested. Team notified and task moved to In Progress.",
+            "status": "changes_requested",
+            "pr_id": pr.id
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Invalid review action. Must be 'approve' or 'request_changes'.")
+
+@router.post("/reviews/{pr_id}/comments")
+def add_inline_review_comment(
+    pr_id: str,
+    req: InlineCommentRequest,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    import uuid
+    college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
+    author_name = current_user.name if isinstance(current_user, TokenPayload) and current_user.name else "Arun Kumar"
+    author_role = current_user.role.capitalize() if isinstance(current_user, TokenPayload) else "Trainer"
+
+    pr = db.execute(
+        select(PullRequest).filter_by(id=pr_id, college_id=college_id)
+    ).scalar_one_or_none()
+
+    if not pr:
+        raise HTTPException(status_code=404, detail="Pull request not found for this tenant")
+
+    comment_id = f"prc_{uuid.uuid4().hex[:10]}"
+    new_comment = PullRequestComment(
+        id=comment_id,
+        college_id=college_id,
+        pr_id=pr.id,
+        file_id=req.file_id,
+        line_number=req.line_number,
+        author_name=author_name,
+        author_role=author_role,
+        comment_text=req.comment_text,
+        created_at=datetime.datetime.utcnow()
+    )
+    db.add(new_comment)
+    db.commit()
+    db.refresh(new_comment)
+
+    return {
+        "success": True,
+        "comment": {
+            "id": new_comment.id,
+            "pr_id": new_comment.pr_id,
+            "file_id": new_comment.file_id,
+            "line_number": new_comment.line_number,
+            "author_name": new_comment.author_name,
+            "author_role": new_comment.author_role,
+            "comment_text": new_comment.comment_text,
+            "created_at": "Just now"
+        }
+    }
+
 

@@ -436,4 +436,57 @@ class ProjectDemoEvent(TenantModel):
     rsvp_status: Mapped[str] = mapped_column(String(32), default="none") # none, attending, declined
     guest_count: Mapped[int] = mapped_column(Integer, default=1)
 
+# Screen 31: Trainer Code Reviews (Pull Requests)
+class PullRequest(TenantModel):
+    __tablename__ = "pull_requests"
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    pr_number: Mapped[str] = mapped_column(String(32), nullable=False) # e.g. "#39", "#41"
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    project_id: Mapped[str] = mapped_column(String(64), default="proj_clinic_02")
+    project_name: Mapped[str] = mapped_column(String(128), default="Clinic Appointment System")
+    team_name: Mapped[str] = mapped_column(String(64), default="Team Phoenix")
+    task_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("sprint_tasks.id"), nullable=True)
+    author_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"))
+    author_name: Mapped[str] = mapped_column(String(128), default="Priya R")
+    author_initials: Mapped[str] = mapped_column(String(8), default="PR")
+    source_branch: Mapped[str] = mapped_column(String(64), default="feat/booking-tests")
+    target_branch: Mapped[str] = mapped_column(String(64), default="main")
+    status: Mapped[str] = mapped_column(String(32), default="pending") # pending, approved, changes_requested
+    story_points: Mapped[int] = mapped_column(Integer, default=3)
+    automated_checks_passed: Mapped[bool] = mapped_column(Boolean, default=True)
+    automated_checks_summary: Mapped[str] = mapped_column(String(255), default="14/14 tests passing · Lint clean")
+    diff_summary: Mapped[str] = mapped_column(String(128), default="+142 -28 across 2 files")
+    review_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    code_quality_score: Mapped[Optional[int]] = mapped_column(Integer, default=5)
+    test_coverage_score: Mapped[Optional[int]] = mapped_column(Integer, default=5)
+    modularity_score: Mapped[Optional[int]] = mapped_column(Integer, default=4)
+    reviewed_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    reviewed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+class PullRequestFile(TenantModel):
+    __tablename__ = "pull_request_files"
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    pr_id: Mapped[str] = mapped_column(String(64), ForeignKey("pull_requests.id"))
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    change_type: Mapped[str] = mapped_column(String(32), default="modified") # modified, added, deleted
+    additions: Mapped[int] = mapped_column(Integer, default=0)
+    deletions: Mapped[int] = mapped_column(Integer, default=0)
+    diff_content: Mapped[str] = mapped_column(Text, nullable=False)
+
+class PullRequestComment(TenantModel):
+    __tablename__ = "pull_request_comments"
+    
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    pr_id: Mapped[str] = mapped_column(String(64), ForeignKey("pull_requests.id"))
+    file_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    line_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    author_name: Mapped[str] = mapped_column(String(128), default="Arun Kumar")
+    author_role: Mapped[str] = mapped_column(String(32), default="Trainer")
+    comment_text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+
 

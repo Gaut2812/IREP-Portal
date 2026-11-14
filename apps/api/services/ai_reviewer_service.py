@@ -27,7 +27,8 @@ class AICodeReviewEngine:
         code: str,
         language: str,
         problem_id: str = "prob_connected_components",
-        problem_title: str = "Number of Connected Components in an Undirected Graph"
+        problem_title: str = "Number of Connected Components in an Undirected Graph",
+        force_deterministic: bool = False
     ) -> Dict[str, Any]:
         start_time = time.perf_counter()
         clean_code = (code or "").strip()
@@ -36,8 +37,8 @@ class AICodeReviewEngine:
         # Step 1: Run Deterministic Analysis Baseline
         deterministic_result = self._run_deterministic_analysis(clean_code, lang, problem_id)
 
-        # Step 2: If GEMINI_API_KEY is present, attempt LLM enhancement with timeout & fallback
-        if settings.GEMINI_API_KEY and len(settings.GEMINI_API_KEY.strip()) > 5:
+        # Step 2: If GEMINI_API_KEY is present and not forced deterministic, attempt LLM enhancement with timeout & fallback
+        if not force_deterministic and settings.GEMINI_API_KEY and len(settings.GEMINI_API_KEY.strip()) > 5:
             try:
                 gemini_result = self._call_gemini_api(clean_code, lang, problem_title, deterministic_result)
                 if gemini_result:

@@ -222,7 +222,7 @@ def test_python_syntax_error_populates_code_smells():
 def test_benchmark_deterministic_under_100ms():
     """Deterministic analysis must complete in under 100ms."""
     start = time.perf_counter()
-    result = engine.analyze_code(OPTIMAL_DSU_PYTHON, "python")
+    result = engine.analyze_code(OPTIMAL_DSU_PYTHON, "python", force_deterministic=True)
     elapsed_ms = (time.perf_counter() - start) * 1000
     assert elapsed_ms < 100, f"Deterministic engine took {elapsed_ms:.1f}ms (must be < 100ms)"
     assert result.get("analysis_duration_ms", 999) < 100

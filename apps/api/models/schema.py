@@ -24,6 +24,8 @@ class User(TenantModel):
     avatar_initials: Mapped[str] = mapped_column(String(8), default="IR")
     language_pref: Mapped[str] = mapped_column(String(8), default="en") # en or ta
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
 
 class Student(TenantModel):
     __tablename__ = "students"
@@ -40,6 +42,11 @@ class Student(TenantModel):
     problems_solved: Mapped[int] = mapped_column(Integer, default=286)
     attendance_pct: Mapped[int] = mapped_column(Integer, default=92)
     streak_days: Mapped[int] = mapped_column(Integer, default=19)
+    # S0 cohort structure
+    branch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("branches.id"), nullable=True, index=True)
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("batches.id"), nullable=True, index=True)
+    track: Mapped[str] = mapped_column(String(64), default="AI & Data Science")
+    academic_year: Mapped[str] = mapped_column(String(16), default="2026-27")
 
 class Trainer(TenantModel):
     __tablename__ = "trainers"
@@ -74,6 +81,8 @@ class SessionItem(TenantModel):
     recording_duration: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     has_lab_preload: Mapped[bool] = mapped_column(Boolean, default=False)
     lab_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("batches.id"), nullable=True, index=True)
+    week_no: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 class SessionAttendance(TenantModel):
     __tablename__ = "session_attendance"
@@ -490,3 +499,193 @@ class PullRequestComment(TenantModel):
 
 
 
+
+# ---------------------------------------------------------------------------
+# S0 Foundation: college structure, cohort, governance
+# ---------------------------------------------------------------------------
+from sqlalchemy import UniqueConstraint, Date
+
+
+class Branch(TenantModel):
+    __tablename__ = "branches"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)      # CSE, IT, AI & DS, Cybersecurity
+    code: Mapped[str] = mapped_column(String(32), nullable=False)       # CSE, IT, AIDS, CYB
+    track: Mapped[str] = mapped_column(String(64), default="Software Engineering")
+    hod_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
+
+class Batch(TenantModel):
+    __tablename__ = "batches"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    branch_id: Mapped[str] = mapped_column(String(64), ForeignKey("branches.id"), index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)      # CSE-A · Sem 5
+    short_name: Mapped[str] = mapped_column(String(32), nullable=False) # CSE-A
+    semester: Mapped[int] = mapped_column(Integer, default=5, index=True)
+    academic_year: Mapped[str] = mapped_column(String(16), default="2026-27")
+    track: Mapped[str] = mapped_column(String(64), default="Software Engineering")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class BatchTrainer(TenantModel):
+    __tablename__ = "batch_trainers"
+    __table_args__ = (UniqueConstraint("batch_id", "trainer_id", name="uq_batch_trainer"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    batch_id: Mapped[str] = mapped_column(String(64), ForeignKey("batches.id"), index=True)
+    trainer_id: Mapped[str] = mapped_column(String(64), ForeignKey("trainers.id"), index=True)
+    role: Mapped[str] = mapped_column(String(32), default="primary")   # primary, substitute
+
+
+class Certificate(TenantModel):
+    __tablename__ = "certificates"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    issuer: Mapped[str] = mapped_column(String(128), default="IREP")
+    cert_type: Mapped[str] = mapped_column(String(32), default="course")   # course, external, exam
+    status: Mapped[str] = mapped_column(String(32), default="earned", index=True)  # earned, scheduled, pending_proof, revoked
+    issued_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, index=True)
+    exam_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    verify_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    proof_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+
+
+class Internship(TenantModel):
+    __tablename__ = "internships"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    company: Mapped[str] = mapped_column(String(128), nullable=False)
+    role_title: Mapped[str] = mapped_column(String(128), default="Software Intern")
+    status: Mapped[str] = mapped_column(String(32), default="secured")  # secured, offered, completed
+    semester: Mapped[int] = mapped_column(Integer, default=6)
+    secured_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+
+
+class AuditLog(TenantModel):
+    """Append-only audit trail for sensitive actions (P04)."""
+    __tablename__ = "audit_log"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    actor_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    actor_role: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)   # login.success, rsvp.save, ...
+    entity_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class OtpAttempt(TenantModel):
+    __tablename__ = "otp_attempts"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    phone_hash: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    otp_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    verify_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    consumed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Notification(TenantModel):
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(64), default="info")  # info, approval, message, event, report, reminder
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    body_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    body_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    link: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    channel: Mapped[str] = mapped_column(String(32), default="in_app")  # in_app, sms, email
+    delivery_status: Mapped[str] = mapped_column(String(32), default="delivered")
+    read_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Screen 12: readiness snapshots, skill scores, badges, events
+# ---------------------------------------------------------------------------
+
+class ReadinessConfig(TenantModel):
+    """Per-college weights (sum to 1.0) and band thresholds (P09)."""
+    __tablename__ = "readiness_config"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    weights: Mapped[dict] = mapped_column(JSON, default=dict)        # {"dsa": 0.25, ...}
+    band_ready_min: Mapped[int] = mapped_column(Integer, default=75)
+    band_nearly_min: Mapped[int] = mapped_column(Integer, default=60)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class SkillScore(TenantModel):
+    __tablename__ = "skill_scores"
+    __table_args__ = (UniqueConstraint("student_id", "skill_key", name="uq_skill_score_student_skill"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    skill_key: Mapped[str] = mapped_column(String(32), nullable=False)   # dsa, aptitude, cloud, track, future_skills, communication
+    label_en: Mapped[str] = mapped_column(String(128), nullable=False)
+    label_ta: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    percentage: Mapped[int] = mapped_column(Integer, default=0)
+    color: Mapped[str] = mapped_column(String(16), default="teal")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ReadinessSnapshot(TenantModel):
+    __tablename__ = "readiness_snapshots"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    snapshot_date: Mapped[datetime.date] = mapped_column(Date, index=True)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    band: Mapped[str] = mapped_column(String(32), default="Needs Support")
+    delta: Mapped[int] = mapped_column(Integer, default=0)
+    breakdown: Mapped[dict] = mapped_column(JSON, default=dict)      # [{"key","label","value","weight","contribution"}]
+    config_version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class Badge(TenantModel):
+    __tablename__ = "badges"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name_en: Mapped[str] = mapped_column(String(128), nullable=False)
+    name_ta: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    description_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    description_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    icon: Mapped[str] = mapped_column(String(16), default="star")   # emoji or icon key
+    rule: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+
+class StudentBadge(TenantModel):
+    __tablename__ = "student_badges"
+    __table_args__ = (UniqueConstraint("student_id", "badge_id", name="uq_student_badge"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    badge_id: Mapped[str] = mapped_column(String(64), ForeignKey("badges.id"), index=True)
+    earned_on: Mapped[datetime.date] = mapped_column(Date)
+
+
+class Event(TenantModel):
+    """Calendar events shared by screens 12, 15, 17, 19, 42."""
+    __tablename__ = "events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    kind: Mapped[str] = mapped_column(String(32), default="event", index=True)  # test, interview, exam, drive, demo_day, meeting, guest
+    starts_at: Mapped[datetime.datetime] = mapped_column(DateTime, index=True)
+    ends_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    audience: Mapped[str] = mapped_column(String(32), default="students")  # students, parents, all, college
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    student_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)  # personal items (own exam/interview)
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rsvp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

@@ -1,22 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { loginAs } from "./helpers/auth";
 
 test.describe("Screen 31: Trainer Code Reviews (/trainer/reviews)", () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "irep_user",
-        JSON.stringify({
-          id: "usr_trainer_01",
-          email: "arun.kumar@demo.edu",
-          role: "trainer",
-          name: "Arun Kumar",
-          avatar: "AK",
-          college_id: "col_demo_001",
-        })
-      );
-      localStorage.setItem("irep_token", "mock_jwt_token_demo");
-      localStorage.setItem("irep_lang", "en");
-    });
+    await loginAs(page, "trainer");
   });
 
   test("should render PR queue, automated checks, code diff viewer, and approve a PR", async ({ page }) => {

@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from core.database import get_db
-from core.security import verify_password, create_access_token, get_current_user, TokenPayload
+from core.security import verify_password, create_access_token, get_current_user, TokenPayload, normalize_role
 from models.schema import User, Student
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -42,7 +42,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             
     if not user or not verify_password(req.password, user.hashed_password):
         # Demo friendly fallback: if email matches any role user, allow password123
-        demo_user = db.execute(select(User).filter_by(role=req.role)).first()
+        demo_user = db.execute(select(User).filter_by(role=normalize_role(req.role)).order_by(User.created_at.asc())).first()
         if demo_user and req.password == "password123":
             user = demo_user[0]
         else:
@@ -87,7 +87,9 @@ def verify_parent_otp(req: ParentOTPVerify, db: Session = Depends(get_db)):
     if req.otp != "123456":
         raise HTTPException(status_code=400, detail="Invalid OTP. Please enter 123456")
         
-    parent_user = db.execute(select(User).filter_by(role="parent")).scalar_one_or_none()
+    parent_user = db.execute(select(User).filter_by(role="parent", phone=req.phone)).scalars().first()
+    if not parent_user:
+        parent_user = db.execute(select(User).filter_by(role="parent").order_by(User.created_at.asc())).scalars().first()
     if not parent_user:
         raise HTTPException(status_code=404, detail="Parent user not found")
         
@@ -115,5 +117,5 @@ def verify_parent_otp(req: ParentOTPVerify, db: Session = Depends(get_db)):
 
 @router.get("/me")
 def get_me(current_user: TokenPayload = Depends(get_current_user)):
-    return current_user.dict()
+    return current_user.model_dump()
 

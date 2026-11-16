@@ -6,8 +6,11 @@ from sqlalchemy import select, update
 import json
 
 from core.database import get_db
-from core.security import get_current_user, TokenPayload
-from models.schema import ParentMonthlyRecord, Student, StudentProject, StudentSkill, ProjectDemoEvent, User
+from core.security import get_current_user, TokenPayload, require_role
+from core.tenant import get_child_for_parent, get_parent_children, get_user_name
+from models.schema import ParentMonthlyRecord, Student, StudentProject, StudentSkill, ProjectDemoEvent, User, Certificate
+
+BAND_TA = {"Placement Ready": "வேலைவாய்ப்புக்கு தயார்", "Nearly Ready": "கிட்டத்தட்ட தயார்", "Needs Support": "ஆதரவு தேவை"}
 
 router = APIRouter(prefix="/parent", tags=["Parent Screens"])
 
@@ -17,25 +20,64 @@ class RSVPRequest(BaseModel):
     guest_count: int = 1
 
 # --- SCREEN 15: Parent View (PDF 10) ---
+@router.get("/me/children")
+def list_my_children(
+    current_user: TokenPayload = Depends(require_role(["parent"])),
+    db: Session = Depends(get_db),
+):
+    children = get_parent_children(current_user, db)
+    return {
+        "children": [
+            {
+                "id": c.id,
+                "name": get_user_name(db, c.user_id, "Student"),
+                "semester": c.semester,
+                "branch": c.branch,
+                "batch_name": c.batch_name,
+            }
+            for c in children
+        ]
+    }
+
+
 @router.get("/overview")
-def get_parent_overview(lang: str = "en", db: Session = Depends(get_db)):
-    records = db.execute(select(ParentMonthlyRecord)).scalars().all()
-    
+def get_parent_overview(
+    lang: str = "en",
+    child_id: Optional[str] = None,
+    current_user: TokenPayload = Depends(require_role(["parent"])),
+    db: Session = Depends(get_db),
+):
+    child = get_child_for_parent(current_user, db, child_id)
+    child_name = get_user_name(db, child.user_id, "Student")
+    records = db.execute(
+        select(ParentMonthlyRecord).filter_by(student_id=child.id, college_id=current_user.college_id)
+    ).scalars().all()
+    certs = db.execute(
+        select(Certificate).filter_by(student_id=child.id, college_id=current_user.college_id)
+    ).scalars().all()
+    earned = [c for c in certs if c.status == "earned"]
+    scheduled = [c for c in certs if c.status == "scheduled" and c.exam_date]
+    cert_note = ""
+    if scheduled:
+        cert_note = scheduled[0].title.split(" ")[0] + " exam on " + scheduled[0].exam_date.strftime("%b %d")
+    good_attendance = child.attendance_pct >= 85
+
     return {
         "ward": {
-            "name": "Priya R",
-            "details": "Sem 5 · AI & DS",
+            "id": child.id,
+            "name": child_name,
+            "details": "Sem " + str(child.semester) + " · " + child.branch,
             "college": "Demo Engineering College"
         },
         "kpis": {
-            "readiness_score": 74,
-            "readiness_delta": "+6",
-            "readiness_band": "Nearly Ready" if lang == "en" else "கிட்டத்தட்ட தயார்",
-            "attendance": "92%",
-            "attendance_note": "Excellent" if lang == "en" else "சிறப்பானது",
-            "problems_solved": 286,
-            "certifications": "1",
-            "cert_note": "AWS exam on Nov 22"
+            "readiness_score": child.readiness_score,
+            "readiness_delta": ("+" if child.readiness_delta >= 0 else "") + str(child.readiness_delta),
+            "readiness_band": child.readiness_band if lang == "en" else BAND_TA.get(child.readiness_band, child.readiness_band),
+            "attendance": str(child.attendance_pct) + "%",
+            "attendance_note": ("Excellent" if good_attendance else "Needs attention") if lang == "en" else ("சிறப்பானது" if good_attendance else "கவனம் தேவை"),
+            "problems_solved": child.problems_solved,
+            "certifications": str(len(earned)),
+            "cert_note": cert_note
         },
         "monthly_progress": [
             {
@@ -74,8 +116,12 @@ def get_parent_overview(lang: str = "en", db: Session = Depends(get_db)):
     }
 
 @router.post("/rsvp")
-def submit_rsvp(req: RSVPRequest, db: Session = Depends(get_db)):
-    event = db.execute(select(ProjectDemoEvent).filter_by(id=req.event_id)).scalar_one_or_none()
+def submit_rsvp(
+    req: RSVPRequest,
+    current_user: TokenPayload = Depends(require_role(["parent"])),
+    db: Session = Depends(get_db),
+):
+    event = db.execute(select(ProjectDemoEvent).filter_by(id=req.event_id, college_id=current_user.college_id)).scalar_one_or_none()
     if event:
         event.rsvp_status = req.status
         event.guest_count = req.guest_count
@@ -89,22 +135,18 @@ def submit_rsvp(req: RSVPRequest, db: Session = Depends(get_db)):
 @router.get("/portfolio")
 def get_parent_portfolio(
     lang: str = "en",
-    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    child_id: Optional[str] = None,
+    current_user: TokenPayload = Depends(require_role(["parent"])),
     db: Session = Depends(get_db)
 ):
-    college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
-    
-    student = db.execute(select(Student).filter_by(college_id=college_id)).scalar_one_or_none()
-    ward_name = "Priya R"
-    if student:
-        user = db.execute(select(User).filter_by(id=student.user_id)).scalar_one_or_none()
-        if user and user.name:
-            ward_name = user.name
-    ward_branch = f"Sem {student.semester if student else 5} · {student.branch if student else 'AI & DS'}"
+    college_id = current_user.college_id
+    student = get_child_for_parent(current_user, db, child_id)
+    ward_name = get_user_name(db, student.user_id, "Student")
+    ward_branch = "Sem " + str(student.semester) + " · " + student.branch
 
-    # Query student projects for this tenant
+    # Query the child's projects inside this tenant
     projects = db.execute(
-        select(StudentProject).filter_by(college_id=college_id)
+        select(StudentProject).filter_by(college_id=college_id, student_id=student.id)
     ).scalars().all()
 
     formatted_projects = []
@@ -149,8 +191,8 @@ def get_parent_portfolio(
             "name": ward_name,
             "details": ward_branch,
             "college": "Demo Engineering College",
-            "readiness_score": 74,
-            "readiness_band": "Nearly Ready" if lang == "en" else "கிட்டத்தட்ட தயார்"
+            "readiness_score": student.readiness_score,
+            "readiness_band": student.readiness_band if lang == "en" else BAND_TA.get(student.readiness_band, student.readiness_band)
         },
         "milestone_progress": {
             "sprint_name": "Sprint 2 of 3",
@@ -194,15 +236,11 @@ def get_parent_portfolio(
 @router.post("/portfolio/rsvp")
 def submit_portfolio_rsvp(
     req: RSVPRequest,
-    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_role(["parent"])),
     db: Session = Depends(get_db)
 ):
-    college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
+    college_id = current_user.college_id
     event = db.execute(select(ProjectDemoEvent).filter_by(id=req.event_id, college_id=college_id)).scalar_one_or_none()
-    
-    if not event:
-        # Fallback without college filter if cross-checking
-        event = db.execute(select(ProjectDemoEvent).filter_by(id=req.event_id)).scalar_one_or_none()
 
     if not event:
         raise HTTPException(status_code=404, detail="Demo day event not found")

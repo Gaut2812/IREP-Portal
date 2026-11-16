@@ -1,22 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { loginAs } from "./helpers/auth";
 
 test.describe("Screen 32: Student Portfolio (/student/portfolio)", () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "irep_user",
-        JSON.stringify({
-          id: "usr_priya_01",
-          email: "priya.r@demo.edu",
-          role: "student",
-          name: "Priya R",
-          avatar: "PR",
-          college_id: "col_demo_001",
-        })
-      );
-      localStorage.setItem("irep_token", "mock_jwt_token_demo");
-      localStorage.setItem("irep_lang", "en");
-    });
+    await loginAs(page, "student");
   });
 
   test("should render student portfolio with hero card, KPI stats, projects, and skills", async ({ page }) => {
@@ -69,21 +56,7 @@ test.describe("Screen 32: Student Portfolio (/student/portfolio)", () => {
 
 test.describe("Screen 33: Parent Projects & Portfolio (/parent/portfolio)", () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "irep_user",
-        JSON.stringify({
-          id: "usr_ramesh_01",
-          email: "ramesh.k@example.com",
-          role: "parent",
-          name: "Mr. Ramesh K",
-          avatar: "RK",
-          college_id: "col_demo_001",
-        })
-      );
-      localStorage.setItem("irep_token", "mock_jwt_token_demo");
-      localStorage.setItem("irep_lang", "en");
-    });
+    await loginAs(page, "parent");
   });
 
   test("should render parent portfolio with ward banner, sprint milestone, plain explanations, and interactive RSVP", async ({ page }) => {

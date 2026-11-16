@@ -1,7 +1,7 @@
 import datetime
 import bcrypt
 from typing import Optional, List
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -48,32 +48,54 @@ def decode_access_token(token: str) -> Optional[TokenPayload]:
     except JWTError:
         return None
 
-async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> TokenPayload:
-    # Default demo student used when no token or an undecodable demo token is provided
-    _demo_fallback = TokenPayload(
-        sub="usr_priya_01",
-        email="priya.r@demo.edu",
-        role="student",
-        college_id=settings.DEFAULT_COLLEGE_ID,
-        name="Priya R",
-        avatar="PR"
-    )
+DEMO_PROFILES = {
+    "student": dict(sub="usr_priya_01", email="priya.r@demo.edu", role="student", name="Priya R", avatar="PR"),
+    "trainer": dict(sub="usr_arun_01", email="arun.k@demo.edu", role="trainer", name="Arun Kumar", avatar="AK"),
+    "college_admin": dict(sub="usr_kavitha_01", email="admin@demo.edu", role="college_admin", name="Dr. Kavitha", avatar="DC"),
+    "parent": dict(sub="usr_ramesh_01", email="ramesh.k@example.com", role="parent", name="Mr. Ramesh K", avatar="RK"),
+}
+# The web app uses the short role name "college"; the API role is college_admin.
+ROLE_ALIASES = {"college": "college_admin"}
 
-    if not token:
-        return _demo_fallback
 
-    payload = decode_access_token(token)
-    if not payload:
-        # In development the frontend sends a mock token ("mock_jwt_token_demo")
-        # that is not a real JWT.  Fall back to the demo student so the UI works
-        # without requiring a real login flow.
-        # In production, swap this block for a hard 401.
-        return _demo_fallback
-    return payload
+def normalize_role(role: Optional[str]) -> Optional[str]:
+    if not role:
+        return role
+    return ROLE_ALIASES.get(role, role)
+
+
+async def get_current_user(
+    token: Optional[str] = Depends(oauth2_scheme),
+    x_demo_role: Optional[str] = Header(default=None, alias="X-Demo-Role"),
+) -> TokenPayload:
+    """Resolve the caller from the bearer JWT.
+
+    Development only: a missing or undecodable token falls back to a seeded
+    demo profile. The role comes from the optional X-Demo-Role header and
+    defaults to the demo student, which keeps local smoke tests and the
+    Playwright specs working without a login round-trip. In production an
+    invalid token is always a 401.
+    """
+    payload = decode_access_token(token) if token else None
+    if payload:
+        return payload
+
+    if settings.ENVIRONMENT.lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    role = normalize_role((x_demo_role or "student").strip().lower()) or "student"
+    profile = DEMO_PROFILES.get(role, DEMO_PROFILES["student"])
+    return TokenPayload(college_id=settings.DEFAULT_COLLEGE_ID, **profile)
+
 
 def require_role(allowed_roles: List[str]):
     def role_checker(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
-        if current_user.role not in allowed_roles:
+        allowed = {normalize_role(r) for r in allowed_roles}
+        if normalize_role(current_user.role) not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Requires one of roles: {', '.join(allowed_roles)}"

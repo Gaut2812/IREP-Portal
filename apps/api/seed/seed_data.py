@@ -477,7 +477,8 @@ def seed_reviews_data(db, college_id="col_demo_001"):
 
 def init_db_and_seed():
     print("Creating tables...", flush=True)
-    Base.metadata.create_all(engine)
+    from core.db_init import ensure_schema
+    ensure_schema(engine)
         
     db = SessionLocal()
     try:
@@ -511,6 +512,13 @@ def init_db_and_seed():
             if not existing_pr:
                 seed_reviews_data(db, college_id="col_demo_001")
                 print("Seeded Screen 31 code reviews data.", flush=True)
+
+            # Ensure the S0 cohort (branches, batches, 612 students, certificates...) exists
+            from seed.seed_cohort import seed_cohort
+            created = seed_cohort(db, college_id="col_demo_001")
+            if created:
+                db.commit()
+                print("Seeded cohort with " + str(created) + " students.", flush=True)
 
             print("Database already seeded.", flush=True)
             return
@@ -1056,6 +1064,11 @@ def init_db_and_seed():
 
         # 15. Screen 31: Trainer Code Reviews PR Data
         seed_reviews_data(db, college_id="col_demo_001")
+
+        # 16. S0 cohort: branches, batches, trainers, 612 students, certificates, internships
+        db.flush()
+        from seed.seed_cohort import seed_cohort
+        seed_cohort(db, college_id="col_demo_001")
 
         db.commit()
     finally:

@@ -8,6 +8,8 @@ import uuid
 
 from core.database import get_db
 from core.security import get_current_user, TokenPayload, require_role
+from core.tenant import get_student_for_user
+from core.tenant import get_student_for_user
 from core.config import settings
 from models.schema import (
     Student, CodingProblem, TestCase, CodingSubmission, SubmissionResult, CodingHintUsage, PracticeTest,
@@ -31,9 +33,7 @@ def get_student_dashboard(
     current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalar_one_or_none()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found")
+    student = get_student_for_user(current_user, db)
         
     return {
         "student": {
@@ -475,10 +475,8 @@ def submit_code(
         raise HTTPException(status_code=404, detail="Problem not found for this tenant")
         
     # Resolve student profile
-    student = db.execute(
-        select(Student).filter_by(college_id=current_user.college_id)
-    ).scalar_one_or_none()
-    student_id = student.id if student else current_user.sub
+    student = get_student_for_user(current_user, db)
+    student_id = student.id
 
     # Condition 5: Rate-limit submissions per student per problem
     last_sub = db.execute(
@@ -708,12 +706,7 @@ class SubmitTestRequest(BaseModel):
     marked_for_review: Optional[List[int]] = None
 
 def _get_student_for_user(current_user: TokenPayload, db: Session) -> Student:
-    student = db.execute(select(Student).filter_by(user_id=current_user.sub, college_id=current_user.college_id)).scalar_one_or_none()
-    if not student:
-        student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalars().first()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found for this tenant")
-    return student
+    return get_student_for_user(current_user, db)
 
 
 @router.get("/tests/{test_id}")
@@ -1536,9 +1529,7 @@ def get_student_portfolio(
             name="Priya R"
         )
 
-    student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalar_one_or_none()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found for this tenant")
+    student = get_student_for_user(current_user, db)
 
     projects = db.execute(
         select(StudentProject).filter_by(college_id=current_user.college_id, student_id=student.id)
@@ -1653,9 +1644,7 @@ def add_portfolio_project(
             name="Priya R"
         )
 
-    student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalar_one_or_none()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found")
+    student = get_student_for_user(current_user, db)
 
     new_id = f"proj_{uuid.uuid4().hex[:12]}"
     new_project = StudentProject(

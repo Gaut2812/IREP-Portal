@@ -285,5 +285,11 @@
     "loading": "Loading pull requests and code diffs...",
     "error_loading": "Failed to load code reviews. Please try again.",
     "retry": "Try Again"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "mark_all_read": "Mark all read",
+    "empty": "You're all caught up",
+    "load_error": "Could not load notifications. Try again."
   }
 }

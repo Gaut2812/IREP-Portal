@@ -520,6 +520,11 @@ def init_db_and_seed():
                 db.commit()
                 print("Seeded cohort with " + str(created) + " students.", flush=True)
 
+            from seed.seed_screen12 import seed_screen12
+            if seed_screen12(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 12 readiness snapshots, skills, badges and events.", flush=True)
+
             print("Database already seeded.", flush=True)
             return
 
@@ -1069,6 +1074,9 @@ def init_db_and_seed():
         db.flush()
         from seed.seed_cohort import seed_cohort
         seed_cohort(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen12 import seed_screen12
+        seed_screen12(db, college_id="col_demo_001")
 
         db.commit()
     finally:

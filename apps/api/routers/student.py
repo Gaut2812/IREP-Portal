@@ -28,64 +28,30 @@ from schemas.coding import (
 router = APIRouter(prefix="/student", tags=["Student Screens"])
 
 # --- SCREEN 12: Student Dashboard (PDF 2) ---
+from services.dashboard import build_student_dashboard, build_why_score
+
+
 @router.get("/dashboard")
 def get_student_dashboard(
-    current_user: TokenPayload = Depends(get_current_user),
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
+    db: Session = Depends(get_db)
+):
+    """One payload for the student home page, built from rows (snapshots, skill
+    scores, sessions, sprint tasks, events, badges)."""
+    student = get_student_for_user(current_user, db)
+    return build_student_dashboard(db, student, current_user, lang)
+
+
+@router.get("/dashboard/why-score")
+def get_why_score(
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
     student = get_student_for_user(current_user, db)
-        
-    return {
-        "student": {
-            "name": current_user.name or "Priya R",
-            "greeting": "Good morning, Priya 👋",
-            "semester": student.semester,
-            "branch": student.branch,
-            "batch": student.batch_name,
-            "readiness_score": student.readiness_score,
-            "readiness_band": student.readiness_band,
-            "readiness_delta": student.readiness_delta,
-            "problems_solved": student.problems_solved,
-            "problems_delta": 34,
-            "attendance_pct": student.attendance_pct,
-            "attendance_target": 85,
-            "streak_days": student.streak_days,
-            "streak_best": 27
-        },
-        "skill_progress": [
-            {"skill": "DSA patterns", "percentage": 78, "color": "teal"},
-            {"skill": "Aptitude & reasoning", "percentage": 71, "color": "blue"},
-            {"skill": "Cloud & DevOps", "percentage": 64, "color": "purple"},
-            {"skill": "AI & Data Science track", "percentage": 82, "color": "teal"},
-            {"skill": "Future Skills: AI engineering", "percentage": 58, "color": "orange"},
-            {"skill": "Communication", "percentage": 69, "color": "blue"}
-        ],
-        "this_week": [
-            {"day": "Mon", "topic": "DSA: Pattern drill – Union-Find", "duration": "1 hr", "type": "Live", "color": "blue"},
-            {"day": "Tue", "topic": "Track: Model evaluation lab", "duration": "1 hr", "type": "Live", "color": "blue"},
-            {"day": "Wed", "topic": "Aptitude: Data interpretation", "duration": "1 hr", "type": "Live", "color": "blue"},
-            {"day": "Thu", "topic": "Future Skills: LLM APIs & RAG", "duration": "1 hr", "type": "Live", "color": "teal"},
-            {"day": "Fri", "topic": "GD + weekly quiz", "duration": "1 hr", "type": "Live", "color": "blue"},
-            {"day": "Sat", "topic": "Track project kick-off + RAG mini-lab", "duration": "3 hrs", "type": "In-lab / Hybrid", "color": "purple"}
-        ],
-        "current_project": {
-            "title": "Crop Price Predictor",
-            "subtitle": "End-to-end ML · Team of 3 · Due Week 12",
-            "progress_pct": 45,
-            "open_tasks": 3
-        },
-        "upcoming_events": [
-            {"title": "Mid-term DSA test", "date": "Sat"},
-            {"title": "Mock interview", "date": "Wed 4:00 PM"},
-            {"title": "AWS Cloud Practitioner", "date": "Nov 22"}
-        ],
-        "badges": [
-            {"name": "Cloud Deployer", "description": "Deployed first app on cloud", "icon": "cloud", "earned_date": "Recently"},
-            {"name": "DSA Master", "description": "100+ patterns solved", "icon": "code", "earned_date": "Oct 2"},
-            {"name": "Consistent 15", "description": "15-day study streak", "icon": "flame", "earned_date": "Sep 28"},
-            {"name": "Team Lead", "description": "Sprint 1 shipped", "icon": "users", "earned_date": "Sep 20"}
-        ]
-    }
+    return build_why_score(db, student, lang)
+
 
 # --- SCREEN 24: Coding Lab (PDF 3) ---
 class CodeRunRequest(BaseModel):
@@ -586,8 +552,7 @@ def submit_code(
 
     # Update student stats on Accepted
     if execution.status == "Accepted" and student:
-        student.problems_solved += 1
-        student.readiness_score = min(100, student.readiness_score + 1)
+        student.problems_solved += 1  # readiness itself is recomputed by the snapshot job (services.readiness)
 
     db.commit()
 

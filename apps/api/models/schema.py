@@ -93,6 +93,9 @@ class SessionAttendance(TenantModel):
     minutes_present: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(32), default="Present") # Present, Absent, Partial
     marked_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    source: Mapped[str] = mapped_column(String(16), default="auto")   # auto (75% rule), qr, manual
+    overridden_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    override_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 # Screen 24: Coding Lab
 class CodingProblem(TenantModel):
@@ -837,3 +840,79 @@ class RecordingView(TenantModel):
     recording_id: Mapped[str] = mapped_column(String(64), ForeignKey("recordings.id"), index=True)
     watched_seconds: Mapped[int] = mapped_column(Integer, default=0)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+# ---------------------------------------------------------------------------
+# Screen 07: live classroom (meetings, join events, polls, Q&A)
+# ---------------------------------------------------------------------------
+
+class LiveMeeting(TenantModel):
+    __tablename__ = "live_meetings"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), unique=True, index=True)
+    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb
+    external_meeting_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    started_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    is_recording: Mapped[bool] = mapped_column(Boolean, default=True)
+    sharing_user_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    shared_file: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    shared_source: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    shared_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    flow_title: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    flow_steps: Mapped[list] = mapped_column(JSON, default=list)
+    finalized: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class JoinEvent(TenantModel):
+    __tablename__ = "join_events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
+    event: Mapped[str] = mapped_column(String(16), nullable=False)               # joined, left
+    at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(16), default="portal")            # portal, webhook
+
+
+class LivePoll(TenantModel):
+    __tablename__ = "live_polls"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), index=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[list] = mapped_column(JSON, default=list)                    # [{"key":"a","text":"...","color":"red"}]
+    is_open: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class LivePollVote(TenantModel):
+    __tablename__ = "live_poll_votes"
+    __table_args__ = (UniqueConstraint("poll_id", "user_id", name="uq_poll_vote_user"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    poll_id: Mapped[str] = mapped_column(String(64), ForeignKey("live_polls.id"), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    option_key: Mapped[str] = mapped_column(String(8), nullable=False)
+
+
+class QaQuestion(TenantModel):
+    __tablename__ = "qa_questions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), index=True)
+    author_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    author_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    answered_at_sec: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class QaUpvote(TenantModel):
+    __tablename__ = "qa_upvotes"
+    __table_args__ = (UniqueConstraint("question_id", "user_id", name="uq_qa_upvote_user"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    question_id: Mapped[str] = mapped_column(String(64), ForeignKey("qa_questions.id"), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)

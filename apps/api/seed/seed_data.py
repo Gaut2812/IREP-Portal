@@ -549,6 +549,11 @@ def init_db_and_seed():
             seed_screen08(db, college_id="col_demo_001")
             db.commit()
 
+            from seed.seed_screen07 import seed_screen07
+            if seed_screen07(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 07 classroom poll and Q&A.", flush=True)
+
             # keep at-risk flags consistent with the latest attendance history
             from services.at_risk import run_rules
             new_flags = run_rules(db, "col_demo_001")
@@ -1117,6 +1122,8 @@ def init_db_and_seed():
         seed_screen15(db, college_id="col_demo_001")
         from seed.seed_screen08 import seed_screen08
         seed_screen08(db, college_id="col_demo_001")
+        from seed.seed_screen07 import seed_screen07
+        seed_screen07(db, college_id="col_demo_001")
 
         db.commit()
     finally:

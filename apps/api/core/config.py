@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # BigBlueButton / Live class service
     BBB_URL: str = os.getenv("BBB_URL", "http://localhost:8080/bigbluebutton")
     BBB_SECRET: str = os.getenv("BBB_SECRET", "bbb_demo_secret_2026")
+    LIVE_CLASS_ADAPTER: str = os.getenv("LIVE_CLASS_ADAPTER", "fake")
+    LAB_ADAPTER: str = os.getenv("LAB_ADAPTER", "fake")
+    TRANSLATE_ADAPTER: str = os.getenv("TRANSLATE_ADAPTER", "fake")
+    TRANSLATE_URL: str = os.getenv("TRANSLATE_URL", "http://localhost:5000")
+    GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "dev_github_webhook_secret")
     
     # AI Reviewer
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)

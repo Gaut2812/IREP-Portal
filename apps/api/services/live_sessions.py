@@ -99,6 +99,33 @@ def rebase_week_sessions(db: Session, college_id: str = "col_demo_001", now: Opt
                 changed += 1
     db.flush()
 
+    # demo hygiene: a demo class that was started/ended before its scheduled end
+    # (e.g. by an end-to-end test) is reset so the room can be opened again
+    from models.schema import LiveMeeting, JoinEvent
+    for sid, *_ in WEEK_PLAN:
+        s_item = db.execute(select(SessionItem).filter_by(id=sid, college_id=college_id)).scalar_one_or_none()
+        meeting = db.execute(select(LiveMeeting).filter_by(session_id=sid)).scalar_one_or_none()
+        if s_item and meeting and meeting.started_at and s_item.scheduled_end > now:
+            from models.schema import LivePoll, LivePollVote, QaQuestion, QaUpvote
+            # rows carry UTC created_at; meeting times are campus-local
+            since = meeting.started_at - (datetime.datetime.now() - datetime.datetime.utcnow()) - datetime.timedelta(seconds=5)
+            poll_ids = db.execute(select(LivePoll.id).where(LivePoll.session_id == sid)).scalars().all()
+            q_ids = db.execute(select(QaQuestion.id).where(QaQuestion.session_id == sid)).scalars().all()
+            db.execute(delete(LivePollVote).where(LivePollVote.poll_id.in_(poll_ids or ["_"]), LivePollVote.created_at >= since))
+            db.execute(delete(QaUpvote).where(QaUpvote.question_id.in_(q_ids or ["_"]), QaUpvote.created_at >= since))
+            new_q = db.execute(select(QaQuestion.id).where(QaQuestion.session_id == sid, QaQuestion.created_at >= since)).scalars().all()
+            db.execute(delete(QaUpvote).where(QaUpvote.question_id.in_(new_q or ["_"])))
+            db.execute(delete(QaQuestion).where(QaQuestion.id.in_(new_q or ["_"])))
+            new_polls = db.execute(select(LivePoll.id).where(LivePoll.session_id == sid, LivePoll.created_at >= since)).scalars().all()
+            db.execute(delete(LivePollVote).where(LivePollVote.poll_id.in_(new_polls or ["_"])))
+            db.execute(delete(LivePoll).where(LivePoll.id.in_(new_polls or ["_"])))
+            for p_ in db.execute(select(LivePoll).where(LivePoll.session_id == sid)).scalars().all():
+                p_.is_open = True
+            meeting.started_at = meeting.ended_at = None
+            meeting.finalized = False
+            db.execute(delete(JoinEvent).where(JoinEvent.session_id == sid))
+            changed += 1
+
     # attendance consistency
     ids = [p[0] for p in WEEK_PLAN] + [t[0] for t in TRAINER_TODAY]
     sessions = db.execute(select(SessionItem).where(SessionItem.id.in_(ids), SessionItem.college_id == college_id)).scalars().all()

@@ -689,3 +689,49 @@ class Event(TenantModel):
     description_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rsvp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Screen 13/14: at-risk flags and rule configuration
+# ---------------------------------------------------------------------------
+
+class RulesConfig(TenantModel):
+    __tablename__ = "rules_config"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    score_below: Mapped[int] = mapped_column(Integer, default=60)
+    attendance_below: Mapped[int] = mapped_column(Integer, default=75)
+    missed_sessions: Mapped[int] = mapped_column(Integer, default=3)
+    project_delay_days: Mapped[int] = mapped_column(Integer, default=7)
+    quiet_hours_start: Mapped[int] = mapped_column(Integer, default=21)   # parent alerts are held between 21:00 and 08:00
+    quiet_hours_end: Mapped[int] = mapped_column(Integer, default=8)
+
+
+class AtRiskFlag(TenantModel):
+    __tablename__ = "at_risk_flags"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    reason_key: Mapped[str] = mapped_column(String(32), nullable=False, index=True)   # low_score, low_attendance, missed_sessions, project_delay
+    reason_text: Mapped[str] = mapped_column(String(255), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), default="medium")                # low, medium, high
+    suggested_action: Mapped[str] = mapped_column(String(32), default="mentor")        # parent_call, extra_saturday, mentor
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)        # open, in_progress, resolved
+    parent_notified: Mapped[bool] = mapped_column(Boolean, default=False)
+    parent_notified_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    resolved_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    flagged_on: Mapped[datetime.date] = mapped_column(Date, default=datetime.date.today)
+
+
+class FlagAction(TenantModel):
+    __tablename__ = "flag_actions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    flag_id: Mapped[str] = mapped_column(String(64), ForeignKey("at_risk_flags.id"), index=True)
+    action_type: Mapped[str] = mapped_column(String(32), nullable=False)   # parent_call, extra_saturday, mentor, note, resolve
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    actor_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    actor_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)

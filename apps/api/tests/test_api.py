@@ -45,10 +45,10 @@ def test_coding_lab():
     assert data["difficulty"] == "Medium"
 
 def test_trainer_dashboard():
-    response = client.get("/api/v1/trainer/dashboard")
+    response = client.get("/api/v1/trainer/dashboard", headers={"X-Demo-Role": "trainer"})
     assert response.status_code == 200
     data = response.json()
-    assert data["kpis"]["active_batches"]["value"] == "5"
+    assert data["kpis"]["active_batches"]["value"] == 5
 
 def test_college_dashboard():
     response = client.get("/api/v1/college/dashboard")

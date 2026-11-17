@@ -9,6 +9,9 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * The API is expected on :8000 (reused when already running).
  */
+const BASE = process.env.PLAYWRIGHT_TEST_BASE_URL || "http://localhost:3002";
+const PORT = new URL(BASE).port || "3002";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -17,7 +20,7 @@ export default defineConfig({
   workers: 1,
   reporter: "line",
   use: {
-    baseURL: "http://localhost:3002",
+    baseURL: BASE,
     trace: "retain-on-failure",
     headless: true,
   },
@@ -30,9 +33,9 @@ export default defineConfig({
       timeout: 60000,
     },
     {
-      command: "pnpm exec next start -p 3002",
-      url: "http://localhost:3002/login",
-      reuseExistingServer: false,
+      command: `pnpm exec next start -p ${PORT}`,
+      url: `${BASE}/login`,
+      reuseExistingServer: !!process.env.PLAYWRIGHT_TEST_BASE_URL,
       timeout: 90000,
     },
   ],

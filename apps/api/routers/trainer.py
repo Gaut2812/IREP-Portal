@@ -14,43 +14,120 @@ from models.schema import (
 
 router = APIRouter(prefix="/trainer", tags=["Trainer Screens"])
 
-# --- SCREEN 13: Trainer Dashboard (PDF 8) ---
+# --- SCREEN 13: Trainer Dashboard (PDF 8) + Screen 14 flag actions ---
+import uuid
+from core.tenant import get_trainer_for_user, get_trainer_batch_ids, get_user_name
+from models.schema import AtRiskFlag, FlagAction, Student as StudentModel, User as UserModel
+from services.trainer_dashboard import build_trainer_dashboard
+from services.at_risk import notify_parent_once, ACTION_LABEL
+from services.audit import record_audit
+
+
+class FlagActionRequest(BaseModel):
+    action_type: str          # parent_call | extra_saturday | mentor | note
+    note: Optional[str] = None
+
+
+class FlagResolveRequest(BaseModel):
+    note: str
+
+
 @router.get("/dashboard")
-def get_trainer_dashboard(db: Session = Depends(get_db)):
-    return {
-        "kpis": {
-            "active_batches": {"value": "5", "subtext": "248 students · 2 colleges"},
-            "today_attendance": {"value": "91%", "subtext": "▲ 3% vs last week", "delta_positive": True},
-            "pending_code_reviews": {"value": "17", "subtext": "6 older than 2 days", "warning": True},
-            "at_risk_students": {"value": "12", "subtext": "Parents notified: 9"}
-        },
-        "batch_readiness": [
-            {"batch": "CSE-A", "score": 82, "color": "teal"},
-            {"batch": "CSE-B", "score": 76, "color": "teal"},
-            {"batch": "IT-A", "score": 71, "color": "blue"},
-            {"batch": "AI & DS", "score": 79, "color": "teal"},
-            {"batch": "Cyber", "score": 68, "color": "blue"}
-        ],
-        "today_schedule": [
-            {"time": "9:00 AM", "batch": "CSE-A · Sem 5", "topic": "System design basics", "status": "Done", "status_color": "green"},
-            {"time": "11:00 AM", "batch": "AI & DS · Sem 5", "topic": "LLM APIs & RAG", "status": "Next", "status_color": "blue"},
-            {"time": "2:00 PM", "batch": "IT-A · Sem 4", "topic": "SQL window functions", "status": "Later", "status_color": "grey"},
-            {"time": "3:30 PM", "batch": "Cyber · Sem 5", "topic": "OWASP lab: XSS", "status": "Later", "status_color": "grey"}
-        ],
-        "students_needing_support": [
-            {"name": "Karthik S.", "batch": "CSE-B", "score": 52, "issue": "Attendance 71%", "action": "Parent call", "action_color": "red"},
-            {"name": "Divya M.", "batch": "IT-A", "score": 56, "issue": "DSA tests", "action": "Extra Sat", "action_color": "amber"},
-            {"name": "Rahul V.", "batch": "Cyber", "score": 58, "issue": "Project delay", "action": "Mentor", "action_color": "blue"}
-        ],
-        "quick_actions": [
-            {"label": "Mark attendance", "type": "primary", "variant": "blue"},
-            {"label": "Create test", "type": "outline", "variant": "default"},
-            {"label": "Review PRs", "type": "outline", "variant": "default"},
-            {"label": "Send parent update", "type": "outline", "variant": "default"},
-            {"label": "Schedule mock", "type": "outline", "variant": "default"},
-            {"label": "Monthly report", "type": "primary", "variant": "teal"}
-        ]
-    }
+def get_trainer_dashboard(
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
+    db: Session = Depends(get_db),
+):
+    trainer = get_trainer_for_user(current_user, db)
+    return build_trainer_dashboard(db, trainer, current_user, lang)
+
+
+def _flag_for_trainer(flag_id: str, current_user: TokenPayload, db: Session) -> AtRiskFlag:
+    trainer = get_trainer_for_user(current_user, db)
+    batch_ids = get_trainer_batch_ids(trainer, db)
+    flag = db.execute(select(AtRiskFlag).filter_by(id=flag_id, college_id=current_user.college_id)).scalar_one_or_none()
+    if not flag or (flag.batch_id and flag.batch_id not in batch_ids):
+        raise HTTPException(status_code=404, detail="Flag not found")
+    return flag
+
+
+@router.get("/at-risk")
+def list_at_risk_flags(
+    status: Optional[str] = "open",
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
+    db: Session = Depends(get_db),
+):
+    trainer = get_trainer_for_user(current_user, db)
+    batch_ids = get_trainer_batch_ids(trainer, db) or ["__none__"]
+    q = select(AtRiskFlag).where(AtRiskFlag.college_id == current_user.college_id, AtRiskFlag.batch_id.in_(batch_ids))
+    if status and status != "all":
+        q = q.where(AtRiskFlag.status == status) if status != "open" else q.where(AtRiskFlag.status != "resolved")
+    flags = db.execute(q.order_by(AtRiskFlag.flagged_on.desc())).scalars().all()
+    students = {st.id: (st, nm) for st, nm in db.execute(
+        select(StudentModel, UserModel.name).join(UserModel, UserModel.id == StudentModel.user_id)
+        .where(StudentModel.id.in_([f.student_id for f in flags] or ["__none__"]))
+    ).all()}
+    return {"flags": [
+        {
+            "id": f.id, "student_id": f.student_id, "name": students.get(f.student_id, (None, "Student"))[1],
+            "score": students[f.student_id][0].readiness_score if f.student_id in students else None,
+            "reason_key": f.reason_key, "issue": f.reason_text, "severity": f.severity, "status": f.status,
+            "suggested_action": f.suggested_action, "action_label": ACTION_LABEL[f.suggested_action][lang if lang in ("en", "ta") else "en"],
+            "parent_notified": f.parent_notified, "flagged_on": f.flagged_on.isoformat() if f.flagged_on else None,
+        } for f in flags
+    ], "total": len(flags)}
+
+
+@router.post("/flags/{flag_id}/actions")
+def add_flag_action(
+    flag_id: str,
+    req: FlagActionRequest,
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
+    db: Session = Depends(get_db),
+):
+    if req.action_type not in ("parent_call", "extra_saturday", "mentor", "note"):
+        raise HTTPException(status_code=422, detail="Unknown action type")
+    flag = _flag_for_trainer(flag_id, current_user, db)
+    student = db.execute(select(StudentModel).filter_by(id=flag.student_id)).scalar_one()
+    student_name = get_user_name(db, student.user_id, "Student")
+    action = FlagAction(
+        id=f"fa_{uuid.uuid4().hex[:18]}", college_id=current_user.college_id, flag_id=flag.id,
+        action_type=req.action_type, note=req.note, actor_user_id=current_user.sub, actor_name=current_user.name,
+    )
+    db.add(action)
+    if flag.status == "open":
+        flag.status = "in_progress"
+    notified = False
+    if req.action_type == "parent_call":
+        notified = notify_parent_once(db, flag, student_name)
+    record_audit(db, current_user, "at_risk.action", "at_risk_flag", flag.id,
+                 {"action_type": req.action_type, "student_id": flag.student_id, "parent_notified": notified})
+    db.commit()
+    return {"success": True, "flag_id": flag.id, "status": flag.status, "action_id": action.id,
+            "parent_notified": flag.parent_notified, "notified_now": notified}
+
+
+@router.post("/flags/{flag_id}/resolve")
+def resolve_flag(
+    flag_id: str,
+    req: FlagResolveRequest,
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
+    db: Session = Depends(get_db),
+):
+    if not req.note or not req.note.strip():
+        raise HTTPException(status_code=422, detail="A resolution note is required")
+    flag = _flag_for_trainer(flag_id, current_user, db)
+    flag.status = "resolved"
+    flag.resolution_note = req.note.strip()
+    flag.resolved_by = current_user.sub
+    flag.resolved_at = datetime.datetime.utcnow()
+    db.add(FlagAction(id=f"fa_{uuid.uuid4().hex[:18]}", college_id=current_user.college_id, flag_id=flag.id,
+                      action_type="resolve", note=req.note.strip(), actor_user_id=current_user.sub, actor_name=current_user.name))
+    record_audit(db, current_user, "at_risk.resolve", "at_risk_flag", flag.id, {"student_id": flag.student_id})
+    db.commit()
+    return {"success": True, "flag_id": flag.id, "status": flag.status}
+
 
 @router.get("/coding-problems")
 def list_trainer_coding_problems(

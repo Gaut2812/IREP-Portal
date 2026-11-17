@@ -794,3 +794,46 @@ class Rsvp(TenantModel):
     student_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="yes")   # yes, no, maybe
     guests: Mapped[int] = mapped_column(Integer, default=1)
+
+
+# ---------------------------------------------------------------------------
+# Screen 08: recordings, reminders, recording views
+# ---------------------------------------------------------------------------
+
+class Recording(TenantModel):
+    __tablename__ = "recordings"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("sessions.id"), nullable=True, index=True)
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(512), nullable=False)       # object-storage key; served via signed URL
+    duration_min: Mapped[int] = mapped_column(Integer, default=60)
+    chapters: Mapped[list] = mapped_column(JSON, default=list)                  # [{"at_sec": 0, "title": "..."}]
+    has_transcript: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_summary: Mapped[bool] = mapped_column(Boolean, default=False)
+    recorded_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="ready")           # processing, ready
+
+
+class SessionReminder(TenantModel):
+    __tablename__ = "reminders"
+    __table_args__ = (UniqueConstraint("user_id", "session_id", name="uq_reminder_user_session"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), index=True)
+    channel: Mapped[str] = mapped_column(String(16), default="in_app")
+    remind_at: Mapped[datetime.datetime] = mapped_column(DateTime)
+    delivered: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class RecordingView(TenantModel):
+    __tablename__ = "recording_views"
+    __table_args__ = (UniqueConstraint("student_id", "recording_id", name="uq_recording_view"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    recording_id: Mapped[str] = mapped_column(String(64), ForeignKey("recordings.id"), index=True)
+    watched_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)

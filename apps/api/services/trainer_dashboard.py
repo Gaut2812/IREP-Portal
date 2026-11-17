@@ -54,7 +54,7 @@ def _attendance_for_day(db: Session, batch_ids: List[str], day: datetime.date):
 
 def build_trainer_dashboard(db: Session, trainer: Trainer, current_user: TokenPayload, lang: str = "en",
                             now: Optional[datetime.datetime] = None) -> dict:
-    now = now or datetime.datetime.utcnow()
+    now = now or datetime.datetime.now()   # session times are stored as campus-local naive datetimes
     today = now.date()
     college_id = trainer.college_id
     batches = trainer_batches(db, trainer)

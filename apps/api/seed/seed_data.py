@@ -545,6 +545,17 @@ def init_db_and_seed():
                 db.commit()
                 print("Re-anchored demo calendar to today.", flush=True)
 
+            from seed.seed_screen08 import seed_screen08
+            seed_screen08(db, college_id="col_demo_001")
+            db.commit()
+
+            # keep at-risk flags consistent with the latest attendance history
+            from services.at_risk import run_rules
+            new_flags = run_rules(db, "col_demo_001")
+            db.commit()
+            if new_flags:
+                print("Opened " + str(new_flags) + " at-risk flags.", flush=True)
+
             print("Database already seeded.", flush=True)
             return
 
@@ -1104,6 +1115,8 @@ def init_db_and_seed():
         seed_screen19(db, college_id="col_demo_001")
         from seed.seed_screen15 import seed_screen15
         seed_screen15(db, college_id="col_demo_001")
+        from seed.seed_screen08 import seed_screen08
+        seed_screen08(db, college_id="col_demo_001")
 
         db.commit()
     finally:

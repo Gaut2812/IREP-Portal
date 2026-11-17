@@ -104,7 +104,7 @@ def test_parent_call_action_notifies_parent_once():
         flag.parent_notified = False
         flag.parent_notified_at = None
         db.commit()
-        before = db.execute(select(func.count(Notification.id)).filter_by(user_id="usr_lakshmi_01", kind="alert")).scalar_one()
+        before = db.execute(select(func.count(Notification.id)).filter_by(user_id="usr_lakshmi_01", kind="alert", channel="in_app")).scalar_one()
         cfg = db.execute(select(RulesConfig).filter_by(college_id="col_demo_001")).scalar_one()
         quiet = in_quiet_hours(cfg)
     finally:
@@ -116,7 +116,7 @@ def test_parent_call_action_notifies_parent_once():
     assert r2.json()["notified_now"] is False
     db = SessionLocal()
     try:
-        after = db.execute(select(func.count(Notification.id)).filter_by(user_id="usr_lakshmi_01", kind="alert")).scalar_one()
+        after = db.execute(select(func.count(Notification.id)).filter_by(user_id="usr_lakshmi_01", kind="alert", channel="in_app")).scalar_one()
         if quiet:
             assert after == before
         else:

@@ -1331,43 +1331,75 @@ def book_interview_slot(req: SlotBookRequest):
     return {"success": True, "message": "Slot booked successfully! Confirmation sent to trainer."}
 
 # --- SCREEN 08: Live Sessions & Recordings (PDF 14) ---
+from models.schema import Recording, RecordingView, SessionReminder
+from services.live_sessions import build_student_live, sign_url, session_status
+from services.notifications import notify_user
+from services.audit import record_audit
+
+
 @router.get("/live")
-def get_student_live_sessions(db: Session = Depends(get_db)):
-    sessions = db.execute(select(SessionItem).order_by(SessionItem.scheduled_start)).scalars().all()
-    
-    return {
-        "hero_session": {
-            "badge": "Starting in 4 min",
-            "title": "Future Skills: LLM APIs & RAG",
-            "time_info": "Thu, Oct 9 · 11:00 AM to 12:00 PM · Arun K. · Lab: AI Notebook pre-loaded",
-            "device_check": "Mic & camera check passed",
-            "session_id": "sess_thu_rag"
-        },
-        "week_sessions": [
-            {
-                "id": s.id,
-                "when": s.scheduled_start.strftime("%a %I:%M–") + s.scheduled_end.strftime("%I:%M"),
-                "title": s.title,
-                "type": s.session_type,
-                "status": s.status,
-                "recording_url": s.recording_url
-            }
-            for s in sessions
-        ],
-        "attendance_summary": {
-            "semester": "Semester 5",
-            "overall_pct": 92,
-            "sessions_attended": "53 of 58 sessions",
-            "weekday_pct": 93,
-            "saturday_pct": 89,
-            "recordings_watched": "4 of 5 for missed"
-        },
-        "recording_library": [
-            {"title": "Cloud deploy walkthrough", "duration": "58 min"},
-            {"title": "Docker Compose lab", "duration": "2 hr 51 min"},
-            {"title": "Mock interview tips", "duration": "42 min"}
-        ]
-    }
+def get_student_live_sessions(
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    return build_student_live(db, student, lang)
+
+
+def _session_for_student(session_id: str, student: Student, db: Session) -> SessionItem:
+    s = db.execute(select(SessionItem).filter_by(id=session_id, college_id=student.college_id)).scalar_one_or_none()
+    if not s or (s.batch_id and s.batch_id != student.batch_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+    return s
+
+
+@router.post("/sessions/{session_id}/remind")
+def set_session_reminder(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    s = _session_for_student(session_id, student, db)
+    now = datetime.datetime.now()
+    if s.scheduled_start <= now:
+        raise HTTPException(status_code=409, detail="This session has already started")
+    existing = db.execute(select(SessionReminder).filter_by(user_id=current_user.sub, session_id=s.id)).scalar_one_or_none()
+    if existing:
+        return {"success": True, "session_id": s.id, "reminder_set": True, "already": True}
+    remind_at = s.scheduled_start - datetime.timedelta(minutes=15)
+    db.add(SessionReminder(id=f"rem_{uuid.uuid4().hex[:16]}", college_id=student.college_id, user_id=current_user.sub,
+                           session_id=s.id, channel="in_app", remind_at=remind_at))
+    when = s.scheduled_start.strftime("%a %I:%M %p").replace(" 0", " ")
+    notify_user(db, current_user.sub, f"Reminder set: {s.title}", f"We will remind you 15 minutes before {when}.",
+                title_ta=f"நினைவூட்டல் அமைக்கப்பட்டது: {s.title}", body_ta=f"{when} தொடங்குவதற்கு 15 நிமிடங்கள் முன் நினைவூட்டுவோம்.",
+                kind="reminder", link="/student/live", college_id=student.college_id)
+    db.commit()
+    return {"success": True, "session_id": s.id, "reminder_set": True, "remind_at": remind_at.isoformat()}
+
+
+@router.get("/recordings/{recording_id}/url")
+def get_recording_url(
+    recording_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    """Short-lived signed URL (presigned URL in production object storage)."""
+    student = get_student_for_user(current_user, db)
+    rec = db.execute(select(Recording).filter_by(id=recording_id, college_id=student.college_id)).scalar_one_or_none()
+    if not rec or (rec.batch_id and rec.batch_id != student.batch_id):
+        raise HTTPException(status_code=404, detail="Recording not found")
+    if rec.status != "ready":
+        raise HTTPException(status_code=409, detail="Recording is still processing")
+    expires = datetime.datetime.now() + datetime.timedelta(minutes=15)
+    view = db.execute(select(RecordingView).filter_by(student_id=student.id, recording_id=rec.id)).scalar_one_or_none()
+    if not view:
+        db.add(RecordingView(id=f"rv_{uuid.uuid4().hex[:16]}", college_id=student.college_id, student_id=student.id, recording_id=rec.id))
+    db.commit()
+    return {"recording_id": rec.id, "title": rec.title, "url": sign_url(rec.storage_key, expires),
+            "expires_at": expires.isoformat(), "chapters": rec.chapters or [], "duration_min": rec.duration_min}
+
 
 # --- SCREEN 34: Discussion Groups (PDF 11) ---
 class GroupMessageRequest(BaseModel):

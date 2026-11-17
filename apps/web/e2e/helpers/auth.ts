@@ -11,6 +11,10 @@ const CREDENTIALS: Record<DemoRole, { identifier: string; password: string; phon
   parent: { identifier: "ramesh.k@example.com", password: "password123", phone: "9876543210" },
 };
 
+// OTP requests are rate limited (5 per 10 min per phone), so each worker logs a
+// parent in once and reuses the token.
+const parentLogins = new Map<string, any>();
+
 function toWebRole(apiRole: string): DemoRole {
   return apiRole === "college_admin" ? "college" : (apiRole as DemoRole);
 }
@@ -28,14 +32,20 @@ export async function loginAs(
   const creds = CREDENTIALS[role];
   let data: any;
   if (role === "parent") {
-    const phone = options.phone || creds.phone;
-    const req = await page.request.post(`${API_BASE}/auth/parent/otp/request`, { data: { phone } });
-    const reqData = await req.json();
-    const res = await page.request.post(`${API_BASE}/auth/parent/otp/verify`, {
-      data: { phone, otp: reqData.demo_otp || "123456" },
-    });
-    if (!res.ok()) throw new Error(`Parent OTP login failed: ${res.status()}`);
-    data = await res.json();
+    const phone = (options.phone || creds.phone) as string;
+    const cached = parentLogins.get(phone);
+    if (cached) {
+      data = cached;
+    } else {
+      const req = await page.request.post(`${API_BASE}/auth/parent/otp/request`, { data: { phone } });
+      const reqData = await req.json();
+      const res = await page.request.post(`${API_BASE}/auth/parent/otp/verify`, {
+        data: { phone, otp: reqData.demo_otp || "123456" },
+      });
+      if (!res.ok()) throw new Error(`Parent OTP login failed: ${res.status()}`);
+      data = await res.json();
+      parentLogins.set(phone, data);
+    }
   } else {
     const res = await page.request.post(`${API_BASE}/auth/login`, {
       data: { role, identifier: creds.identifier, password: creds.password },

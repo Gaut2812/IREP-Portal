@@ -76,12 +76,23 @@ def test_demo_login_each_role(role, identifier):
     assert me["email"] == identifier
 
 
+def _otp_login(phone):
+    otp = client.post("/api/v1/auth/parent/otp/request", json={"phone": phone}).json()["demo_otp"]
+    return client.post("/api/v1/auth/parent/otp/verify", json={"phone": phone, "otp": otp})
+
+
 def test_parent_otp_resolves_by_phone():
-    res = client.post("/api/v1/auth/parent/otp/verify", json={"phone": "9876543214", "otp": "123456"})
+    from seed.seed_screen01 import seed_screen01
+    res = _otp_login("9876543214")
     assert res.status_code == 200
     assert res.json()["user"]["id"] == "usr_lakshmi_01"
-    res = client.post("/api/v1/auth/parent/otp/verify", json={"phone": "9876543210", "otp": "123456"})
-    assert res.json()["user"]["id"] == "usr_ramesh_01"
+    assert _otp_login("9876543210").json()["user"]["id"] == "usr_ramesh_01"
+    db = SessionLocal()
+    try:
+        seed_screen01(db)
+        db.commit()
+    finally:
+        db.close()
 
 
 # ---- tenant helpers --------------------------------------------------------

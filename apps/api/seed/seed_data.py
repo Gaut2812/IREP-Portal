@@ -574,6 +574,10 @@ def init_db_and_seed():
             seed_screen35(db, college_id="col_demo_001")
             db.commit()
 
+            from seed.seed_screen01 import seed_screen01
+            seed_screen01(db, college_id="col_demo_001")
+            db.commit()
+
             # keep at-risk flags consistent with the latest attendance history
             from services.at_risk import run_rules
             new_flags = run_rules(db, "col_demo_001")
@@ -1154,6 +1158,8 @@ def init_db_and_seed():
         seed_screen34(db, college_id="col_demo_001")
         from seed.seed_screen35 import seed_screen35
         seed_screen35(db, college_id="col_demo_001")
+        from seed.seed_screen01 import seed_screen01
+        seed_screen01(db, college_id="col_demo_001")
 
         db.commit()
     finally:

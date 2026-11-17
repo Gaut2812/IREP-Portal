@@ -1384,7 +1384,7 @@ def request_lab_access(
     ).scalars().all()
     for uid in trainer_users:
         notify_user(db, uid, f"Lab access request: {lab.name}", f"{current_user.name} requested access to {lab.name}.",
-                    title_ta=f"லேப் அனுமதி கோரிக்கை: {lab.name}", kind="approval", link="/trainer/approvals", college_id=student.college_id)
+                    title_ta=f"லேப் அனுமதி கோரிக்கை: {lab.name}", kind="approval", link="/trainer#lab-approvals", college_id=student.college_id)
     record_audit(db, current_user, "lab.access_request", "lab_approval", ap.id, {"lab_id": lab.id, "aup": True})
     db.commit()
     return {"success": True, "status": "pending", "approval_id": ap.id}

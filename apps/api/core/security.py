@@ -80,7 +80,10 @@ async def get_current_user(
     if payload:
         return payload
 
-    if settings.ENVIRONMENT.lower() == "production":
+    # A token that is present but invalid or expired is always a 401, even in
+    # development: falling back to the demo student would show one user
+    # another user's data (e.g. notifications).
+    if token or settings.ENVIRONMENT.lower() == "production":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",

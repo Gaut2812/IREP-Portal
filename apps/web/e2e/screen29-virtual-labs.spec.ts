@@ -43,7 +43,7 @@ test.describe("Screen 29: Virtual Labs (/student/labs)", () => {
     await expect(page.getByTestId("workspace-status")).toContainText("stopped");
   });
 
-  test("Cyber Range needs the acceptable-use agreement and trainer approval", async ({ page }) => {
+  test("Cyber Range: AUP, request, trainer approves on the dashboard, student launches", async ({ page, browser }) => {
     await loginAs(page, "student");
     await page.goto("/student/labs");
     await page.getByTestId("launch-lab_cyber_range").click();
@@ -55,14 +55,26 @@ test.describe("Screen 29: Virtual Labs (/student/labs)", () => {
     await expect(page.getByTestId("toast")).toContainText("Request sent to your trainer");
     await expect(page.getByTestId("pending-lab_cyber_range")).toBeVisible();
 
-    // trainer approves through the API, student can launch
-    const trainer = await (await page.request.post(`${API}/auth/login`, { data: { role: "trainer", identifier: "arun.k@demo.edu", password: "password123" } })).json();
-    const list = await (await page.request.get(`${API}/trainer/approvals/labs`, { headers: bearer(trainer.access_token) })).json();
-    const ap = list.approvals.find((a: any) => a.lab_id === "lab_cyber_range" && a.student_name === "Priya R");
-    await page.request.post(`${API}/trainer/approvals/labs/${ap.id}`, { headers: bearer(trainer.access_token), data: { decision: "approve" } });
+    // trainer sees the request on the dashboard and approves it in the UI
+    const trainerPage = await browser.newPage();
+    await loginAs(trainerPage, "trainer");
+    await trainerPage.goto("/trainer");
+    const card = trainerPage.getByTestId("lab-approvals");
+    const row = card.locator("[data-testid^='approval-']", { hasText: "Priya R" });
+    await expect(row).toContainText("Cyber Range");
+    await row.getByTestId("approve").click();
+    await expect(card).toContainText("Access approved for Priya R");
+    await trainerPage.close();
 
+    // student is notified and can now launch the lab
     await page.reload();
     await expect(page.getByTestId("lab-lab_cyber_range")).toContainText("Access approved");
+    await page.getByTestId("notification-bell").click();
+    await expect(page.getByTestId("notification-panel")).toContainText("Access approved: Cyber Range");
+    await page.keyboard.press("Escape");
+    await page.mouse.click(5, 300);
+    await page.getByTestId("launch-lab_cyber_range").click();
+    await expect(page.getByTestId("toast")).toContainText("Cyber Range is starting");
   });
 
   test("supports the Tamil toggle", async ({ page }) => {

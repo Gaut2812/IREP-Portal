@@ -34,8 +34,11 @@ def seed_screen29(db, college_id: str = "col_demo_001") -> None:
     period = now.strftime("%Y-%m")
     # restore Priya's demo state
     db.execute(delete(LabApproval).where(LabApproval.student_id == PRIYA, LabApproval.lab_id == "lab_cyber_range"))
-    for s in db.execute(select(LabSession).where(LabSession.student_id == PRIYA, LabSession.status == "running", LabSession.id != DEMO_SESSION)).scalars().all():
-        s.status, s.stopped_at, s.stop_reason = "stopped", now, "user"
+    # sessions launched by tests or demos are removed (with the usage they logged)
+    extra = db.execute(select(LabSession.id).where(LabSession.student_id == PRIYA, LabSession.id.not_in([DEMO_SESSION, "ls_demo_priya_docker"]))).scalars().all()
+    if extra:
+        db.execute(delete(UsageLedger).where(UsageLedger.ref_id.in_(extra)))
+        db.execute(delete(LabSession).where(LabSession.id.in_(extra)))
     # the demo session id is reused on every re-seed: drop the usage it logged in earlier runs
     db.execute(delete(UsageLedger).where(UsageLedger.ref_id == DEMO_SESSION))
     demo = db.execute(select(LabSession).filter_by(id=DEMO_SESSION)).scalar_one_or_none()
@@ -49,11 +52,16 @@ def seed_screen29(db, college_id: str = "col_demo_001") -> None:
     demo.stopped_at = demo.stop_reason = None
 
     # "Last used: yesterday" for Docker, and the month's metered usage
-    if not db.execute(select(LabSession).filter_by(id="ls_demo_priya_docker")).first():
-        y = now - datetime.timedelta(days=1, hours=2)
-        db.add(LabSession(id="ls_demo_priya_docker", college_id=college_id, lab_id="lab_docker_k8s", student_id=PRIYA, provider="fake",
-                          status="stopped", workspace_file="deploy.yaml", started_at=y, expires_at=y + datetime.timedelta(minutes=120),
-                          last_active_at=y + datetime.timedelta(minutes=55), stopped_at=y + datetime.timedelta(minutes=55), stop_reason="user"))
+    y = now - datetime.timedelta(days=1, hours=2)
+    docker = db.execute(select(LabSession).filter_by(id="ls_demo_priya_docker")).scalar_one_or_none()
+    if not docker:
+        docker = LabSession(id="ls_demo_priya_docker", college_id=college_id, lab_id="lab_docker_k8s", student_id=PRIYA, provider="fake",
+                            workspace_file="deploy.yaml")
+        db.add(docker)
+    # re-anchored on every seed so it always reads "yesterday"
+    docker.status, docker.stop_reason = "stopped", "user"
+    docker.started_at, docker.expires_at = y, y + datetime.timedelta(minutes=120)
+    docker.last_active_at = docker.stopped_at = y + datetime.timedelta(minutes=55)
     db.execute(delete(UsageLedger).where(UsageLedger.student_id == PRIYA, UsageLedger.ref_type == "demo"))
     db.add(UsageLedger(id=f"ul_demo_{uuid.uuid4().hex[:10]}", college_id=college_id, student_id=PRIYA, kind="lab_minutes",
                        amount=640, period=period, ref_type="demo", ref_id="month_to_date"))

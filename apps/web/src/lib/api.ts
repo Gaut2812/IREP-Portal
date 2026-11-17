@@ -46,6 +46,12 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
 
   const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
 
+  if (res.status === 401 && !endpoint.startsWith("/auth/") && typeof window !== "undefined" && localStorage.getItem("irep_token")) {
+    localStorage.removeItem("irep_token");
+    localStorage.removeItem("irep_user");
+    window.location.href = "/login?expired=1";
+  }
+
   if (!res.ok) {
     let detail = res.statusText;
     try {

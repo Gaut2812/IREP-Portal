@@ -43,6 +43,13 @@ export const NotificationBell: React.FC = () => {
     refreshCount();
   }, [refreshCount, pathname, user?.id, token]);
 
+  // a different signed-in user never sees the previous user's list
+  useEffect(() => {
+    setItems([]);
+    setUnread(0);
+    setOpen(false);
+  }, [user?.id]);
+
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -110,7 +117,7 @@ export const NotificationBell: React.FC = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1.5 w-80 bg-white rounded-xl shadow-xl border border-[#E2E8F0] z-50 text-xs overflow-hidden">
+        <div data-testid="notification-panel" className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:top-auto sm:right-0 sm:mt-1.5 sm:w-80 bg-white rounded-xl shadow-xl border border-[#E2E8F0] z-50 text-xs overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-[#E2E8F0]">
             <span className="font-bold text-[#0F1F3A]">{t("notifications.title")}</span>
             <button type="button" onClick={markAll} className="flex items-center gap-1 text-[11px] font-semibold text-[#2B5CD0] hover:underline">

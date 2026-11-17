@@ -160,7 +160,7 @@ def build_trainer_dashboard(db: Session, trainer: Trainer, current_user: TokenPa
             {"key": "create_test", "href": "/trainer/assessments", "variant": "outline"},
             {"key": "review_prs", "href": "/trainer/reviews", "variant": "outline"},
             {"key": "send_parent_update", "href": "/trainer/messages", "variant": "outline"},
-            {"key": "schedule_mock", "href": "/trainer/interviews", "variant": "outline"},
+            {"key": "schedule_mock", "href": "/trainer/messages", "variant": "outline"},
             {"key": "monthly_report", "href": "/trainer/reports", "variant": "teal"},
         ],
     }

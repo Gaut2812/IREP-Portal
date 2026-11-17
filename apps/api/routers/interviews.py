@@ -59,7 +59,7 @@ def book(slot_id: str, current_user: TokenPayload = Depends(require_role(["stude
     tr = db.execute(select(Trainer).filter_by(id=slot.trainer_id)).scalar_one_or_none()
     if tr:
         notify_user(db, tr.user_id, f"Interview booked by {current_user.name}", f"{when} · {slot.round_type.replace('_', ' ')}", kind="info",
-                    link="/trainer/interviews", college_id=student.college_id)
+                    link="/trainer", college_id=student.college_id)
     record_audit(db, current_user, "interview.book", "interview_slot", slot.id)
     db.commit()
     return {"success": True, "booking_id": booking.id}

@@ -84,7 +84,7 @@ test.describe("Screen 24 - Coding Lab (/student/coding/:problemId)", () => {
 
     // Should display access restricted banner
     await expect(page.getByText(/Access Restricted/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /Switch to Student/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Go to my dashboard/i })).toBeVisible();
   });
 });
 

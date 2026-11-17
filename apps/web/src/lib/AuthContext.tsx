@@ -92,7 +92,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(demoProfiles.student);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -116,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(savedUser);
         setToken(savedToken);
       } catch {
-        setUser(demoProfiles.student);
+        setUser(null);
       }
     }
     setIsLoaded(true);

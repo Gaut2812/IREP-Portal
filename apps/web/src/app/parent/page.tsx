@@ -214,8 +214,8 @@ export default function ParentViewPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left">
                         <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
-                          <th className="pb-2 font-semibold">{t("parent_view.area")}</th><th className="pb-2 font-semibold">{data.monthly_card.prev_month}</th>
-                          <th className="pb-2 font-semibold">{data.monthly_card.month}</th><th className="pb-2 font-semibold text-right">{t("parent_view.status")}</th>
+                          <th className="pb-2 font-semibold">{t("parent_view.area")}</th><th className="pb-2 px-1 font-semibold"><span className="sm:hidden">{data.monthly_card.prev_month.slice(0, 3)}</span><span className="hidden sm:inline">{data.monthly_card.prev_month}</span></th>
+                          <th className="pb-2 px-1 font-semibold"><span className="sm:hidden">{data.monthly_card.month.slice(0, 3)}</span><span className="hidden sm:inline">{data.monthly_card.month}</span></th><th className="pb-2 font-semibold text-right">{t("parent_view.status")}</th>
                         </tr></thead>
                         <tbody className="divide-y divide-[#E2E8F0]">
                           {data.monthly_card.rows.map((r) => (

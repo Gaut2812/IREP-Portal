@@ -827,5 +827,39 @@
     "loading": "Loading messages...",
     "error_title": "Could not load messages",
     "retry": "Try again"
+  },
+  "shell": {
+    "role_student": "Student",
+    "role_trainer": "Trainer",
+    "role_college": "College admin",
+    "role_parent": "Parent",
+    "profile": "Profile",
+    "sign_out": "Sign out",
+    "language": "Language",
+    "college_name": "Demo Engineering College",
+    "open_menu": "Open menu",
+    "close_menu": "Close menu",
+    "main_menu": "Main menu",
+    "search": "Search courses, tests, students...",
+    "restricted_title": "Access restricted",
+    "restricted_body": "Your account does not have access to this page.",
+    "go_home": "Go to my dashboard",
+    "sign_in_other": "Sign in as another user",
+    "soon_title": "Coming soon",
+    "soon_body": "This module is planned for a later phase of the IREP portal.",
+    "session_expired": "Your session has expired. Please sign in again."
+  },
+  "lab_approvals": {
+    "title": "Lab access requests",
+    "empty": "No pending lab requests.",
+    "wants": "requests access to",
+    "aup": "AUP accepted",
+    "approve": "Approve",
+    "deny": "Deny",
+    "reason": "Reason for denying",
+    "confirm_deny": "Deny access",
+    "reason_required": "Enter a reason to deny access",
+    "approved": "Access approved for {name}",
+    "denied": "Request from {name} denied"
   }
 }

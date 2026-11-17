@@ -735,3 +735,23 @@ class FlagAction(TenantModel):
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     actor_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     actor_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Screen 19/20: MoU report runs
+# ---------------------------------------------------------------------------
+
+class ReportRun(TenantModel):
+    __tablename__ = "report_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    report_type: Mapped[str] = mapped_column(String(32), default="progress")   # progress, performance, readiness
+    period_label: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    generated_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    data_as_of: Mapped[datetime.date] = mapped_column(Date, default=datetime.date.today)
+    file_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)   # relative to the API static dir
+    file_size_kb: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(32), default="ready")   # queued, running, ready, failed
+    generated_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

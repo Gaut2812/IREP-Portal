@@ -51,10 +51,10 @@ def test_trainer_dashboard():
     assert data["kpis"]["active_batches"]["value"] == 5
 
 def test_college_dashboard():
-    response = client.get("/api/v1/college/dashboard")
+    response = client.get("/api/v1/college/overview", headers={"X-Demo-Role": "college"})
     assert response.status_code == 200
     data = response.json()
-    assert data["kpis"]["students_enrolled"]["value"] == "612"
+    assert data["kpis"]["students_enrolled"]["value"] == 612
 
 def test_parent_overview():
     response = client.get("/api/v1/parent/overview", headers={"X-Demo-Role": "parent"})

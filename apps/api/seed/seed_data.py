@@ -530,6 +530,11 @@ def init_db_and_seed():
                 db.commit()
                 print("Seeded Screen 13 at-risk flags.", flush=True)
 
+            from seed.seed_screen19 import seed_screen19
+            if seed_screen19(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 19 MoU report runs.", flush=True)
+
             print("Database already seeded.", flush=True)
             return
 
@@ -1085,6 +1090,8 @@ def init_db_and_seed():
         db.flush()
         from seed.seed_screen13 import seed_screen13
         seed_screen13(db, college_id="col_demo_001")
+        from seed.seed_screen19 import seed_screen19
+        seed_screen19(db, college_id="col_demo_001")
 
         db.commit()
     finally:

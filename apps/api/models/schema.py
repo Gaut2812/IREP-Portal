@@ -755,3 +755,42 @@ class ReportRun(TenantModel):
     file_size_kb: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(32), default="ready")   # queued, running, ready, failed
     generated_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Screen 15/16/17: parent monthly cards and RSVPs
+# ---------------------------------------------------------------------------
+
+class MonthlyCard(TenantModel):
+    """One parent progress card per student per month. Released to parents only
+    when status is approved or sent (trainer approval, Screen 21)."""
+    __tablename__ = "monthly_cards"
+    __table_args__ = (UniqueConstraint("student_id", "year", "month", name="uq_monthly_card_student_month"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    rows: Mapped[list] = mapped_column(JSON, default=list)   # [{area_en, area_ta, prev, curr, status_en, status_ta, color}]
+    how_to_help_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    how_to_help_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    trainer_remark_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    trainer_remark_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    trainer_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)   # draft, approved, sent
+    approved_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    approved_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    sent_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    pdf_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+
+
+class Rsvp(TenantModel):
+    __tablename__ = "rsvps"
+    __table_args__ = (UniqueConstraint("event_id", "parent_user_id", name="uq_rsvp_event_parent"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(64), ForeignKey("events.id"), index=True)
+    parent_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
+    student_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="yes")   # yes, no, maybe
+    guests: Mapped[int] = mapped_column(Integer, default=1)

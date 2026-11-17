@@ -20,6 +20,18 @@ class RSVPRequest(BaseModel):
     guest_count: int = 1
 
 # --- SCREEN 15: Parent View (PDF 10) ---
+from services.parent_overview import build_parent_overview
+from services.audit import record_audit
+from models.schema import Event, Rsvp
+import uuid
+
+
+class EventRsvpRequest(BaseModel):
+    status: str = "yes"      # yes | no | maybe
+    guests: int = 1
+    child_id: Optional[str] = None
+
+
 @router.get("/me/children")
 def list_my_children(
     current_user: TokenPayload = Depends(require_role(["parent"])),
@@ -47,89 +59,64 @@ def get_parent_overview(
     current_user: TokenPayload = Depends(require_role(["parent"])),
     db: Session = Depends(get_db),
 ):
+    """Screen 15 overview for one child (defaults to the first linked child)."""
     child = get_child_for_parent(current_user, db, child_id)
     child_name = get_user_name(db, child.user_id, "Student")
-    records = db.execute(
-        select(ParentMonthlyRecord).filter_by(student_id=child.id, college_id=current_user.college_id)
-    ).scalars().all()
-    certs = db.execute(
-        select(Certificate).filter_by(student_id=child.id, college_id=current_user.college_id)
-    ).scalars().all()
-    earned = [c for c in certs if c.status == "earned"]
-    scheduled = [c for c in certs if c.status == "scheduled" and c.exam_date]
-    cert_note = ""
-    if scheduled:
-        cert_note = scheduled[0].title.split(" ")[0] + " exam on " + scheduled[0].exam_date.strftime("%b %d")
-    good_attendance = child.attendance_pct >= 85
+    return build_parent_overview(db, child, child_name, current_user, lang)
 
-    return {
-        "ward": {
-            "id": child.id,
-            "name": child_name,
-            "details": "Sem " + str(child.semester) + " · " + child.branch,
-            "college": "Demo Engineering College"
-        },
-        "kpis": {
-            "readiness_score": child.readiness_score,
-            "readiness_delta": ("+" if child.readiness_delta >= 0 else "") + str(child.readiness_delta),
-            "readiness_band": child.readiness_band if lang == "en" else BAND_TA.get(child.readiness_band, child.readiness_band),
-            "attendance": str(child.attendance_pct) + "%",
-            "attendance_note": ("Excellent" if good_attendance else "Needs attention") if lang == "en" else ("சிறப்பானது" if good_attendance else "கவனம் தேவை"),
-            "problems_solved": child.problems_solved,
-            "certifications": str(len(earned)),
-            "cert_note": cert_note
-        },
-        "monthly_progress": [
-            {
-                "area": r.area,
-                "september": r.prev_month_val,
-                "october": r.curr_month_val,
-                "status": r.status_text,
-                "color": r.status_color
-            }
-            for r in records
-        ],
-        "how_you_can_help": {
-            "en": "Encourage 10 minutes of spoken English daily and ask Priya to explain her project to you at home.",
-            "ta": "தினமும் 10 நிமிடங்கள் வீட்டில் ஆங்கிலத்தில் பேச ஊக்குவிக்கவும், மேலும் பிரியாவிடம் அவரது புராஜெக்ட் பற்றி விளக்குமாறு கேட்கவும்."
-        },
-        "trainer_remark": {
-            "month": "October",
-            "trainer_name": "Arun Kumar",
-            "en": "Priya showed outstanding consistency in coding lab problems this month. If she focuses on thinking aloud during mock interviews, she will easily attain top-tier product company placement readiness.",
-            "ta": "இந்த மாதம் கோடிங் பயிற்சியில் பிரியா சிறப்பான அர்ப்பணிப்பைக் காட்டியுள்ளார். மாக் இன்டர்வியூவில் யோசனைகளை உரக்க வெளிப்படுத்துவதில் கவனம் செலுத்தினால் எளிதில் முன்னணி நிறுவனங்களின் வேலைவாய்ப்பைப் பெறுவார்."
-        },
-        "invitations": [
-            {
-                "id": "event_demo_day",
-                "title": "Project Demo Day",
-                "when": "Sat, Nov 8 · 10:00 AM",
-                "subtitle": "You are invited to watch students present live projects",
-                "rsvp_status": "none"
-            }
-        ],
-        "portfolio": {
-            "github_projects": 5,
-            "live_project": "Crop Price Predictor",
-            "demo_video": "Sem 4 project available"
-        }
-    }
 
-@router.post("/rsvp")
-def submit_rsvp(
+@router.get("/children/{child_id}/overview")
+def get_child_overview(
+    child_id: str,
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["parent"])),
+    db: Session = Depends(get_db),
+):
+    child = get_child_for_parent(current_user, db, child_id)
+    child_name = get_user_name(db, child.user_id, "Student")
+    return build_parent_overview(db, child, child_name, current_user, lang)
+
+
+@router.post("/events/{event_id}/rsvp")
+def rsvp_event(
+    event_id: str,
+    req: EventRsvpRequest,
+    current_user: TokenPayload = Depends(require_role(["parent"])),
+    db: Session = Depends(get_db),
+):
+    if req.status not in ("yes", "no", "maybe"):
+        raise HTTPException(status_code=422, detail="status must be yes, no or maybe")
+    if req.guests < 0 or req.guests > 10:
+        raise HTTPException(status_code=422, detail="guests must be between 0 and 10")
+    event = db.execute(select(Event).filter_by(id=event_id, college_id=current_user.college_id)).scalar_one_or_none()
+    if not event or not event.rsvp_enabled:
+        raise HTTPException(status_code=404, detail="Event not found or does not take RSVPs")
+    child = get_child_for_parent(current_user, db, req.child_id)
+    rsvp = db.execute(select(Rsvp).filter_by(event_id=event.id, parent_user_id=current_user.sub, college_id=current_user.college_id)).scalar_one_or_none()
+    if rsvp:
+        rsvp.status, rsvp.guests, rsvp.student_id = req.status, req.guests, child.id
+    else:
+        rsvp = Rsvp(id=f"rsvp_{uuid.uuid4().hex[:16]}", college_id=current_user.college_id, event_id=event.id,
+                    parent_user_id=current_user.sub, student_id=child.id, status=req.status, guests=req.guests)
+        db.add(rsvp)
+    record_audit(db, current_user, "rsvp.save", "event", event.id, {"status": req.status, "guests": req.guests})
+    db.commit()
+    return {"success": True, "event_id": event.id, "rsvp_status": rsvp.status, "guests": rsvp.guests}
+
+
+@router.post("/rsvp", include_in_schema=False)
+def submit_rsvp_legacy(
     req: RSVPRequest,
     current_user: TokenPayload = Depends(require_role(["parent"])),
     db: Session = Depends(get_db),
 ):
+    """Legacy Screen 15 RSVP (ProjectDemoEvent). Kept for the first-generation page."""
     event = db.execute(select(ProjectDemoEvent).filter_by(id=req.event_id, college_id=current_user.college_id)).scalar_one_or_none()
     if event:
         event.rsvp_status = req.status
         event.guest_count = req.guest_count
         db.commit()
-    return {
-        "success": True,
-        "message": f"RSVP saved for {req.event_id}. Thank you!"
-    }
+    return {"success": True, "message": f"RSVP saved for {req.event_id}. Thank you!"}
 
 # --- SCREEN 33: Parent Projects & Portfolio ---
 @router.get("/portfolio")

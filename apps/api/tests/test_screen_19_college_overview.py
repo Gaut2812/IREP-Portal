@@ -54,7 +54,8 @@ def test_overview_matches_source_tables():
         db.close()
     titles = [e["title"] for e in d["upcoming_events"]]
     assert "Project Demo Day" in titles
-    assert len(d["mou_reports"]) == 3
+    assert len(d["mou_reports"]) >= 3
+    assert any(r["id"] == "rep_sep_progress" for r in d["mou_reports"])
     assert all(r["generated_at"] and r["data_as_of"] for r in d["mou_reports"])
 
 

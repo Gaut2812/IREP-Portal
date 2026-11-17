@@ -306,6 +306,8 @@ def seed_cohort(db, college_id: str = "col_demo_001") -> int:
         for k in range(count):
             st = ranked[cert_idx % len(ranked)]
             title, issuer, ctype = CERT_TITLES[cert_idx % len(CERT_TITLES)]
+            if cert_idx == 183 and priya is not None:   # PDF 10: Priya holds one course certificate
+                st = priya
             if st.id == "std_priya_01":
                 title, issuer, ctype = CERT_TITLES[4]
             db.add(Certificate(

@@ -535,6 +535,16 @@ def init_db_and_seed():
                 db.commit()
                 print("Seeded Screen 19 MoU report runs.", flush=True)
 
+            from seed.seed_screen15 import seed_screen15
+            if seed_screen15(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 15 monthly cards.", flush=True)
+
+            from seed.seed_screen12 import rebase_demo_dates
+            if rebase_demo_dates(db, college_id="col_demo_001"):
+                db.commit()
+                print("Re-anchored demo calendar to today.", flush=True)
+
             print("Database already seeded.", flush=True)
             return
 
@@ -1092,6 +1102,8 @@ def init_db_and_seed():
         seed_screen13(db, college_id="col_demo_001")
         from seed.seed_screen19 import seed_screen19
         seed_screen19(db, college_id="col_demo_001")
+        from seed.seed_screen15 import seed_screen15
+        seed_screen15(db, college_id="col_demo_001")
 
         db.commit()
     finally:

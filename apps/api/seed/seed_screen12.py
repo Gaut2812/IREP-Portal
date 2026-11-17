@@ -39,6 +39,57 @@ def _skills_for_score(score: int, attendance: int, rng: random.Random) -> Dict[s
     return skills
 
 
+def _next_weekday(today: datetime.date, weekday: int, min_days: int = 1) -> datetime.date:
+    """Next date with the given weekday (0=Mon) at least min_days away."""
+    d = today + datetime.timedelta(days=min_days)
+    while d.weekday() != weekday:
+        d += datetime.timedelta(days=1)
+    return d
+
+
+def demo_event_dates(today: datetime.date) -> dict:
+    """Demo calendar relative to today: mirrors the PDF spacing (test on Saturday,
+    interview midweek, exam in ~5 days, demo day in ~2 weeks, review the week after)."""
+    sat = _next_weekday(today, 5, 2)
+    wed = _next_weekday(today, 2, 1)
+    demo = _next_weekday(today, 5, 9)
+
+    def dt(d, h, m=0):
+        return datetime.datetime(d.year, d.month, d.day, h, m)
+
+    return {
+        "evt_midterm_dsa": dt(sat, 10),
+        "evt_mock_interview_priya": dt(wed, 16),
+        "evt_aws_exam_priya": dt(today + datetime.timedelta(days=5), 9),
+        "evt_mock_drive_1": dt(today + datetime.timedelta(days=9), 9),
+        "evt_demo_day": dt(demo, 10),
+        "evt_parent_review": dt(demo + datetime.timedelta(days=7), 10, 30),
+        "evt_guest_gcc": dt(demo + datetime.timedelta(days=14), 15),
+    }
+
+
+def rebase_demo_dates(db, college_id: str = "col_demo_001", today: datetime.date = None) -> int:
+    """Re-anchor the seeded demo events and Priya's scheduled exam to today.
+    Runs on every seed so a demo database never shows a stale calendar."""
+    from models.schema import Certificate
+    today = today or datetime.date.today()
+    dates = demo_event_dates(today)
+    changed = 0
+    for eid, when in dates.items():
+        ev = db.execute(select(Event).filter_by(id=eid, college_id=college_id)).scalar_one_or_none()
+        if ev and ev.starts_at != when:
+            ev.starts_at = when
+            ev.ends_at = when + datetime.timedelta(hours=3) if eid == "evt_demo_day" else None
+            changed += 1
+    cert = db.execute(select(Certificate).filter_by(id="cert_priya_aws_sched")).scalar_one_or_none()
+    exam_day = dates["evt_aws_exam_priya"].date()
+    if cert and cert.exam_date != exam_day:
+        cert.exam_date = exam_day
+        changed += 1
+    db.flush()
+    return changed
+
+
 def seed_screen12(db, college_id: str = "col_demo_001") -> int:
     if db.execute(select(ReadinessSnapshot).filter_by(college_id=college_id)).first():
         return 0
@@ -96,28 +147,27 @@ def seed_screen12(db, college_id: str = "col_demo_001") -> int:
         count += 1
     db.flush()
 
-    # Events (shared with screens 15/19)
+    # Events (shared with screens 15/19), dated relative to today so the demo never goes stale
     if not db.execute(select(Event).filter_by(college_id=college_id)).first():
-        def dt(month, day, hour=10, minute=0):
-            return datetime.datetime(2026, month, day, hour, minute)
         aids_batch = "bat_aids_s5_aids"
+        d = demo_event_dates(today)
         events = [
             Event(id="evt_midterm_dsa", college_id=college_id, title_en="Mid-term DSA test", title_ta="இடைப்பருவ DSA தேர்வு", kind="test",
-                  starts_at=dt(11, 21, 10), audience="students", batch_id=aids_batch, location="Online · Practice Tests"),
+                  starts_at=d["evt_midterm_dsa"], audience="students", batch_id=aids_batch, location="Online · Practice Tests"),
             Event(id="evt_mock_interview_priya", college_id=college_id, title_en="Mock interview", title_ta="மாதிரி நேர்காணல்", kind="interview",
-                  starts_at=dt(11, 18, 16), audience="students", student_id="std_priya_01", location="Interview room 2"),
+                  starts_at=d["evt_mock_interview_priya"], audience="students", student_id="std_priya_01", location="Interview room 2"),
             Event(id="evt_aws_exam_priya", college_id=college_id, title_en="AWS Cloud Practitioner", title_ta="AWS கிளவுட் பிராக்டிஷனர்", kind="exam",
-                  starts_at=dt(11, 22, 9), audience="students", student_id="std_priya_01", location="Pearson VUE centre"),
+                  starts_at=d["evt_aws_exam_priya"], audience="students", student_id="std_priya_01", location="Pearson VUE centre"),
             Event(id="evt_mock_drive_1", college_id=college_id, title_en="Mock Drive 1 · Sem 7", title_ta="மாதிரி டிரைவ் 1 · பருவம் 7", kind="drive",
-                  starts_at=dt(10, 25, 9), audience="college", location="Seminar hall"),
+                  starts_at=d["evt_mock_drive_1"], audience="college", location="Seminar hall"),
             Event(id="evt_demo_day", college_id=college_id, title_en="Project Demo Day", title_ta="புராஜெக்ட் டெமோ தினம்", kind="demo_day",
-                  starts_at=dt(11, 8, 10), ends_at=dt(11, 8, 13), audience="all", location="Auditorium A & Live Stream",
+                  starts_at=d["evt_demo_day"], ends_at=d["evt_demo_day"] + datetime.timedelta(hours=3), audience="all", location="Auditorium A & Live Stream",
                   description_en="Students present live projects. Parents are invited.", description_ta="மாணவர்கள் திட்டங்களை நேரலையில் வழங்குவர். பெற்றோர் அழைக்கப்படுகிறார்கள்.",
                   rsvp_enabled=True),
             Event(id="evt_parent_review", college_id=college_id, title_en="Parent review meeting", title_ta="பெற்றோர் ஆய்வு கூட்டம்", kind="meeting",
-                  starts_at=dt(11, 15, 10, 30), audience="parents", location="Block B conference room", rsvp_enabled=True),
+                  starts_at=d["evt_parent_review"], audience="parents", location="Block B conference room", rsvp_enabled=True),
             Event(id="evt_guest_gcc", college_id=college_id, title_en="Guest session: GCC leaders", title_ta="விருந்தினர் அமர்வு: GCC தலைவர்கள்", kind="guest",
-                  starts_at=dt(11, 22, 15), audience="all", location="Auditorium A"),
+                  starts_at=d["evt_guest_gcc"], audience="all", location="Auditorium A"),
         ]
         db.add_all(events)
     db.flush()

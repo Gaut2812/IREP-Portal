@@ -297,6 +297,15 @@ class VirtualLabItem(TenantModel):
     is_active_session: Mapped[bool] = mapped_column(Boolean, default=False)
     active_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     active_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    # S-29 entitlement & metering
+    min_semester: Mapped[int] = mapped_column(Integer, default=2)
+    allowed_tracks: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)     # None = every track
+    session_minutes: Mapped[int] = mapped_column(Integer, default=120)
+    meter: Mapped[str] = mapped_column(String(16), default="lab_minutes")          # lab_minutes | cloud_credits
+    icon: Mapped[str] = mapped_column(String(16), default="terminal")
+    image: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)       # container image for the docker adapter
+    network: Mapped[str] = mapped_column(String(32), default="none")              # none | isolated (cyber range)
+    default_file: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
 # Screen 30: Sprint Board
 class SprintTask(TenantModel):
@@ -916,3 +925,50 @@ class QaUpvote(TenantModel):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     question_id: Mapped[str] = mapped_column(String(64), ForeignKey("qa_questions.id"), index=True)
     user_id: Mapped[str] = mapped_column(String(64), index=True)
+
+
+# ---------------------------------------------------------------------------
+# Screen 29: virtual labs (sessions, approvals, usage ledger)
+# ---------------------------------------------------------------------------
+
+class LabSession(TenantModel):
+    __tablename__ = "lab_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    lab_id: Mapped[str] = mapped_column(String(64), ForeignKey("virtual_labs.id"), index=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="running", index=True)   # starting, running, stopped, expired
+    provider: Mapped[str] = mapped_column(String(16), default="fake")
+    container_ref: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    workspace_file: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    started_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    last_active_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    stopped_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    stop_reason: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)   # user, expired, idle, trainer
+
+
+class LabApproval(TenantModel):
+    __tablename__ = "lab_approvals"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    lab_id: Mapped[str] = mapped_column(String(64), ForeignKey("virtual_labs.id"), index=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending, approved, denied
+    aup_accepted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class UsageLedger(TenantModel):
+    """Metered usage per student (P17): lab minutes, cloud credits, AI calls."""
+    __tablename__ = "usage_ledger"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)          # lab_minutes, cloud_credits, ai_calls
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    period: Mapped[str] = mapped_column(String(7), index=True)         # YYYY-MM
+    ref_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    ref_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

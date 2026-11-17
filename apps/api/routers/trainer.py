@@ -577,3 +577,72 @@ def add_inline_review_comment(
     }
 
 
+
+
+# --- Lab access approvals (Screen 29 / 43) ---
+from models.schema import LabApproval, VirtualLabItem
+from services.notifications import notify_user as _notify
+
+
+class LabDecisionRequest(BaseModel):
+    decision: str            # approve | deny
+    reason: Optional[str] = None
+
+
+@router.get("/approvals/labs")
+def list_lab_approvals(
+    status: Optional[str] = "pending",
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
+    db: Session = Depends(get_db),
+):
+    trainer = get_trainer_for_user(current_user, db)
+    batch_ids = get_trainer_batch_ids(trainer, db) or ["__none__"]
+    q = (select(LabApproval, StudentModel, UserModel.name, VirtualLabItem.name)
+         .join(StudentModel, StudentModel.id == LabApproval.student_id)
+         .join(UserModel, UserModel.id == StudentModel.user_id)
+         .join(VirtualLabItem, VirtualLabItem.id == LabApproval.lab_id)
+         .where(LabApproval.college_id == current_user.college_id, StudentModel.batch_id.in_(batch_ids)))
+    if status and status != "all":
+        q = q.where(LabApproval.status == status)
+    rows = db.execute(q.order_by(LabApproval.created_at.desc())).all()
+    return {"approvals": [
+        {"id": ap.id, "lab_id": ap.lab_id, "lab_name": lab_name, "student_id": st.id, "student_name": name,
+         "batch": st.batch_name, "status": ap.status, "aup_accepted": ap.aup_accepted_at is not None,
+         "requested_at": ap.created_at.isoformat() if ap.created_at else None, "reason": ap.reason}
+        for ap, st, name, lab_name in rows
+    ]}
+
+
+@router.post("/approvals/labs/{approval_id}")
+def decide_lab_approval(
+    approval_id: str,
+    req: LabDecisionRequest,
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
+    db: Session = Depends(get_db),
+):
+    if req.decision not in ("approve", "deny"):
+        raise HTTPException(status_code=422, detail="decision must be approve or deny")
+    if req.decision == "deny" and not (req.reason or "").strip():
+        raise HTTPException(status_code=422, detail="A reason is required to deny access")
+    trainer = get_trainer_for_user(current_user, db)
+    batch_ids = get_trainer_batch_ids(trainer, db)
+    ap = db.execute(select(LabApproval).filter_by(id=approval_id, college_id=current_user.college_id)).scalar_one_or_none()
+    st = db.execute(select(StudentModel).filter_by(id=ap.student_id)).scalar_one_or_none() if ap else None
+    if not ap or not st or st.batch_id not in batch_ids:
+        raise HTTPException(status_code=404, detail="Approval not found")
+    if ap.status != "pending":
+        raise HTTPException(status_code=409, detail=f"Already {ap.status}")
+    ap.status = "approved" if req.decision == "approve" else "denied"
+    ap.reason = (req.reason or "").strip() or ap.reason
+    ap.decided_by = current_user.sub
+    ap.decided_at = datetime.datetime.utcnow()
+    lab = db.execute(select(VirtualLabItem).filter_by(id=ap.lab_id)).scalar_one()
+    if ap.status == "approved":
+        _notify(db, st.user_id, f"Access approved: {lab.name}", "You can launch the lab now.",
+                title_ta=f"அனுமதி வழங்கப்பட்டது: {lab.name}", body_ta="இப்போது லேபைத் தொடங்கலாம்.", kind="approval", link="/student/labs")
+    else:
+        _notify(db, st.user_id, f"Access declined: {lab.name}", ap.reason,
+                title_ta=f"அனுமதி மறுக்கப்பட்டது: {lab.name}", kind="approval", link="/student/labs")
+    record_audit(db, current_user, f"lab.access_{ap.status}", "lab_approval", ap.id, {"lab_id": ap.lab_id, "student_id": st.id})
+    db.commit()
+    return {"success": True, "status": ap.status}

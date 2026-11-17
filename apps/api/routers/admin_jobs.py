@@ -31,3 +31,14 @@ def trigger_at_risk_rules(
     record_audit(db, current_user, "job.at_risk.run", "college", current_user.college_id, {"flags_created": created})
     db.commit()
     return {"success": True, "flags_created": created}
+
+
+@router.post("/labs/cull")
+def trigger_lab_cull(
+    current_user: TokenPayload = Depends(require_role(["college_admin", "trainer", "super_admin"])),
+    db: Session = Depends(get_db),
+):
+    from services.lab_orchestrator import cull
+    stopped = cull(db, current_user.college_id)
+    db.commit()
+    return {"success": True, "stopped": stopped}

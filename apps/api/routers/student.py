@@ -1191,49 +1191,204 @@ def get_attempt_result(
     }
 
 # --- SCREEN 29: Virtual Labs (PDF 5) ---
-@router.get("/labs")
-def get_virtual_labs(db: Session = Depends(get_db)):
-    labs = db.execute(select(VirtualLabItem)).scalars().all()
-    active_lab = next((lab for lab in labs if lab.is_active_session), None)
-    
+# --- SCREEN 29: Virtual Labs (PDF 5) ---
+from models.schema import LabSession, LabApproval, BatchTrainer, Trainer
+from services.lab_orchestrator import (
+    launch as orchestrate_launch, stop_session, cull, lock_reason, approval_for, usage, quota_for, period_of,
+    running_minutes, LabLaunchError, MONTHLY_LAB_MINUTES, IDLE_LIMIT_MIN,
+)
+
+
+class LabAccessRequest(BaseModel):
+    accept_aup: bool = False
+    note: Optional[str] = None
+
+
+def _ago(when: datetime.datetime, now: datetime.datetime) -> str:
+    days = (now.date() - when.date()).days
+    return "today" if days <= 0 else ("yesterday" if days == 1 else f"{days} days ago")
+
+
+def _lab_card(db: Session, student: Student, lab: VirtualLabItem, running: Optional[LabSession], now: datetime.datetime) -> dict:
+    locked = lock_reason(db, student, lab, now)
+    approval = approval_for(db, student, lab) if lab.requires_approval else None
+    if lab.allowed_tracks:
+        short = {"AI & Data Science": "AI & DS", "Software Engineering": "SE", "Cybersecurity": "Cybersecurity"}
+        elig = {"label": short.get(lab.allowed_tracks[0], lab.allowed_tracks[0]) if len(lab.allowed_tracks) == 1 else "Track", "type": "purple"}
+    elif lab.requires_approval:
+        elig = {"label": lab.category, "type": "red"}
+    else:
+        elig = {"label": f"Sem {lab.min_semester}+", "type": "blue"}
+    if lab.meter == "cloud_credits":
+        left = max(0, round(100 * (1 - usage(db, student, "cloud_credits", period_of(now)) / quota_for("cloud_credits"))))
+        status = {"label": f"Credits: {left}%", "type": "amber" if left < 80 else "green"}
+    elif lab.requires_approval and (not approval or approval.status != "approved"):
+        status = {"label": "Track access", "type": "amber"}
+    elif locked and locked[0] in ("semester", "track"):
+        status = {"label": "Locked", "type": "red"}
+    else:
+        status = {"label": "Ready", "type": "green"}
+    last = db.execute(select(LabSession).filter_by(student_id=student.id, lab_id=lab.id).order_by(LabSession.started_at.desc())).scalars().first()
+    if lab.requires_approval:
+        footer = {"pending": "Request pending", "approved": "Access approved", "denied": "Access declined"}.get(approval.status if approval else "", "Trainer approval needed")
+    elif lab.meter == "cloud_credits":
+        footer = lab.footer_text
+    elif last and (not running or running.lab_id != lab.id):
+        footer = f"Last used: {_ago(last.started_at, now)}"
+    else:
+        footer = lab.footer_text
+    if running and running.lab_id == lab.id:
+        action = "open"
+    elif locked:
+        action = {"approval": "request", "approval_pending": "pending", "approval_denied": "locked"}.get(locked[0], "locked")
+    else:
+        action = "launch"
     return {
-        "labs": [
-            {
-                "id": l.id,
-                "name": l.name,
-                "category": l.category,
-                "description": l.description,
-                "eligibility_chip": l.eligibility_chip,
-                "status_chip": l.status_chip,
-                "tag_color": l.tag_color,
-                "footer_text": l.footer_text,
-                "requires_approval": l.requires_approval
-            }
-            for l in labs
-        ],
-        "active_session": {
-            "lab_name": active_lab.name if active_lab else "AI Notebook Lab",
-            "active_filename": active_lab.active_filename if active_lab else "rag_notes_demo.ipynb",
-            "running_minutes": active_lab.active_minutes if active_lab else 38,
-            "session_id": "session_rag_demo_01"
-        } if active_lab else None
+        "id": lab.id, "name": lab.name, "category": lab.category, "description": lab.description, "icon": lab.icon,
+        "chips": [elig, status], "footer": footer, "requires_approval": lab.requires_approval,
+        "session_minutes": lab.session_minutes, "action": action,
+        "locked": {"reason": locked[0], "message": locked[1]} if locked else None,
     }
 
-@router.post("/labs/{lab_id}/launch")
-def launch_lab(lab_id: str, db: Session = Depends(get_db)):
-    db.execute(update(VirtualLabItem).where(VirtualLabItem.id == lab_id).values(
-        is_active_session=True,
-        active_filename="workspace_session.ipynb",
-        active_minutes=1
-    ))
-    db.commit()
-    return {"status": "started", "session_url": f"/live/lab_{lab_id}"}
 
-@router.post("/labs/{lab_id}/stop")
-def stop_lab(lab_id: str, db: Session = Depends(get_db)):
-    db.execute(update(VirtualLabItem).where(VirtualLabItem.id == lab_id).values(is_active_session=False))
+def _session_payload(s: LabSession, lab: VirtualLabItem, now: datetime.datetime) -> dict:
+    return {
+        "id": s.id, "lab_id": lab.id, "lab_name": lab.name, "icon": lab.icon, "status": s.status,
+        "workspace_file": s.workspace_file, "running_minutes": running_minutes(s, now),
+        "expires_at": s.expires_at.isoformat(), "minutes_left": max(0, int((s.expires_at - now).total_seconds() // 60)),
+        "idle_limit_min": IDLE_LIMIT_MIN, "open_url": f"/lab/{s.id}", "provider": s.provider,
+        "started_at": s.started_at.isoformat(), "stop_reason": s.stop_reason,
+    }
+
+
+@router.get("/labs")
+def get_virtual_labs(
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    now = datetime.datetime.now()
+    if cull(db, student.college_id, now):
+        db.commit()
+    labs = db.execute(select(VirtualLabItem).filter_by(college_id=student.college_id).order_by(VirtualLabItem.id)).scalars().all()
+    order = ["lab_linux", "lab_docker_k8s", "lab_cloud", "lab_ai_notebook", "lab_cyber_range", "lab_fullstack"]
+    labs = sorted(labs, key=lambda l: order.index(l.id) if l.id in order else 99)
+    running = db.execute(select(LabSession).filter_by(student_id=student.id, status="running")).scalars().all()
+    lab_by_id = {l.id: l for l in labs}
+    period = period_of(now)
+    minutes_used = usage(db, student, "lab_minutes", period) + sum(running_minutes(r, now) for r in running if lab_by_id.get(r.lab_id) and lab_by_id[r.lab_id].meter == "lab_minutes")
+    credits_used = usage(db, student, "cloud_credits", period)
+    return {
+        "filters": ["All labs", "Software Engineering", "AI & Data Science", "Cybersecurity", "Cloud & DevOps"],
+        "labs": [_lab_card(db, student, l, running[0] if running else None, now) for l in labs],
+        "active_sessions": [_session_payload(r, lab_by_id[r.lab_id], now) for r in running if r.lab_id in lab_by_id],
+        "usage": {
+            "period": period,
+            "lab_minutes_used": int(minutes_used), "lab_minutes_quota": MONTHLY_LAB_MINUTES,
+            "cloud_credits_used": round(credits_used, 1), "cloud_credits_quota": quota_for("cloud_credits"),
+            "cloud_credits_left_pct": max(0, round(100 * (1 - credits_used / quota_for("cloud_credits")))),
+        },
+        "queue": {"waiting": 0, "label": "none"},
+    }
+
+
+@router.post("/labs/{lab_id}/launch")
+def launch_lab(
+    lab_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    lab = db.execute(select(VirtualLabItem).filter_by(id=lab_id, college_id=student.college_id)).scalar_one_or_none()
+    if not lab:
+        raise HTTPException(status_code=404, detail="Lab not found")
+    try:
+        s = orchestrate_launch(db, student, lab)
+    except LabLaunchError as e:
+        db.rollback()
+        raise HTTPException(status_code=e.status, detail={"reason": e.reason, "message": e.message})
+    record_audit(db, current_user, "lab.launch", "lab_session", s.id, {"lab_id": lab.id})
     db.commit()
-    return {"status": "stopped"}
+    return {"status": "started", "session": _session_payload(s, lab, datetime.datetime.now())}
+
+
+@router.post("/lab-sessions/{session_id}/stop")
+def stop_lab_session(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    s = db.execute(select(LabSession).filter_by(id=session_id, student_id=student.id)).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Lab session not found")
+    minutes = stop_session(db, s, "user", datetime.datetime.now())
+    record_audit(db, current_user, "lab.stop", "lab_session", s.id, {"minutes": minutes})
+    db.commit()
+    return {"status": "stopped", "minutes": minutes}
+
+
+@router.get("/lab-sessions/{session_id}")
+def get_lab_session(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    now = datetime.datetime.now()
+    cull(db, student.college_id, now)
+    db.commit()
+    s = db.execute(select(LabSession).filter_by(id=session_id, student_id=student.id)).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Lab session not found")
+    lab = db.execute(select(VirtualLabItem).filter_by(id=s.lab_id)).scalar_one()
+    return _session_payload(s, lab, now)
+
+
+@router.post("/lab-sessions/{session_id}/heartbeat")
+def lab_heartbeat(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    s = db.execute(select(LabSession).filter_by(id=session_id, student_id=student.id, status="running")).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Lab session is not running")
+    s.last_active_at = datetime.datetime.now()
+    db.commit()
+    return {"success": True}
+
+
+@router.post("/labs/{lab_id}/request-access")
+def request_lab_access(
+    lab_id: str,
+    req: LabAccessRequest,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    lab = db.execute(select(VirtualLabItem).filter_by(id=lab_id, college_id=student.college_id)).scalar_one_or_none()
+    if not lab or not lab.requires_approval:
+        raise HTTPException(status_code=404, detail="This lab does not need approval")
+    if not req.accept_aup:
+        raise HTTPException(status_code=422, detail="Accept the acceptable-use agreement to request access")
+    existing = approval_for(db, student, lab)
+    if existing and existing.status in ("pending", "approved"):
+        return {"success": True, "status": existing.status, "approval_id": existing.id}
+    ap = LabApproval(id=f"lap_{uuid.uuid4().hex[:16]}", college_id=student.college_id, lab_id=lab.id, student_id=student.id,
+                     status="pending", aup_accepted_at=datetime.datetime.now(), reason=req.note)
+    db.add(ap)
+    trainer_users = db.execute(
+        select(Trainer.user_id).join(BatchTrainer, BatchTrainer.trainer_id == Trainer.id).where(BatchTrainer.batch_id == student.batch_id)
+    ).scalars().all()
+    for uid in trainer_users:
+        notify_user(db, uid, f"Lab access request: {lab.name}", f"{current_user.name} requested access to {lab.name}.",
+                    title_ta=f"லேப் அனுமதி கோரிக்கை: {lab.name}", kind="approval", link="/trainer/approvals", college_id=student.college_id)
+    record_audit(db, current_user, "lab.access_request", "lab_approval", ap.id, {"lab_id": lab.id, "aup": True})
+    db.commit()
+    return {"success": True, "status": "pending", "approval_id": ap.id}
+
 
 # --- SCREEN 30: Sprint Board (PDF 6) ---
 class TaskMoveRequest(BaseModel):

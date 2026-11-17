@@ -32,7 +32,8 @@ app = FastAPI(
 # CORS middleware for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict to settings.PUBLIC_BASE_URL
+    # development: any origin; production: only the portal itself
+    allow_origins=[settings.PUBLIC_BASE_URL] if settings.ENVIRONMENT.lower() == "production" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

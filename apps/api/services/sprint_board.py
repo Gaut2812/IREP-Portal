@@ -117,7 +117,7 @@ def move_task(db: Session, task: SprintTask, column: str, position: Optional[int
     if old_col != column:
         rest = db.execute(
             select(SprintTask).where(SprintTask.team_id == task.team_id, SprintTask.sprint_id == task.sprint_id,
-                                     SprintTask.column_name == old_col).order_by(SprintTask.position, SprintTask.id)
+                                     SprintTask.column_name == old_col, SprintTask.id != task.id).order_by(SprintTask.position, SprintTask.id)
         ).scalars().all()
         for i, t in enumerate(rest):
             t.position = i

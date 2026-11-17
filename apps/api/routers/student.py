@@ -1392,49 +1392,7 @@ def request_lab_access(
 
 # --- SCREEN 30: Sprint Board lives in routers/projects.py ---
 
-# --- SCREEN 36: Mock Interviews (PDF 7) ---
-class SlotBookRequest(BaseModel):
-    slot_id: str
-
-@router.get("/interviews")
-def get_mock_interviews(db: Session = Depends(get_db)):
-    interview = db.execute(select(MockInterview)).first()
-    int_data = interview[0] if interview else None
-    
-    return {
-        "latest_interview": {
-            "title": int_data.round_title if int_data else "Mock Interview #2 – Technical",
-            "date_info": int_data.interview_date if int_data else "Oct 8 · 40 min",
-            "interviewer": int_data.interviewer_name if int_data else "Arun K.",
-            "overall_score": int_data.overall_score if int_data else 3.8,
-            "service_chip": int_data.service_chip if int_data else "Hire-ready for service roles",
-            "product_chip": int_data.product_chip if int_data else "Improve for product roles",
-            "rubrics": [
-                {"category": "Problem solving", "score": int_data.problem_solving if int_data else 4, "max": 5},
-                {"category": "Coding & correctness", "score": int_data.coding_correctness if int_data else 4, "max": 5},
-                {"category": "Thinking aloud", "score": int_data.thinking_aloud if int_data else 3, "max": 5},
-                {"category": "Core CS knowledge", "score": int_data.core_cs if int_data else 4, "max": 5},
-                {"category": "Project explanation", "score": int_data.project_explanation if int_data else 4, "max": 5},
-                {"category": "Communication & confidence", "score": int_data.communication if int_data else 3, "max": 5}
-            ],
-            "trainer_feedback": int_data.feedback_text if int_data else "Strong grasp of graph traversals and Union-Find.",
-            "recording_url": int_data.recording_url if int_data else "/videos/mock_02.mp4"
-        },
-        "progress_trend": [
-            {"round": "#1", "score": 3.0, "label": "#1 · 3.0"},
-            {"round": "#2", "score": 3.8, "label": "#2 · 3.8"},
-            {"target": 4.2, "label": "Target 4.2"}
-        ],
-        "available_slots": [
-            {"id": "slot_01", "time": "Wed, Oct 15 · 4:00 PM", "type": "Technical", "tag_color": "blue"},
-            {"id": "slot_02", "time": "Sat, Oct 18 · 10:30 AM", "type": "HR round", "tag_color": "green"},
-            {"id": "slot_03", "time": "Sat, Oct 18 · 12:00 PM", "type": "AI-allowed coding", "tag_color": "purple"}
-        ]
-    }
-
-@router.post("/interviews/book")
-def book_interview_slot(req: SlotBookRequest):
-    return {"success": True, "message": "Slot booked successfully! Confirmation sent to trainer."}
+# --- SCREEN 36: Mock Interviews lives in routers/interviews.py ---
 
 # --- SCREEN 08: Live Sessions & Recordings (PDF 14) ---
 from models.schema import Recording, RecordingView, SessionReminder

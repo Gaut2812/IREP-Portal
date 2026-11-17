@@ -672,5 +672,32 @@
     "loading": "Loading the sprint board...",
     "error_title": "Could not load the board",
     "retry": "Try again"
+  },
+  "interviews": {
+    "title": "Mock Interviews",
+    "meta": "{d} · {m} min · Interviewer: {i}",
+    "overall": "Overall",
+    "trainer_feedback": "Trainer feedback",
+    "no_interview": "No scored interview yet. Book your first slot on the right; scores appear after your trainer submits them.",
+    "progress": "Progress across interviews",
+    "target": "Target {t}",
+    "book_next": "Book next slot",
+    "book": "Book",
+    "booking": "Booking...",
+    "booked": "Booked",
+    "no_slots": "No open slots right now. Your trainer adds new slots every week.",
+    "my_bookings": "Your upcoming rounds",
+    "cancel": "Cancel",
+    "cancelled": "Booking cancelled",
+    "booked_toast": "Slot booked. Your trainer has been notified.",
+    "action_failed": "Something went wrong. Try again.",
+    "recording": "Recording",
+    "recording_caption": "Watch your interview with timestamped trainer comments",
+    "play": "Play recording",
+    "comments": "Trainer comments",
+    "jump": "Jump to {t}",
+    "loading": "Loading your interviews...",
+    "error_title": "Could not load interviews",
+    "retry": "Try again"
   }
 }

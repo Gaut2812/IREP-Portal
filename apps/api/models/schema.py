@@ -1056,3 +1056,81 @@ class BuildRun(TenantModel):
     environment: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)   # staging, production
     url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     finished_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Screen 36/37: mock interviews (slots, bookings, rubric scores, comments)
+# ---------------------------------------------------------------------------
+
+class RubricConfig(TenantModel):
+    __tablename__ = "rubric_config"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    round_type: Mapped[str] = mapped_column(String(32), default="technical")
+    criteria: Mapped[list] = mapped_column(JSON, default=list)        # [{"key","label_en","label_ta"}]
+    max_score: Mapped[int] = mapped_column(Integer, default=5)
+    service_ready_min: Mapped[float] = mapped_column(Float, default=3.5)
+    product_ready_min: Mapped[float] = mapped_column(Float, default=4.2)
+
+
+class InterviewSlot(TenantModel):
+    __tablename__ = "interview_slots"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    trainer_id: Mapped[str] = mapped_column(String(64), ForeignKey("trainers.id"), index=True)
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    round_type: Mapped[str] = mapped_column(String(32), default="technical")    # technical, hr, ai_coding
+    starts_at: Mapped[datetime.datetime] = mapped_column(DateTime, index=True)
+    duration_min: Mapped[int] = mapped_column(Integer, default=40)
+    status: Mapped[str] = mapped_column(String(16), default="open")              # open, booked, cancelled
+
+
+class InterviewBooking(TenantModel):
+    """One booking per slot, enforced by the database (no double booking)."""
+    __tablename__ = "interview_bookings"
+    __table_args__ = (UniqueConstraint("slot_id", name="uq_booking_slot"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    slot_id: Mapped[str] = mapped_column(String(64), ForeignKey("interview_slots.id"), index=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    interview_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class Interview(TenantModel):
+    __tablename__ = "interviews"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id"), nullable=True)
+    slot_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    round_number: Mapped[int] = mapped_column(Integer, default=1)
+    round_type: Mapped[str] = mapped_column(String(32), default="technical")
+    scheduled_at: Mapped[datetime.datetime] = mapped_column(DateTime)
+    duration_min: Mapped[int] = mapped_column(Integer, default=40)
+    status: Mapped[str] = mapped_column(String(16), default="scheduled", index=True)   # scheduled, completed, submitted, cancelled
+    overall_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    feedback_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    feedback_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    recording_key: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    recording_started_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    submitted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class InterviewRubricScore(TenantModel):
+    __tablename__ = "rubric_scores"
+    __table_args__ = (UniqueConstraint("interview_id", "criterion_key", name="uq_rubric_score"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    interview_id: Mapped[str] = mapped_column(String(64), ForeignKey("interviews.id"), index=True)
+    criterion_key: Mapped[str] = mapped_column(String(32), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class InterviewComment(TenantModel):
+    __tablename__ = "interview_comments"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    interview_id: Mapped[str] = mapped_column(String(64), ForeignKey("interviews.id"), index=True)
+    at_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    author_name: Mapped[str] = mapped_column(String(128), default="Trainer")

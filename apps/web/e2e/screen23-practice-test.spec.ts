@@ -39,6 +39,19 @@ test.describe("Screen 23: Practice Test (/student/tests/:id)", () => {
     expect(crashes).toEqual([]);
   });
 
+  test("submits exactly once when the timer runs out", async ({ page }) => {
+    let submits = 0;
+    page.on("request", (r) => { if (r.method() === "POST" && r.url().includes("/submit")) submits++; });
+    await page.clock.install();
+    await loginAs(page, "student");
+    await page.goto(URL);
+    await expect(page.getByText(/Question 12 of \d+/)).toBeVisible();
+    await page.clock.runFor(2 * 60 * 60 * 1000);   // two hours: past any test duration
+    await expect(page.getByText("Test Submitted Successfully!")).toBeVisible({ timeout: 15000 });
+    await page.clock.runFor(10_000);
+    expect(submits).toBe(1);
+  });
+
   test("supports the Tamil toggle", async ({ page }) => {
     await loginAs(page, "student", { lang: "ta" });
     await page.goto(URL);

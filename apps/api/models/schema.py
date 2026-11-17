@@ -409,6 +409,33 @@ class DirectMessage(TenantModel):
     text_en: Mapped[str] = mapped_column(Text, nullable=False)
     text_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     timestamp_str: Mapped[str] = mapped_column(String(32), default="10:45 AM")
+    sender_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    original_lang: Mapped[str] = mapped_column(String(8), default="en")
+    read_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+# Screen 35: translation cache + broadcasts
+class TranslationCache(TenantModel):
+    __tablename__ = "translations_cache"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)   # sha256(src|dst|text)
+    src: Mapped[str] = mapped_column(String(8), nullable=False)
+    dst: Mapped[str] = mapped_column(String(8), nullable=False)
+    source_text: Mapped[str] = mapped_column(Text, nullable=False)
+    translated_text: Mapped[str] = mapped_column(Text, nullable=False)
+    engine: Mapped[str] = mapped_column(String(32), default="fake")
+
+
+class Broadcast(TenantModel):
+    __tablename__ = "broadcasts"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    author_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
+    audience: Mapped[str] = mapped_column(String(16), nullable=False)        # students | parents | both
+    batch_ids: Mapped[str] = mapped_column(Text, default="[]")               # JSON list
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    delivery: Mapped[str] = mapped_column(Text, default="{}")                # JSON delivery report
 
 # Screen 15: Parent View Monthly Cards
 class ParentMonthlyRecord(TenantModel):

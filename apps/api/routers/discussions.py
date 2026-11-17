@@ -12,6 +12,7 @@ from core.database import get_db, SessionLocal
 from core.security import require_role, TokenPayload, decode_access_token, normalize_role
 from models.schema import (
     DiscussionGroup, GroupMessage, GroupMember, MessageReaction, MessageReport, User, College, TrainerDirectThread,
+    Student, ParentStudent, BatchTrainer, Trainer,
 )
 from services.chat_policy import can_message
 from services.moderation import contains_blocked
@@ -233,6 +234,13 @@ def create_thread(req: ThreadIn, current_user: TokenPayload = Depends(require_ro
         record_audit(db, current_user, "thread.blocked", "user", other.id, {"to_role": other.role})
         db.commit()
         raise HTTPException(status_code=403, detail=why)
+    if {normalize_role(current_user.role), normalize_role(other.role)} == {"parent", "trainer"}:
+        parent_id, trainer_uid = (current_user.sub, other.id) if normalize_role(current_user.role) == "parent" else (other.id, current_user.sub)
+        child_batches = db.execute(select(Student.batch_id).join(ParentStudent, ParentStudent.student_id == Student.id).where(ParentStudent.parent_user_id == parent_id)).scalars().all()
+        teaches = db.execute(select(BatchTrainer.id).join(Trainer, Trainer.id == BatchTrainer.trainer_id)
+                             .where(Trainer.user_id == trainer_uid, BatchTrainer.batch_id.in_(child_batches or ["_"]))).first()
+        if not teaches:
+            raise HTTPException(status_code=403, detail="Parents can message only their child's trainers.")
     trainer_id, contact = (current_user.sub, other) if normalize_role(current_user.role) == "trainer" else (other.id, db.execute(select(User).filter_by(id=current_user.sub)).scalar_one())
     existing = db.execute(select(TrainerDirectThread).filter_by(trainer_user_id=trainer_id, contact_user_id=contact.id)).scalars().first()
     if existing:

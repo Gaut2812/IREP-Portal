@@ -80,7 +80,9 @@ def seed_screen34(db, college_id: str = "col_demo_001") -> None:
     db.execute(delete(MessageReaction).where(MessageReaction.message_id.in_(stray or ["_"])))
     db.execute(delete(MessageReport).where(MessageReport.message_id.in_(stray or ["_"])))
     db.execute(delete(GroupMessage).where(GroupMessage.id.in_(stray or ["_"])))
-    db.execute(delete(MessageReport).where(MessageReport.group_id.in_(demo_groups)))
+    db.execute(delete(MessageReport).where(MessageReport.group_id.in_(demo_groups), ~MessageReport.id.like("rep_seed_%")))
+    for rep in db.execute(select(MessageReport).where(MessageReport.id.like("rep_seed_%"))).scalars().all():
+        rep.status = "open"   # Screen 35 moderation-queue seed
     db.execute(delete(ModerationAction).where(ModerationAction.actor_user_id.in_(MODERATORS)))
     if priya:
         db.execute(delete(MessageReaction).where(MessageReaction.user_id == priya.id))

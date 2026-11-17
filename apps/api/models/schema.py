@@ -11,6 +11,7 @@ class College(TenantModel):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     code: Mapped[str] = mapped_column(String(64), unique=True)
     logo_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    chat_retention_days: Mapped[int] = mapped_column(Integer, default=365)
 
 class User(TenantModel):
     __tablename__ = "users"
@@ -361,6 +362,9 @@ class DiscussionGroup(TenantModel):
     members_count: Mapped[int] = mapped_column(Integer, default=42)
     online_count: Mapped[int] = mapped_column(Integer, default=18)
     pinned_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    kind: Mapped[str] = mapped_column(String(32), default="batch")   # batch, track_doubts, daily_dsa, team, announcements, gd
+    icon: Mapped[str] = mapped_column(String(16), default="users")
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 class GroupMessage(TenantModel):
     __tablename__ = "group_messages"
@@ -375,11 +379,16 @@ class GroupMessage(TenantModel):
     is_marked_as_answer: Mapped[bool] = mapped_column(Boolean, default=False)
     reactions_count: Mapped[int] = mapped_column(Integer, default=0)
     timestamp_str: Mapped[str] = mapped_column(String(32), default="10:32 AM")
+    sender_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    is_removed: Mapped[bool] = mapped_column(Boolean, default=False)
+    removed_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 class TrainerDirectThread(TenantModel):
     __tablename__ = "trainer_direct_threads"
     
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    contact_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    student_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # the child a parent thread is about
     trainer_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
     contact_name: Mapped[str] = mapped_column(String(128), nullable=False) # e.g. Mr. Ramesh K
     contact_category: Mapped[str] = mapped_column(String(32), default="Parents") # Parents, College, Groups
@@ -1134,3 +1143,54 @@ class InterviewComment(TenantModel):
     at_seconds: Mapped[int] = mapped_column(Integer, default=0)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     author_name: Mapped[str] = mapped_column(String(128), default="Trainer")
+
+
+# ---------------------------------------------------------------------------
+# Screen 34/35: group membership, reactions, reports, moderation
+# ---------------------------------------------------------------------------
+
+class GroupMember(TenantModel):
+    __tablename__ = "group_members"
+    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_member"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    group_id: Mapped[str] = mapped_column(String(64), ForeignKey("discussion_groups.id"), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
+    role: Mapped[str] = mapped_column(String(16), default="member")       # member, moderator
+    last_read_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    last_seen_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    muted_until: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class MessageReaction(TenantModel):
+    __tablename__ = "reactions"
+    __table_args__ = (UniqueConstraint("message_id", "user_id", name="uq_reaction_user"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    message_id: Mapped[str] = mapped_column(String(64), ForeignKey("group_messages.id"), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    emoji: Mapped[str] = mapped_column(String(8), default="👍")
+
+
+class MessageReport(TenantModel):
+    __tablename__ = "reports"
+    __table_args__ = (UniqueConstraint("message_id", "reporter_user_id", name="uq_report_once"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    message_id: Mapped[str] = mapped_column(String(64), ForeignKey("group_messages.id"), index=True)
+    group_id: Mapped[str] = mapped_column(String(64), index=True)
+    reporter_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)   # open, kept, removed
+
+
+class ModerationAction(TenantModel):
+    __tablename__ = "moderation_actions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    report_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    message_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    target_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    action: Mapped[str] = mapped_column(String(16), nullable=False)               # remove, keep, mute
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    actor_user_id: Mapped[str] = mapped_column(String(64), nullable=False)

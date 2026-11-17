@@ -1,0 +1,54 @@
+name: Backend CI & Judge0 Verification
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+
+    services:
+      judge0:
+        image: judge0/judge0:latest
+        ports:
+          - 2358:2358
+        env:
+          JUDGE0_AUTH_TOKEN: test_judge0_token_2026
+          ENABLE_NETWORK: "false"
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: irep_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          cd apps/api
+          pip install -r requirements.txt
+
+      - name: Run Screen 24 Tests (Foundation, Execution, and Coding)
+        env:
+          ENVIRONMENT: testing
+          JUDGE0_URL: http://localhost:2358
+          JUDGE0_ADAPTER: fake
+          JUDGE0_AUTH_TOKEN: test_judge0_token_2026
+          DATABASE_URL: sqlite:///irep_test.db
+        run: |
+          cd apps/api
+          python -m pytest tests/test_screen24_db_foundation.py tests/test_screen24_execution.py tests/test_screen24_coding.py -v
+

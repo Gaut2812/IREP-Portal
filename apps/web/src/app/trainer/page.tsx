@@ -1,15 +1,33 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import {
   Users, ClipboardCheck, Code2, AlertTriangle,
-  Calendar, CheckCircle2, Clock, ArrowRight, FileText
+  Calendar, CheckCircle2, Clock, ArrowRight, FileText,
+  BookOpen, ExternalLink, Filter, PlusCircle
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
+import { fetchApi } from "@/lib/api";
+
+interface CodingProblemSummary {
+  id: string;
+  slug: string;
+  title: string;
+  difficulty: string;
+  topic: string;
+  week_info: string;
+  total_submissions: number;
+  accepted_submissions: number;
+  solved_percentage: number;
+}
 
 export default function TrainerDashboardPage() {
+  const [codingProblems, setCodingProblems] = useState<CodingProblemSummary[]>([]);
+  const [loadingProblems, setLoadingProblems] = useState<boolean>(true);
+  const [selectedWeek, setSelectedWeek] = useState<string>("All");
+
   const readinessData = [
     { batch: "CSE-A", score: 82 },
     { batch: "CSE-B", score: 76 },
@@ -31,9 +49,31 @@ export default function TrainerDashboardPage() {
     { name: "Rahul V.", batch: "Cyber", score: 58, issue: "Project delay", action: "Mentor", actionClass: "chip-blue" }
   ];
 
+  useEffect(() => {
+    async function loadProblems() {
+      try {
+        const res = await fetchApi<CodingProblemSummary[]>("/trainer/coding-problems");
+        if (Array.isArray(res) && res.length > 0) {
+          setCodingProblems(res);
+        } else {
+          setCodingProblems(getFallbackProblems());
+        }
+      } catch (err) {
+        setCodingProblems(getFallbackProblems());
+      } finally {
+        setLoadingProblems(false);
+      }
+    }
+    loadProblems();
+  }, []);
+
+  const filteredProblems = selectedWeek === "All"
+    ? codingProblems
+    : codingProblems.filter(p => p.week_info?.includes(`Week ${selectedWeek}`));
+
   return (
     <AppShell pageTitle="Trainer Dashboard">
-      <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="space-y-6 max-w-7xl mx-auto pb-10">
         
         {/* ROW 1: 4 Metric Cards (PDF 8) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -137,7 +177,119 @@ export default function TrainerDashboardPage() {
           </div>
         </div>
 
-        {/* ROW 3: Students Needing Support + Quick Actions (PDF 8) */}
+        {/* ROW 3: Weekly DSA Curriculum & Coding Lab Widget (Screen 24 Integration) */}
+        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4" data-testid="trainer-dsa-widget">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Code2 className="w-5 h-5 text-[#2B5CD0]" />
+                <h3 className="font-bold text-sm text-[#0F1F3A]">Weekly DSA Curriculum · Coding Lab</h3>
+                <span className="chip-purple text-[10px]">Trainer: Arun Kumar</span>
+              </div>
+              <p className="text-xs text-[#64748B] mt-0.5">
+                20 Structured Problems across Weeks 1-8 · Solved on weekly basis by placement students
+              </p>
+            </div>
+
+            {/* Filter by Week */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#64748B] font-medium flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5" /> Week:
+              </span>
+              <select
+                value={selectedWeek}
+                onChange={(e) => setSelectedWeek(e.target.value)}
+                className="bg-[#F8FAFC] border border-[#CBD5E1] text-xs font-semibold text-[#0F1F3A] rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer"
+              >
+                <option value="All">All Weeks (1-8)</option>
+                <option value="1">Week 1 (Arrays & Pointers)</option>
+                <option value="2">Week 2 (Sliding Window)</option>
+                <option value="3">Week 3 (Stacks & Queues)</option>
+                <option value="4">Week 4 (Linked Lists)</option>
+                <option value="5">Week 5 (Binary Search)</option>
+                <option value="6">Week 6 (Trees & BST)</option>
+                <option value="7">Week 7 (Dynamic Programming)</option>
+                <option value="8">Week 8 (Graphs & DSU)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Table of DSA Problems */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
+                  <th className="pb-2.5 font-semibold">Problem Title</th>
+                  <th className="pb-2.5 font-semibold">Curriculum Schedule</th>
+                  <th className="pb-2.5 font-semibold">Topic</th>
+                  <th className="pb-2.5 font-semibold">Difficulty</th>
+                  <th className="pb-2.5 font-semibold text-center">Submissions</th>
+                  <th className="pb-2.5 font-semibold text-center">Solved %</th>
+                  <th className="pb-2.5 font-semibold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E2E8F0]">
+                {loadingProblems ? (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">
+                      Loading weekly curriculum problems...
+                    </td>
+                  </tr>
+                ) : filteredProblems.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">
+                      No problems found for Week {selectedWeek}.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProblems.map((prob) => (
+                    <tr key={prob.id} className="hover:bg-[#F8FAFC] transition-colors">
+                      <td className="py-2.5 font-bold text-[#0F1F3A]">
+                        {prob.title}
+                      </td>
+                      <td className="py-2.5 text-[#64748B] font-medium">
+                        {prob.week_info}
+                      </td>
+                      <td className="py-2.5">
+                        <span className="chip-blue text-[10px]">{prob.topic}</span>
+                      </td>
+                      <td className="py-2.5">
+                        <span className={
+                          prob.difficulty === "Easy"
+                            ? "chip-green text-[10px]"
+                            : prob.difficulty === "Medium"
+                              ? "chip-amber text-[10px]"
+                              : "chip-red text-[10px]"
+                        }>
+                          {prob.difficulty}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-center font-mono text-[#0F1F3A]">
+                        {prob.total_submissions}
+                      </td>
+                      <td className="py-2.5 text-center">
+                        <span className="font-bold text-[#15803D] text-[11px]">
+                          {prob.solved_percentage}%
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <Link
+                          href={`/student/coding/${prob.id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-[11px] rounded-lg shadow-sm transition-all"
+                        >
+                          <span>Solve</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ROW 4: Students Needing Support + Quick Actions (PDF 8) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Table (2 cols) */}
           <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
@@ -213,3 +365,15 @@ export default function TrainerDashboardPage() {
   );
 }
 
+function getFallbackProblems(): CodingProblemSummary[] {
+  return [
+    { id: "prob_connected_components", slug: "connected-components", title: "Number of Connected Components in an Undirected Graph", difficulty: "Medium", topic: "Union-Find", week_info: "Week 8 · Pattern drill · 3 of 6 solved", total_submissions: 18, accepted_submissions: 16, solved_percentage: 88 },
+    { id: "prob_two_sum", slug: "two-sum", title: "Two Sum", difficulty: "Easy", topic: "Arrays & Hash Map", week_info: "Week 1 · Foundation · 1 of 3", total_submissions: 42, accepted_submissions: 38, solved_percentage: 90 },
+    { id: "prob_container_water", slug: "container-with-most-water", title: "Container With Most Water", difficulty: "Medium", topic: "Two Pointers", week_info: "Week 1 · Pattern drill · 2 of 3", total_submissions: 35, accepted_submissions: 28, solved_percentage: 80 },
+    { id: "prob_3sum", slug: "3sum", title: "3Sum", difficulty: "Medium", topic: "Two Pointers", week_info: "Week 1 · Advanced drill · 3 of 3", total_submissions: 29, accepted_submissions: 21, solved_percentage: 72 },
+    { id: "prob_longest_substring", slug: "longest-substring", title: "Longest Substring Without Repeating Characters", difficulty: "Medium", topic: "Sliding Window", week_info: "Week 2 · Pattern drill · 1 of 2", total_submissions: 31, accepted_submissions: 25, solved_percentage: 81 },
+    { id: "prob_valid_parentheses", slug: "valid-parentheses", title: "Valid Parentheses", difficulty: "Easy", topic: "Stack", week_info: "Week 3 · Foundation · 1 of 3", total_submissions: 45, accepted_submissions: 42, solved_percentage: 93 },
+    { id: "prob_climbing_stairs", slug: "climbing-stairs", title: "Climbing Stairs", difficulty: "Easy", topic: "Dynamic Programming", week_info: "Week 7 · Foundation · 1 of 3", total_submissions: 38, accepted_submissions: 35, solved_percentage: 92 },
+    { id: "prob_course_schedule", slug: "course-schedule", title: "Course Schedule", difficulty: "Medium", topic: "Graph Topological Sort", week_info: "Week 8 · Advanced drill · 2 of 2", total_submissions: 22, accepted_submissions: 17, solved_percentage: 77 }
+  ];
+}

@@ -17,6 +17,7 @@ export interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   token: string | null;
+  isLoaded: boolean;
   login: (token: string, user: UserProfile) => void;
   logout: () => void;
   switchRoleDemo: (role: Role) => void;
@@ -60,6 +61,7 @@ const demoProfiles: Record<Role, UserProfile> = {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
+  isLoaded: false,
   login: () => {},
   logout: () => {},
   switchRoleDemo: () => {},
@@ -68,6 +70,7 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(demoProfiles.student);
   const [token, setToken] = useState<string | null>("mock_jwt_token_demo");
+  const [isLoaded, setIsLoaded] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -81,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(demoProfiles.student);
       }
     }
+    setIsLoaded(true);
   }, []);
 
   const login = (newToken: string, newUser: UserProfile) => {
@@ -110,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, switchRoleDemo }}>
+    <AuthContext.Provider value={{ user, token, isLoaded, login, logout, switchRoleDemo }}>
       {children}
     </AuthContext.Provider>
   );

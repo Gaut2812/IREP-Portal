@@ -255,6 +255,16 @@ def handle_moderation(item_id: str, action: str):
     # action: keep or remove
     return {"success": True, "action": action, "item_id": item_id}
 
+def _publish_board_for_task(db: Session, task_id: Optional[str]) -> None:
+    """Live-update the team's sprint board after a review decision (Screen 30)."""
+    if not task_id:
+        return
+    from services.realtime import publish_sync
+    t = db.execute(select(SprintTask).filter_by(id=task_id)).scalar_one_or_none()
+    if t and t.team_id:
+        publish_sync(f"board:{t.team_id}", {"type": "review", "team_id": t.team_id, "task_id": t.id})
+
+
 # --- SCREEN 31: Trainer Code Reviews ---
 class ReviewActionRequest(BaseModel):
     action: str  # "approve" | "request_changes"
@@ -493,6 +503,7 @@ def submit_review_action(
                     project.score_percent = req.score_percent
 
         db.commit()
+        _publish_board_for_task(db, pr.task_id)
         return {
             "success": True,
             "message": "Pull Request approved! Sprint task moved to 'Done' and Student Portfolio verified.",
@@ -518,6 +529,7 @@ def submit_review_action(
                 task.column_name = "in_progress"
 
         db.commit()
+        _publish_board_for_task(db, pr.task_id)
         return {
             "success": True,
             "message": "Changes requested. Team notified and task moved to In Progress.",

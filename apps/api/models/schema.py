@@ -321,6 +321,11 @@ class SprintTask(TenantModel):
     assignee_name: Mapped[str] = mapped_column(String(64), default="Priya R")
     story_points: Mapped[int] = mapped_column(Integer, default=3)
     pr_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    # S-30 board structure
+    team_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    sprint_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    assignee_student_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 # Screen 36: Mock Interviews
 class MockInterview(TenantModel):
@@ -972,3 +977,82 @@ class UsageLedger(TenantModel):
     period: Mapped[str] = mapped_column(String(7), index=True)         # YYYY-MM
     ref_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     ref_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Screen 30: sprint board (teams, sprints, change requests, stand-ups, builds)
+# ---------------------------------------------------------------------------
+
+class Team(TenantModel):
+    __tablename__ = "teams"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    project_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    project_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)      # student_projects id shown in portfolios
+    client_name: Mapped[str] = mapped_column(String(128), default="Trainer")
+    repo_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # owner/repo linked through the GitHub App
+    trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id"), nullable=True)
+
+
+class TeamMember(TenantModel):
+    __tablename__ = "team_members"
+    __table_args__ = (UniqueConstraint("team_id", "student_id", name="uq_team_member"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    team_id: Mapped[str] = mapped_column(String(64), ForeignKey("teams.id"), index=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    role: Mapped[str] = mapped_column(String(32), default="developer")   # lead, developer, qa
+
+
+class Sprint(TenantModel):
+    __tablename__ = "sprints"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    team_id: Mapped[str] = mapped_column(String(64), ForeignKey("teams.id"), index=True)
+    number: Mapped[int] = mapped_column(Integer, default=1)
+    total_sprints: Mapped[int] = mapped_column(Integer, default=3)
+    ends_week: Mapped[int] = mapped_column(Integer, default=8)
+    status: Mapped[str] = mapped_column(String(16), default="active")    # planned, active, closed
+    velocity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)   # points completed when closed
+    goal: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class ChangeRequest(TenantModel):
+    __tablename__ = "change_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    team_id: Mapped[str] = mapped_column(String(64), ForeignKey("teams.id"), index=True)
+    sprint_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("sprints.id"), nullable=True)
+    code: Mapped[str] = mapped_column(String(16), nullable=False)        # CR-04
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="open")      # open, accepted, done
+    task_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    raised_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class Standup(TenantModel):
+    __tablename__ = "standups"
+    __table_args__ = (UniqueConstraint("sprint_id", "student_id", "standup_date", name="uq_standup_day"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sprint_id: Mapped[str] = mapped_column(String(64), ForeignKey("sprints.id"), index=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    standup_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    yesterday: Mapped[str] = mapped_column(Text, nullable=False)
+    today: Mapped[str] = mapped_column(Text, nullable=False)
+    blockers: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class BuildRun(TenantModel):
+    __tablename__ = "build_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    team_id: Mapped[str] = mapped_column(String(64), ForeignKey("teams.id"), index=True)
+    run_number: Mapped[int] = mapped_column(Integer, default=1)
+    workflow: Mapped[str] = mapped_column(String(128), default="CI")
+    status: Mapped[str] = mapped_column(String(16), default="passing")   # passing, failing, running
+    environment: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)   # staging, production
+    url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    finished_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)

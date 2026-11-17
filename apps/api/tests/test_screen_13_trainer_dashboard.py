@@ -131,7 +131,14 @@ def test_parent_call_action_notifies_parent_once():
 def test_resolve_requires_note_and_removes_from_open_count():
     db = SessionLocal()
     try:
-        flag = db.execute(select(AtRiskFlag).where(AtRiskFlag.status != "resolved", AtRiskFlag.batch_id == "bat_cyb_s5_cyber")).scalars().first()
+        arun_batches = db.execute(select(BatchTrainer.batch_id).filter_by(trainer_id="trn_arun_01")).scalars().all()
+        flag = db.execute(select(AtRiskFlag).where(AtRiskFlag.status != "resolved", AtRiskFlag.batch_id.in_(arun_batches))).scalars().first()
+        if flag is None:   # every flag resolved by earlier runs: open a fresh one for this test
+            st = db.execute(select(Student).where(Student.batch_id.in_(arun_batches))).scalars().first()
+            flag = AtRiskFlag(id="flag_test_resolve", college_id="col_demo_001", student_id=st.id, batch_id=st.batch_id,
+                              reason_key="low_score", reason_text="Score 50", severity="medium", suggested_action="extra_saturday", status="open")
+            db.merge(flag)
+            db.commit()
         flag_id = flag.id
     finally:
         db.close()

@@ -1390,56 +1390,7 @@ def request_lab_access(
     return {"success": True, "status": "pending", "approval_id": ap.id}
 
 
-# --- SCREEN 30: Sprint Board (PDF 6) ---
-class TaskMoveRequest(BaseModel):
-    task_id: str
-    target_column: str
-
-class StandupRequest(BaseModel):
-    yesterday: str
-    today: str
-    blockers: Optional[str] = None
-
-@router.get("/projects/board")
-def get_sprint_board(db: Session = Depends(get_db)):
-    tasks = db.execute(select(SprintTask)).scalars().all()
-    
-    columns = {"todo": [], "in_progress": [], "code_review": [], "done": []}
-    for t in tasks:
-        col = t.column_name if t.column_name in columns else "todo"
-        columns[col].append({
-            "id": t.id,
-            "title": t.title,
-            "tag": t.tag,
-            "tag_type": t.tag_type,
-            "assignee_initials": t.assignee_initials,
-            "assignee_name": t.assignee_name,
-            "story_points": t.story_points,
-            "pr_number": t.pr_number
-        })
-        
-    return {
-        "team_name": "Team Phoenix",
-        "sprint_info": "Sprint 2 of 3",
-        "project_title": "Clinic Appointment System",
-        "client": "Trainer (Arun K.)",
-        "deadline": "Ends Week 8",
-        "change_request": "SMS reminder for appointments (CR-04)",
-        "progress_pct": 58,
-        "story_points": {"completed": 21, "total": 36, "velocity_last": 30},
-        "build_status": {"state": "Passing", "deployed_time": "Deployed to staging 2 hrs ago"},
-        "columns": columns
-    }
-
-@router.post("/projects/tasks/move")
-def move_sprint_task(req: TaskMoveRequest, db: Session = Depends(get_db)):
-    db.execute(update(SprintTask).where(SprintTask.id == req.task_id).values(column_name=req.target_column))
-    db.commit()
-    return {"success": True, "task_id": req.task_id, "column": req.target_column}
-
-@router.post("/projects/standup")
-def submit_standup(req: StandupRequest):
-    return {"success": True, "message": "Daily standup shared with Team Phoenix & Trainer Arun K."}
+# --- SCREEN 30: Sprint Board lives in routers/projects.py ---
 
 # --- SCREEN 36: Mock Interviews (PDF 7) ---
 class SlotBookRequest(BaseModel):

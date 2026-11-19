@@ -481,6 +481,25 @@ def init_db_and_seed():
     ensure_schema(engine)
         
     db = SessionLocal()
+    if engine.dialect.name == "sqlite":
+        # The models declare ForeignKeys but no relationship(), so the unit of
+        # work does not order parent rows before child rows inside a flush, and
+        # a first-time seed into an empty database trips row-by-row FK checks.
+        # Switch row-level checks off for this session only and verify the
+        # whole database with foreign_key_check before every commit instead,
+        # so an orphan row still fails the seed.
+        from sqlalchemy import event
+
+        @event.listens_for(db, "after_begin")
+        def _relax_fks(session, transaction, connection):
+            # pysqlite has not opened its transaction yet, so this PRAGMA applies
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+
+        @event.listens_for(db, "before_commit")
+        def _verify_fks(session):
+            bad = session.connection().exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+            if bad:
+                raise RuntimeError(f"Seed left {len(bad)} foreign-key violations, e.g. {bad[:3]}")
     try:
         # Check if already seeded
         result = db.execute(select(College).filter_by(id="col_demo_001")).scalar_one_or_none()
@@ -495,6 +514,16 @@ def init_db_and_seed():
                         db.add(tc)
                 db.commit()
                 print("18 TestCases verified and committed.", flush=True)
+            # Repair: older Coding Lab builds stored users.id in student_id for
+            # hints and some submissions. Re-key those rows to students.id.
+            from sqlalchemy import text as _sql
+            for _tbl in ("coding_hint_usages", "coding_submissions"):
+                db.execute(_sql(
+                    f"UPDATE {_tbl} SET student_id = (SELECT s.id FROM students s WHERE s.user_id = {_tbl}.student_id) "
+                    f"WHERE student_id IN (SELECT user_id FROM students)"
+                ))
+            db.commit()
+
             # Ensure weekly DSA problems are seeded
             from seed.seed_weekly_dsa import seed_weekly_problems
             seeded_w = seed_weekly_problems(db, college_id="col_demo_001")
@@ -1160,10 +1189,18 @@ def init_db_and_seed():
         seed_screen35(db, college_id="col_demo_001")
         from seed.seed_screen01 import seed_screen01
         seed_screen01(db, college_id="col_demo_001")
+        db.flush()
+
+        # same as the re-seed path: open at-risk flags for the seeded history
+        from services.at_risk import run_rules
+        run_rules(db, "col_demo_001")
 
         db.commit()
     finally:
         db.close()
+        if engine.dialect.name == "sqlite":
+            # drop pooled connections that had FK checks switched off
+            engine.dispose()
 
 if __name__ == "__main__":
     init_db_and_seed()

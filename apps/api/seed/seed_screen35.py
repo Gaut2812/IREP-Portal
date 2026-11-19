@@ -7,11 +7,13 @@ from sqlalchemy import select, delete
 
 from models.schema import (
     TrainerDirectThread, DirectMessage, GroupMessage, MessageReport, Broadcast, Notification, User,
+    ParentStudent,
 )
 
 THREADS = {
     "th_ramesh": ("usr_ramesh_01", "std_priya_01"),
-    "th_lakshmi": ("usr_lakshmi_01", "std_cse_5_001_7868"),
+    # Karthik S is a generated cohort student; his id is resolved from parent_student
+    "th_lakshmi": ("usr_lakshmi_01", None),
     "th_kavitha": ("usr_kavitha_01", None),
     "th_placement": (None, None),
 }
@@ -32,6 +34,10 @@ def seed_screen35(db, college_id: str = "col_demo_001") -> None:
     for tid, (contact, student) in THREADS.items():
         t = db.execute(select(TrainerDirectThread).filter_by(id=tid)).scalar_one_or_none()
         if t:
+            if contact == "usr_lakshmi_01":
+                student = db.execute(
+                    select(ParentStudent.student_id).filter_by(parent_user_id=contact, college_id=college_id)
+                ).scalars().first()
             t.contact_user_id, t.student_id, t.unread_badge = contact, student, 0
 
     # (id, thread, sender user or None, incoming, text_en, text_ta, at, read)

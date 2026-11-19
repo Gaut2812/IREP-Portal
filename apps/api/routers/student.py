@@ -195,6 +195,16 @@ def _get_ordered_problems(db: Session, college_id: str):
     order_map = {pid: i for i, pid in enumerate(CURRICULUM_ORDER)}
     return sorted(all_probs, key=lambda p: order_map.get(p.id, 999))
 
+
+def _coding_student_id(current_user: TokenPayload, db: Session) -> Optional[str]:
+    """students.id of the caller, or None for staff (trainer/college) previews.
+
+    Coding submissions and hint usages reference students.id, never users.id.
+    """
+    return db.execute(
+        select(Student.id).filter_by(user_id=current_user.sub, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
 @router.get("/coding")
 def list_coding_problems(
     current_user: TokenPayload = Depends(require_role(["student", "trainer", "college_admin"])),
@@ -205,7 +215,7 @@ def list_coding_problems(
     # Query solved problems for this student
     accepted_submissions = db.execute(
         select(CodingSubmission.problem_id).filter_by(
-            student_id=current_user.sub,
+            student_id=_coding_student_id(current_user, db),
             college_id=current_user.college_id,
             status="Accepted"
         )
@@ -251,25 +261,27 @@ def get_coding_problem(
     prev_prob = ordered_all[curr_idx - 1] if curr_idx > 0 else None
     next_prob = ordered_all[curr_idx + 1] if 0 <= curr_idx < len(ordered_all) - 1 else None
 
+    student_id = _coding_student_id(current_user, db)
+
     # Query hints used by this student
     hint_records = db.execute(
         select(CodingHintUsage).filter_by(
             problem_id=prob.id,
-            student_id=current_user.sub,
+            student_id=student_id,
             college_id=current_user.college_id
         ).order_by(CodingHintUsage.hint_number)
     ).scalars().all()
-    
+
     revealed_hints = [r.hint_text for r in hint_records]
     if not revealed_hints:
         # Default with the first hint
         revealed_hints = [PROBLEM_HINTS[0]]
-        
+
     # Check if student has previous submissions
     last_submission = db.execute(
         select(CodingSubmission).filter_by(
             problem_id=prob.id,
-            student_id=current_user.sub,
+            student_id=student_id,
             college_id=current_user.college_id
         ).order_by(CodingSubmission.created_at.desc())
     ).scalars().first()
@@ -507,7 +519,7 @@ def submit_code(
     hint_count = db.execute(
         select(CodingHintUsage).filter_by(
             problem_id=prob.id,
-            student_id=current_user.sub,
+            student_id=student_id,
             college_id=current_user.college_id
         )
     ).scalars().all()
@@ -610,15 +622,17 @@ def request_coding_hint(
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found")
         
+    student_id = _coding_student_id(current_user, db)
+
     # Query current hints used
     hint_records = db.execute(
         select(CodingHintUsage).filter_by(
             problem_id=prob.id,
-            student_id=current_user.sub,
+            student_id=student_id,
             college_id=current_user.college_id
         ).order_by(CodingHintUsage.hint_number)
     ).scalars().all()
-    
+
     next_hint_idx = len(hint_records)
     if next_hint_idx >= len(PROBLEM_HINTS):
         # All hints exhausted
@@ -631,16 +645,18 @@ def request_coding_hint(
         }
         
     hint_text = PROBLEM_HINTS[next_hint_idx]
-    new_usage = CodingHintUsage(
-        id=f"hint_{int(datetime.datetime.utcnow().timestamp())}_{next_hint_idx}",
-        college_id=current_user.college_id,
-        problem_id=prob.id,
-        student_id=current_user.sub,
-        hint_number=next_hint_idx + 1,
-        hint_text=hint_text
-    )
-    db.add(new_usage)
-    db.commit()
+    if student_id is not None:
+        # trainers preview hints without consuming a student's hint quota
+        new_usage = CodingHintUsage(
+            id=f"hint_{uuid.uuid4().hex[:20]}",
+            college_id=current_user.college_id,
+            problem_id=prob.id,
+            student_id=student_id,
+            hint_number=next_hint_idx + 1,
+            hint_text=hint_text
+        )
+        db.add(new_usage)
+        db.commit()
     
     return {
         "success": True,

@@ -32,7 +32,10 @@ TOPICS = [
     ("How do embeddings differ from one-hot vectors?", "Embeddings are dense and learned; similar items end up close."),
     ("Why does my RAG answer cite the wrong chunk?", "Your chunks are too large; try 300 tokens with overlap."),
 ]
-SEED_PREFIXES = ("msg_seed_", "msg_0")
+SEED_PREFIXES = ("msg_seed_",)
+# the original PDF 11 conversation; exact ids, because runtime ids are
+# "msg_" + random hex and a "msg_0" prefix would also keep some of those
+SEED_IDS = {"msg_01", "msg_02", "msg_03"}
 
 
 def _utc(local: datetime.datetime) -> datetime.datetime:
@@ -76,7 +79,7 @@ def seed_screen34(db, college_id: str = "col_demo_001") -> None:
     # ---- reset demo state ----
     demo_groups = list(GROUPS)
     stray = db.execute(select(GroupMessage.id).where(GroupMessage.group_id.in_(demo_groups))).scalars().all()
-    stray = [m for m in stray if not m.startswith(SEED_PREFIXES)]
+    stray = [m for m in stray if not (m.startswith(SEED_PREFIXES) or m in SEED_IDS)]
     db.execute(delete(MessageReaction).where(MessageReaction.message_id.in_(stray or ["_"])))
     db.execute(delete(MessageReport).where(MessageReport.message_id.in_(stray or ["_"])))
     db.execute(delete(GroupMessage).where(GroupMessage.id.in_(stray or ["_"])))
@@ -93,8 +96,16 @@ def seed_screen34(db, college_id: str = "col_demo_001") -> None:
         # only the seeded trainer answers stay marked (tests/demos may mark others)
         msg.is_marked_as_answer = msg.id == "msg_03" or (msg.id.startswith("msg_seed_h") and msg.id.endswith("t"))
 
-    # ---- doubt history (once) ----
-    if not db.execute(select(GroupMessage).where(GroupMessage.id.like("msg_seed_h%"))).first():
+    # ---- doubt history (rebuilt every seed so it stays anchored to today) ----
+    # "Top helpers" counts the last 30 days, so a history generated once drifts
+    # out of the window as the database ages. Same RNG seed -> same rows.
+    old_hist = db.execute(select(GroupMessage.id).where(GroupMessage.id.like("msg_seed_h%"))).scalars().all()
+    if old_hist:
+        db.execute(delete(MessageReaction).where(MessageReaction.message_id.in_(old_hist)))
+        db.execute(delete(MessageReport).where(MessageReport.message_id.in_(old_hist)))
+        db.execute(delete(GroupMessage).where(GroupMessage.id.in_(old_hist)))
+        db.flush()
+    if True:
         rng = random.Random(3434)
         helper_pool = []
         for name, n in HELPERS_RECENT.items():

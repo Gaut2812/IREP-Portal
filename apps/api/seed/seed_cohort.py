@@ -10,8 +10,8 @@ The generator uses a fixed random seed, so every fresh database gets the
 same cohort and the tests can assert on it.
 """
 import datetime
+import hashlib
 import random
-import uuid
 from typing import Dict, List
 
 from sqlalchemy import select
@@ -217,7 +217,10 @@ def seed_cohort(db, college_id: str = "col_demo_001") -> int:
             n += 1
             email = base_email + str(n) + "@demo.edu"
         used_emails.add(email)
-        suffix = code.lower() + "_" + str(b.semester) + "_" + str(idx).zfill(3) + "_" + uuid.uuid4().hex[:4]
+        stem = code.lower() + "_" + str(b.semester) + "_" + str(idx).zfill(3)
+        # deterministic (not uuid4) so every fresh database gets the same ids;
+        # hashed rather than drawn from rng so the cohort figures are unchanged
+        suffix = stem + "_" + hashlib.sha1((college_id + ":" + b.id + ":" + stem).encode()).hexdigest()[:4]
         uid = "usr_" + suffix
         sid = "std_" + suffix
         user = User(id=uid, college_id=college_id, email=email, hashed_password=shared_hash, role="student",

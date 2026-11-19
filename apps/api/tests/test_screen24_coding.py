@@ -114,10 +114,10 @@ def test_submit_code_persistence_and_scoring(db, student_user):
     assert len(result["cases"]) == 2
     assert "18 / 18 hidden tests passed" in result["message"]
 
-    # Verify submission was saved in database
+    # Verify submission was saved in database (keyed by students.id, not users.id)
     sub = db.query(CodingSubmission).filter_by(
         problem_id="prob_connected_components",
-        student_id=student_user.sub
+        student_id="std_priya_01"
     ).order_by(CodingSubmission.created_at.desc()).first()
     assert sub is not None
     assert sub.status == "Accepted"

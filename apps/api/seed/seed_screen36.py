@@ -66,7 +66,7 @@ def seed_screen36(db, college_id: str = "col_demo_001") -> None:
 
     # PDF 7 "Book next slot": Wed 4:00 PM Technical · Sat 10:30 AM HR · Sat 12:00 PM AI-allowed coding
     wed = _next(today, 2, 1)
-    sat = _next(today, 5, 2)
+    sat = wed + datetime.timedelta(days=3)  # the Saturday after that Wednesday, so the PDF order holds on every weekday
     plan = [("slot_demo_tech", wed, 16, 0, "technical"), ("slot_demo_hr", sat, 10, 30, "hr"), ("slot_demo_ai", sat, 12, 0, "ai_coding")]
     db.execute(delete(InterviewSlot).where(InterviewSlot.trainer_id == ARUN, InterviewSlot.id.notin_([p[0] for p in plan]),
                                            InterviewSlot.starts_at > now))

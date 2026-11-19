@@ -1,6 +1,6 @@
 import { Page } from "@playwright/test";
 
-export type DemoRole = "student" | "trainer" | "college" | "parent";
+export type DemoRole = "student" | "trainer" | "college" | "parent" | "admin";
 
 const API_BASE = process.env.PLAYWRIGHT_API_URL || "http://localhost:8000/api/v1";
 
@@ -9,6 +9,7 @@ const CREDENTIALS: Record<DemoRole, { identifier: string; password: string; phon
   trainer: { identifier: "arun.k@demo.edu", password: "password123" },
   college: { identifier: "admin@demo.edu", password: "password123" },
   parent: { identifier: "ramesh.k@example.com", password: "password123", phone: "9876543210" },
+  admin: { identifier: "staff@irep.demo", password: "password123" },
 };
 
 // OTP requests are rate limited (5 per 10 min per phone), so each worker logs a
@@ -16,7 +17,9 @@ const CREDENTIALS: Record<DemoRole, { identifier: string; password: string; phon
 const parentLogins = new Map<string, any>();
 
 function toWebRole(apiRole: string): DemoRole {
-  return apiRole === "college_admin" ? "college" : (apiRole as DemoRole);
+  if (apiRole === "college_admin") return "college";
+  if (apiRole === "irep_admin") return "admin";
+  return apiRole as DemoRole;
 }
 
 /**

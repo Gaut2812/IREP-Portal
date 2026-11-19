@@ -77,8 +77,11 @@ DEMO_PROFILES = {
     "college_admin": dict(sub="usr_kavitha_01", email="admin@demo.edu", role="college_admin", name="Dr. Kavitha", avatar="DC"),
     "parent": dict(sub="usr_ramesh_01", email="ramesh.k@example.com", role="parent", name="Mr. Ramesh K", avatar="RK"),
 }
-# The web app uses the short role name "college"; the API role is college_admin.
-ROLE_ALIASES = {"college": "college_admin"}
+# The web app uses short role names ("college", "admin"). IREP staff are
+# "irep_admin" (Keycloak realm role); "super_admin" is the older spelling.
+ROLE_ALIASES = {"college": "college_admin", "admin": "irep_admin", "super_admin": "irep_admin"}
+# IREP staff are not in any college: their token carries the platform tenant.
+PLATFORM_TENANT = "irep_platform"
 
 
 def normalize_role(role: Optional[str]) -> Optional[str]:

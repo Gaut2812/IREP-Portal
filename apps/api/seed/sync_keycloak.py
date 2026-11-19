@@ -23,52 +23,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import httpx
 from sqlalchemy import select
 
 from core.database import SessionLocal
 from core.keycloak import IREP_ROLES
+from services.keycloak_admin import KeycloakAdmin, admin_from_env
 from models.schema import User
 
-DEMO_EMAILS = ["priya.r@demo.edu", "arun.k@demo.edu", "admin@demo.edu"]
-
-
-class KeycloakAdmin:
-    def __init__(self, base: str, realm: str, user: str, password: str):
-        self.base, self.realm = base.rstrip("/"), realm
-        tok = httpx.post(f"{self.base}/realms/master/protocol/openid-connect/token",
-                         data={"grant_type": "password", "client_id": "admin-cli", "username": user, "password": password},
-                         timeout=10)
-        tok.raise_for_status()
-        self.http = httpx.Client(base_url=f"{self.base}/admin/realms/{realm}", timeout=10,
-                                 headers={"Authorization": f"Bearer {tok.json()['access_token']}"})
-
-    def find_user(self, username: str):
-        r = self.http.get("/users", params={"username": username, "exact": "true"})
-        r.raise_for_status()
-        return r.json()[0] if r.json() else None
-
-    def upsert_user(self, rep: dict) -> str:
-        existing = self.find_user(rep["username"])
-        if existing:
-            self.http.put(f"/users/{existing['id']}", json={**existing, **rep}).raise_for_status()
-            return existing["id"]
-        r = self.http.post("/users", json=rep)
-        r.raise_for_status()
-        return r.headers["Location"].rsplit("/", 1)[-1]
-
-    def set_password(self, kc_id: str, password: str) -> None:
-        self.http.put(f"/users/{kc_id}/reset-password",
-                      json={"type": "password", "value": password, "temporary": False}).raise_for_status()
-
-    def set_only_irep_role(self, kc_id: str, role: str) -> None:
-        current = self.http.get(f"/users/{kc_id}/role-mappings/realm").raise_for_status().json()
-        stale = [r for r in current if r["name"] in IREP_ROLES and r["name"] != role]
-        if stale:
-            self.http.request("DELETE", f"/users/{kc_id}/role-mappings/realm", json=stale).raise_for_status()
-        if not any(r["name"] == role for r in current):
-            rep = self.http.get(f"/roles/{role}").raise_for_status().json()
-            self.http.post(f"/users/{kc_id}/role-mappings/realm", json=[rep]).raise_for_status()
+DEMO_EMAILS = ["priya.r@demo.edu", "arun.k@demo.edu", "admin@demo.edu", "staff@irep.demo"]
 
 
 def representation(u: User) -> dict:
@@ -88,8 +50,7 @@ def main() -> int:
     ap.add_argument("--password", default=os.getenv("DEMO_PASSWORD", "password123"))
     args = ap.parse_args()
 
-    kc = KeycloakAdmin(os.getenv("KEYCLOAK_ADMIN_URL", "http://localhost:8081"), os.getenv("KEYCLOAK_REALM", "irep"),
-                       os.getenv("KEYCLOAK_ADMIN_USER", "admin"), os.getenv("KEYCLOAK_ADMIN_PASSWORD", "admin"))
+    kc = admin_from_env()
     db = SessionLocal()
     try:
         q = select(User).where(User.role != "parent")

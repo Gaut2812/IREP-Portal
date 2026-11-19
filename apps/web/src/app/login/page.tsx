@@ -37,7 +37,9 @@ export default function LoginPage() {
     { id: "student" as Role, title: t("login.roles.student"), icon: GraduationCap, defaultEmail: "priya.r@demo.edu" },
     { id: "parent" as Role, title: t("login.roles.parent"), icon: Users, defaultEmail: "ramesh.k@example.com" },
     { id: "trainer" as Role, title: t("login.roles.trainer"), icon: UserCheck, defaultEmail: "arun.k@demo.edu" },
-    { id: "college" as Role, title: t("login.roles.college"), icon: Building2, defaultEmail: "admin@demo.edu" }
+    { id: "college" as Role, title: t("login.roles.college"), icon: Building2, defaultEmail: "admin@demo.edu" },
+    // IREP staff (screens 45-49): reached from the small link under the grid, not a card
+    { id: "admin" as Role, title: t("login.roles.admin"), icon: ShieldCheck, defaultEmail: "staff@irep.demo" },
   ];
 
   const handleRoleSelect = (role: Role) => {
@@ -177,7 +179,7 @@ export default function LoginPage() {
 
           {/* 2 by 2 Role Grid */}
           <div className="grid grid-cols-2 gap-2.5">
-            {roleConfigs.map((r) => {
+            {roleConfigs.filter((r) => r.id !== "admin").map((r) => {
               const Icon = r.icon;
               const isSelected = selectedRole === r.id;
               return (
@@ -206,6 +208,16 @@ export default function LoginPage() {
               );
             })}
           </div>
+
+          <button
+            type="button"
+            data-testid="role-admin"
+            aria-pressed={selectedRole === "admin"}
+            onClick={() => handleRoleSelect("admin")}
+            className={`w-full text-[11px] font-semibold underline-offset-2 hover:underline ${selectedRole === "admin" ? "text-[#2B5CD0]" : "text-[#64748B]"}`}
+          >
+            {t("login.staff_link")}
+          </button>
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium" role="alert" data-testid="login-error">

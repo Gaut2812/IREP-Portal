@@ -85,6 +85,16 @@ def test_trainer_and_college_roles_come_from_the_realm(api):
         assert api.get(denied, headers=h).status_code == 403
 
 
+def test_irep_staff_reach_screen_45_with_a_keycloak_token(api):
+    h = {"Authorization": f"Bearer {browser_sign_in('staff@irep.demo', 'password123')['access_token']}"}
+    me = api.get("/api/v1/auth/me", headers=h).json()
+    assert (me["role"], me["college_id"]) == ("irep_admin", "irep_platform")
+    assert api.get("/api/v1/admin/colleges", headers=h).status_code == 200
+    # college routes admit staff (legacy super_admin), but the platform tenant holds no
+    # college data: no student data without a logged support session (§5.4)
+    assert api.get("/api/v1/college/overview", headers=h).json()["kpis"]["students_enrolled"]["value"] == 0
+
+
 def test_wrong_password_gets_no_code():
     assert browser_sign_in("priya.r@demo.edu", "wrong-password")["error"] == "login_failed"
 

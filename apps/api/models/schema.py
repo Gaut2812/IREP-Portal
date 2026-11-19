@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, Date, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import TenantModel
 
@@ -12,6 +12,28 @@ class College(TenantModel):
     code: Mapped[str] = mapped_column(String(64), unique=True)
     logo_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     chat_retention_days: Mapped[int] = mapped_column(Integer, default=365)
+    # Screen 45 (IREP staff): onboarding state and feature switches
+    city: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="active")   # onboarding, active, suspended
+    features: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class MouTerm(TenantModel):
+    """One version of a college's MoU (screen 45). At most one is active."""
+    __tablename__ = "mou_terms"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    starts_on: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    ends_on: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    students_cap: Mapped[int] = mapped_column(Integer, nullable=False)
+    lab_hours_per_student: Mapped[int] = mapped_column(Integer, default=40)
+    ai_calls_per_day: Mapped[int] = mapped_column(Integer, default=30)
+    storage_gb: Mapped[int] = mapped_column(Integer, default=50)
+    fee_per_student_inr: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)   # draft, active, superseded
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 class User(TenantModel):
     __tablename__ = "users"

@@ -8,7 +8,8 @@
       "student": "Student",
       "parent": "Parent",
       "trainer": "Trainer",
-      "college": "College"
+      "college": "College",
+      "admin": "IREP staff"
     },
     "identifier_label": "Register number / email",
     "password_label": "Password",
@@ -41,7 +42,8 @@
     "otp_hint": "OTP Login",
     "staff_hint": "Staff",
     "sso_btn": "Sign in with IREP account",
-    "sso_hint": "You will sign in on the IREP account page and come straight back here."
+    "sso_hint": "You will sign in on the IREP account page and come straight back here.",
+    "staff_link": "IREP staff sign-in"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -77,7 +79,12 @@
     "projects_portfolio": "Projects & Portfolio",
     "events": "Events",
     "message_trainer": "Message Trainer",
-    "feedback_survey": "Feedback Survey"
+    "feedback_survey": "Feedback Survey",
+    "colleges": "Colleges & MoU",
+    "content_library": "Content library",
+    "usage_billing": "Usage & billing",
+    "audit_consent": "Audit & consent",
+    "support_desk": "Support desk"
   },
   "student": {
     "readiness_score": "Readiness score",
@@ -852,7 +859,8 @@
     "sign_in_other": "Sign in as another user",
     "soon_title": "Coming soon",
     "soon_body": "This module is planned for a later phase of the IREP portal.",
-    "session_expired": "Your session has expired. Please sign in again."
+    "session_expired": "Your session has expired. Please sign in again.",
+    "role_admin": "IREP staff"
   },
   "lab_approvals": {
     "title": "Lab access requests",
@@ -871,5 +879,61 @@
     "signing_in": "Signing you in…",
     "callback_failed": "We could not complete sign-in. Please try again.",
     "back_to_login": "Back to sign-in"
+  },
+  "admin_colleges": {
+    "title": "Colleges and MoU terms",
+    "subtitle": "Create colleges, set MoU terms and feature switches, and add the first college admin.",
+    "new_college": "New college",
+    "load_failed": "Could not load colleges. Try again.",
+    "save_failed": "Could not save. Try again.",
+    "err_name": "Enter the college name (at least 3 characters).",
+    "err_code": "Code must be 2-16 letters or digits.",
+    "err_city": "Enter the city.",
+    "err_state": "Enter the state.",
+    "name": "College",
+    "code": "Code",
+    "city": "City",
+    "state": "State",
+    "create": "Create college",
+    "empty": "No colleges yet. Create the first one.",
+    "status": "Status",
+    "students": "Students",
+    "mou_until": "MoU until",
+    "status_active": "Active",
+    "status_onboarding": "Onboarding",
+    "status_suspended": "Suspended",
+    "back": "All colleges",
+    "mou_terms": "MoU terms",
+    "no_mou": "No MoU yet.",
+    "lab_hours": "lab hours / student",
+    "mou_draft": "Draft",
+    "mou_active": "Active",
+    "mou_superseded": "Superseded",
+    "starts_on": "Starts on",
+    "ends_on": "Ends on",
+    "students_cap": "Student cap",
+    "ai_calls": "AI calls / day",
+    "fee": "Fee per student (₹)",
+    "err_mou_dates": "The MoU must end after it starts.",
+    "err_mou_cap": "Student cap must be more than 0.",
+    "save_activate_mou": "Save and activate MoU",
+    "features": "Feature switches",
+    "feature_virtual_labs": "Virtual labs",
+    "feature_cyber_range": "Cyber Range",
+    "feature_ai_study_buddy": "AI Study Buddy",
+    "feature_parent_sms": "SMS to parents",
+    "feature_whatsapp": "WhatsApp",
+    "feature_teams_live_classes": "Live classes on Teams",
+    "college_admins": "College admins",
+    "no_admins": "No college admin yet. The college stays in onboarding until it has one and an active MoU.",
+    "temp_password_title": "Temporary password (shown once)",
+    "copy": "Copy",
+    "temp_password_note": "Share it securely. It is not stored in readable form and cannot be shown again.",
+    "admin_name": "Name",
+    "admin_email": "Email",
+    "admin_phone": "Mobile (optional)",
+    "add_admin": "Add college admin",
+    "err_admin_name": "Enter the admin's name.",
+    "err_admin_email": "Enter a valid email."
   }
 }

@@ -12,7 +12,7 @@ interface RoleGuardProps {
   children: React.ReactNode;
 }
 
-export const HOME_FOR_ROLE: Record<Role, string> = { student: "/student", trainer: "/trainer", college: "/college", parent: "/parent" };
+export const HOME_FOR_ROLE: Record<Role, string> = { student: "/student", trainer: "/trainer", college: "/college", parent: "/parent", admin: "/admin/colleges" };
 
 /** Signed-out visitors go to /login; a signed-in user with the wrong role sees
  *  "Access restricted" with a way back to their own dashboard. */

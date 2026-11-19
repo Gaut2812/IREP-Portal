@@ -1,0 +1,32 @@
+"""Screen 45 seed: the demo IREP staff account and the demo college's MoU.
+Idempotent; dates are relative to today. Colleges created by tests or demos
+(anything but the demo college) are left alone."""
+import datetime
+
+from sqlalchemy import select
+
+from core.security import PLATFORM_TENANT, get_password_hash
+from models.schema import College, MouTerm, User
+
+STAFF_ID = "usr_irep_staff_01"
+FEATURES = {"virtual_labs": True, "cyber_range": True, "ai_study_buddy": True, "parent_sms": True,
+            "whatsapp": False, "teams_live_classes": True}
+
+
+def seed_screen45(db, college_id: str = "col_demo_001") -> None:
+    if db.get(User, STAFF_ID) is None:
+        db.add(User(id=STAFF_ID, college_id=PLATFORM_TENANT, email="staff@irep.demo", hashed_password=get_password_hash("password123"),
+                    role="irep_admin", name="IREP Operations", phone="9876500001", avatar_initials="IO", language_pref="en"))
+    c = db.get(College, college_id)
+    if c is None:
+        return
+    c.city, c.state, c.status = c.city or "Coimbatore", c.state or "Tamil Nadu", "active"
+    c.features = {**FEATURES, **(c.features or {})} if c.features else dict(FEATURES)
+    today = datetime.date.today()
+    m = db.get(MouTerm, "mou_demo_2026")
+    if m is None:
+        db.add(MouTerm(id="mou_demo_2026", college_id=college_id, starts_on=today.replace(month=6, day=1) if today.month >= 6 else today.replace(year=today.year - 1, month=6, day=1),
+                       ends_on=(today.replace(month=5, day=31) if today.month < 6 else today.replace(year=today.year + 1, month=5, day=31)),
+                       students_cap=650, lab_hours_per_student=60, ai_calls_per_day=30, storage_gb=200, fee_per_student_inr=4500,
+                       status="active", notes="Academic year MoU (B.Tech Sem 2-7)", created_by=STAFF_ID))
+    db.flush()

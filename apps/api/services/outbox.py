@@ -79,6 +79,7 @@ def _load_handlers() -> None:
     # import modules that register handlers so a bare worker process sees them
     import services.notifications  # noqa: F401
     import services.teams  # noqa: F401
+    import routers.admin_colleges  # noqa: F401  (identity.invite_user)
 
 
 def dispatch_pending(session_factory: Callable[[], Session], limit: int = 100) -> dict:

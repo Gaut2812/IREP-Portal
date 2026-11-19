@@ -58,6 +58,7 @@ The web app runs at `http://localhost:3000`. Set `NEXT_PUBLIC_API_URL` if the AP
 | Student | `priya.r@demo.edu` / `password123` | `/student` |
 | Trainer | `arun.k@demo.edu` / `password123` | `/trainer` |
 | College admin | `admin@demo.edu` / `password123` | `/college` |
+| IREP staff | `staff@irep.demo` / `password123` (link "IREP staff sign-in") | `/admin/colleges` |
 | Parent | Mobile `9876543210` (Ramesh K) or `9876543214` (Lakshmi S), then the OTP | `/parent` |
 
 In development the API returns the OTP in its response and the sign-in card shows it as "Demo OTP". In production it is sent only by SMS. The **View as** switcher in the top bar signs in as each demo role.
@@ -84,6 +85,7 @@ Sign-in rules:
 | 34 | Discussion groups | `/student/discussions` |
 | 35 | Trainer message hub | `/trainer/messages` (parents: `/parent/messages`) |
 | 36 | Mock interviews | `/student/interviews` |
+| 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
 
 ## Sign-in with Keycloak (optional in development)
 

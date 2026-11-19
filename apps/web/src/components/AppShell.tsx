@@ -45,6 +45,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     trainer: t("shell.role_trainer"),
     college: t("shell.role_college"),
     parent: t("shell.role_parent"),
+    admin: t("shell.role_admin"),
   };
 
   const studentNav = [
@@ -97,8 +98,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.feedback_survey"), href: "/parent/surveys", icon: MessageSquare },
   ];
 
-  const currentNav = role === "trainer" ? trainerNav : role === "college" ? collegeNav : role === "parent" ? parentNav : studentNav;
-  const homes = ["/student", "/trainer", "/college", "/parent"];
+  // IREP staff (screens 45-49)
+  const adminNav = [
+    { label: t("nav.colleges"), href: "/admin/colleges", icon: Building2 },
+    { label: t("nav.content_library"), href: "/admin/content", icon: BookOpen },
+    { label: t("nav.usage_billing"), href: "/admin/usage", icon: Cpu },
+    { label: t("nav.audit_consent"), href: "/admin/audit", icon: ShieldCheck },
+    { label: t("nav.support_desk"), href: "/admin/support", icon: MessageSquare },
+  ];
+
+  const currentNav = role === "admin" ? adminNav : role === "trainer" ? trainerNav : role === "college" ? collegeNav : role === "parent" ? parentNav : studentNav;
+  const homes = ["/student", "/trainer", "/college", "/parent", "/admin/colleges"];
 
   const sidebar = (
     <>

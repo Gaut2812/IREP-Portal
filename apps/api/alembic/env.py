@@ -16,7 +16,8 @@ import models.schema
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # keep the app's loggers alive when migrations run in-process (tests, startup)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
@@ -35,6 +36,14 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
+    # Callers (tests, tooling) may pass an open connection via config.attributes
+    given = config.attributes.get("connection")
+    if given is not None:
+        context.configure(connection=given, target_metadata=target_metadata, render_as_batch=True)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     configuration = config.get_section(config.config_ini_section) or {}
     configuration["sqlalchemy.url"] = get_url()
 

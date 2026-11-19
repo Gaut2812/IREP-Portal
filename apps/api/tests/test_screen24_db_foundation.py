@@ -380,17 +380,32 @@ def test_postgresql_ddl_compilation():
 
 
 # 8. Alembic Migration Structure and Revisions
-def test_alembic_migration_integrity():
-    """Verify Alembic migration revision script exists, defines upgrade/downgrade, and has valid tables."""
-    migration_file = Path(api_dir) / "alembic" / "versions" / "0001_screen24_coding_foundation.py"
-    assert migration_file.exists(), "Alembic migration file not found"
-    
-    content = migration_file.read_text(encoding="utf-8")
-    assert "def upgrade()" in content
-    assert "def downgrade()" in content
-    assert "coding_problems" in content
-    assert "test_cases" in content
-    assert "coding_submissions" in content
-    assert "submission_results" in content
-    assert "college_id" in content
-    assert "is_hidden" in content
+def test_alembic_migration_integrity(tmp_path):
+    """An empty database migrated to head matches the models exactly, and the
+    chain downgrades cleanly (production uses migrations only)."""
+    from alembic import command
+    from alembic.config import Config
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+    import models.schema  # noqa: F401  (registers every table)
+
+    cfg = Config(str(Path(api_dir) / "alembic.ini"))
+    cfg.set_main_option("script_location", str(Path(api_dir) / "alembic"))
+    eng = create_engine(f"sqlite:///{(tmp_path / 'mig.db').as_posix()}")
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "head")
+    with eng.connect() as conn:
+        tables = set(conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").scalars())
+        # the coding and lab tables must exist from the first migration
+        assert {"coding_problems", "test_cases", "coding_submissions", "submission_results",
+                "virtual_labs", "lab_sessions", "lab_approvals", "usage_ledger", "audit_log"} <= tables
+        diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)
+        assert diff == [], f"migrations and models differ: {diff[:5]}"
+    with eng.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.downgrade(cfg, "base")
+    with eng.connect() as conn:
+        left = set(conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").scalars())
+        assert left <= {"alembic_version"}
+    eng.dispose()

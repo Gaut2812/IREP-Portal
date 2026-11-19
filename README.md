@@ -9,7 +9,7 @@ A multi-tenant training portal for students, trainers, colleges and parents. The
 ```
 apps/
 ├── api/                  FastAPI backend
-│   ├── alembic/          Database migrations (one revision per screen)
+│   ├── alembic/          Database migrations (0001_baseline, then one revision per change)
 │   ├── core/             Settings, database, JWT security, tenant helpers
 │   ├── models/           SQLAlchemy models (every table carries college_id)
 │   ├── routers/          API endpoints

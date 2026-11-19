@@ -141,6 +141,52 @@ jobs:
           name: e2e-links
           path: e2e-links.json
 
+  keycloak:
+    name: Keycloak sign-in (live server, browser)
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: development
+      JUDGE0_ADAPTER: fake
+      DATABASE_URL: sqlite:///irep_ci.db
+      API_PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start Keycloak with the dev realm
+        run: docker compose -f infra/keycloak/docker-compose.yml up -d
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - run: pip install -r apps/api/requirements.txt
+      - name: Database and demo users
+        working-directory: apps/api
+        run: |
+          python -m alembic upgrade head
+          python seed/run_seed.py
+          for i in $(seq 1 60); do curl -sf http://localhost:8081/realms/irep/.well-known/openid-configuration >/dev/null && break; sleep 3; done
+          python seed/sync_keycloak.py
+      - name: API accepts real Keycloak tokens
+        working-directory: apps/api
+        env:
+          KEYCLOAK_IT: "1"
+        run: python -m pytest tests/test_keycloak_live.py -q
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Browser sign-in through Keycloak
+        working-directory: apps/web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test -c playwright.keycloak.config.ts
+
   link-gate:
     name: Link gate (docs/INTERCONNECT.md)
     runs-on: ubuntu-latest

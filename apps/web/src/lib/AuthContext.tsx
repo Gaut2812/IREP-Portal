@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE } from "@/lib/api";
+import { clearKeycloakSession, keycloakLogoutUrl } from "@/lib/oidc";
 
 export type Role = "student" | "trainer" | "college" | "parent";
 
@@ -146,6 +147,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
     localStorage.removeItem("irep_user");
     localStorage.removeItem("irep_token");
+    // Keycloak sign-in: end the SSO session too, or the next sign-in is silent
+    const sso = keycloakLogoutUrl();
+    clearKeycloakSession();
+    if (sso) {
+      window.location.assign(sso);
+      return;
+    }
     router.push("/login");
   };
 

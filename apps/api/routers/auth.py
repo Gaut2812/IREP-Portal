@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from core.config import settings
 from core.database import get_db
-from core.security import verify_password, get_password_hash, create_access_token, get_current_user, TokenPayload, normalize_role
+from core.security import verify_password, get_password_hash, create_access_token, get_current_user, TokenPayload, normalize_role, keycloak_mode
 from models.schema import User, Student, OtpAttempt
 from services.audit import record_audit
 from services.notifications import get_notification_adapter
@@ -85,6 +85,9 @@ def _find_user(db: Session, identifier: str) -> Optional[User]:
 def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """Wrong role or unknown account gets the same message as a wrong password
     (no account probing). Five failures lock the account for 15 minutes."""
+    if keycloak_mode():
+        # one password store: Keycloak owns staff and student credentials
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Password sign-in moved to single sign-on. Use 'Sign in with IREP account'.")
     now = datetime.datetime.utcnow()
     user = _find_user(db, req.identifier)
     ip = _client_ip(request)
@@ -186,8 +189,26 @@ def verify_parent_otp(req: ParentOTPVerify, request: Request, db: Session = Depe
 
 
 @router.get("/me")
-def get_me(current_user: TokenPayload = Depends(get_current_user)):
-    return current_user.model_dump()
+def get_me(current_user: TokenPayload = Depends(get_current_user), db: Session = Depends(get_db)):
+    """The caller's token claims plus the portal profile (id, language) the
+    web app stores after sign-in. Used after the Keycloak redirect."""
+    out = current_user.model_dump()
+    user = db.execute(select(User).filter_by(id=current_user.sub, college_id=current_user.college_id)).scalar_one_or_none()
+    out["id"] = current_user.sub
+    out["language_pref"] = user.language_pref if user else "en"
+    if user:
+        out["name"] = out.get("name") or user.name
+        out["avatar"] = out.get("avatar") or user.avatar_initials
+    return out
+
+
+@router.get("/config")
+def auth_config():
+    """Public sign-in settings for the web app (no secrets)."""
+    if not keycloak_mode():
+        return {"provider": "local"}
+    return {"provider": "keycloak", "issuer": settings.KEYCLOAK_ISSUER, "client_id": "irep-web",
+            "parent_sign_in": "otp"}
 
 
 @router.put("/me/language")

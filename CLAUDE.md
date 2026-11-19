@@ -38,12 +38,19 @@ venv/Scripts/python -m alembic check               # models and migrations must 
 venv/Scripts/python -m pytest ../workers/tests -q
 cd ../workers && ../api/venv/Scripts/python -m irep_workers.run_outbox --loop   # no broker needed
 
+# Keycloak (dev): realm "irep" on :8081, then demo users from the DB
+docker compose -f ../../infra/keycloak/docker-compose.yml up -d
+venv/Scripts/python seed/sync_keycloak.py
+KEYCLOAK_IT=1 venv/Scripts/python -m pytest tests/test_keycloak_live.py -q
+AUTH_PROVIDER=keycloak venv/Scripts/python -m uvicorn main:app --port 8000
+
 # Web
 cd apps/web
 pnpm install --frozen-lockfile   # apps/web/pnpm-lock.yaml is the lockfile CI uses
 pnpm exec tsc --noEmit
 pnpm build
 pnpm exec playwright test        # starts API and web unless already running; re-seed first
+pnpm exec playwright test -c playwright.keycloak.config.ts   # Keycloak sign-in; stop other APIs on :8000 first
 ```
 
 Demo logins: `priya.r@demo.edu`, `arun.k@demo.edu`, `admin@demo.edu` (password `password123`). Parents sign in with mobile 9876543210 or 9876543214 plus the OTP that development returns.
@@ -60,6 +67,7 @@ Demo logins: `priya.r@demo.edu`, `arun.k@demo.edu`, `admin@demo.edu` (password `
    - They are delivered after commit by the dispatcher: the API thread in development, `apps/workers` in production.
    - Never call an external gateway inside a request transaction.
    - Handlers must be idempotent.
+   - One exception: the parent sign-in OTP is sent directly (`routers/auth.py`), because an outbox payload would store the OTP in plain text.
 4. **Audit.** Every approval, release, removal and sensitive read calls `services/audit.record_audit()` in the same transaction. It also emits an `audit.<action>` outbox event.
 5. **Notifications.** Use `services/notifications.notify_user()`.
    - In-app rows are immediate. SMS and email are queued through the outbox.
@@ -78,6 +86,12 @@ Demo logins: `priya.r@demo.edu`, `arun.k@demo.edu`, `admin@demo.edu` (password `
     - No `uuid4()` or `random` without a fixed seed in generated ids.
     - Dates are relative to today.
     - A re-run restores demo state.
+
+13. **Identity.** `AUTH_PROVIDER=local` (dev default) or `keycloak` (required in production).
+    - In Keycloak mode the API verifies RS256 tokens (`core/keycloak.py`). It maps realm role, `irep_user_id` and `college_id` claims to `TokenPayload`.
+    - Only admins can edit `irep_user_id` and `college_id` (realm user profile), so users cannot change tenant.
+    - Parents keep the API's mobile OTP until Keycloak has SMS OTP (MSG91, pilot). In Keycloak mode a local token is accepted only for the parent role, and `/auth/login` returns 410.
+    - Never commit a realm export with users or secrets. `infra/keycloak/realm-irep.json` is a dev realm template.
 
 ## Definition of done (per screen or PR)
 
@@ -101,6 +115,6 @@ Changes to auth, messaging policy, Microsoft Graph, labs, Judge0, migrations tha
 ## Current state (keep this short and true)
 
 - Built: 01, 07, 08, 12, 13, 15, 18, 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36.
-- Done in S1: outbox, workers, migrations baseline, link gate.
-- Not built yet (S1 plan): Keycloak (sign-in is still the API's own JWT), `packages/api-client`, `infra/`, `docs/screens/` specs.
+- Done in S1: outbox, workers, migrations baseline, link gate, Keycloak (realm, roles, tenancy claims, web PKCE sign-in).
+- Not built yet (S1 plan): `packages/api-client`, `docs/screens/` specs, Keycloak SMS OTP for parents (pilot).
 - Live classes still use the BigBlueButton adapter until the Teams service (S4).

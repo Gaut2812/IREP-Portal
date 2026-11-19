@@ -13,6 +13,8 @@ async def lifespan(app: FastAPI):
                 "Production environment requires a live Judge0 execution cluster. "
                 "JUDGE0_ADAPTER must be 'judge0' with valid JUDGE0_URL and JUDGE0_AUTH_TOKEN."
             )
+        if settings.AUTH_PROVIDER.lower() != "keycloak":
+            raise RuntimeError("Production requires AUTH_PROVIDER=keycloak (Master Plan: Keycloak at every stage).")
     # Development: keep the local SQLite schema in sync with the models.
     if settings.ENVIRONMENT.lower() != "production":
         from core.database import engine

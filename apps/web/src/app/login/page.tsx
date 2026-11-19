@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, Role } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi, ApiError } from "@/lib/api";
+import { AuthConfig, getAuthConfig, startKeycloakSignIn } from "@/lib/oidc";
 import { GraduationCap, Users, UserCheck, Building2, Languages, ArrowRight, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
@@ -23,6 +24,14 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const [langTouched, setLangTouched] = useState(false);
+  const [authCfg, setAuthCfg] = useState<AuthConfig>({ provider: "local" });
+
+  useEffect(() => {
+    getAuthConfig().then(setAuthCfg);
+  }, []);
+
+  // Keycloak mode: staff and students use single sign-on; parents keep mobile OTP
+  const sso = authCfg.provider === "keycloak" && selectedRole !== "parent";
 
   const roleConfigs = [
     { id: "student" as Role, title: t("login.roles.student"), icon: GraduationCap, defaultEmail: "priya.r@demo.edu" },
@@ -46,7 +55,7 @@ export default function LoginPage() {
     if (selectedRole === "parent") {
       if (phone.replace(/\D/g, "").length < 10) errs.phone = t("login.err_phone");
       if (otpSent && !/^\d{6}$/.test(otp.trim())) errs.otp = t("login.err_otp");
-    } else {
+    } else if (!sso) {
       if (!identifier.trim()) errs.identifier = t("login.err_identifier");
       if (!password) errs.password = t("login.err_password");
     }
@@ -67,6 +76,10 @@ export default function LoginPage() {
     if (!validate()) return;
     setLoading(true);
     try {
+      if (sso) {
+        await startKeycloakSignIn(authCfg, language);   // leaves the page
+        return;
+      }
       if (selectedRole === "parent") {
         if (!otpSent) {
           const data = await fetchApi<{ demo_otp?: string; message: string }>("/auth/parent/otp/request", { method: "POST", body: JSON.stringify({ phone }) });
@@ -243,6 +256,9 @@ export default function LoginPage() {
                   </div>
                 )}
               </div>
+            ) : sso ? (
+              /* Keycloak single sign-on */
+              <p className="text-xs text-[#64748B] leading-relaxed" data-testid="login-sso-hint">{t("login.sso_hint")}</p>
             ) : (
               /* Student / Trainer / College Username + Password view */
               <div className="space-y-3">
@@ -291,7 +307,7 @@ export default function LoginPage() {
               <span>
                 {selectedRole === "parent"
                   ? (otpSent ? t("login.verify_otp_btn") : t("login.get_otp_btn"))
-                  : t("login.sign_in_btn")}
+                  : (sso ? t("login.sso_btn") : t("login.sign_in_btn"))}
               </span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>

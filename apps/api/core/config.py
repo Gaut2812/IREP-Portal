@@ -45,6 +45,18 @@ class Settings(BaseSettings):
     TRANSLATE_URL: str = os.getenv("TRANSLATE_URL", "http://localhost:5000")
     GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "dev_github_webhook_secret")
     
+    # Identity. "local": the API's own JWT (dev default). "keycloak": staff and
+    # students sign in through Keycloak; parents keep the API's OTP until the
+    # Keycloak SMS OTP (MSG91) lands at pilot. Production requires "keycloak".
+    AUTH_PROVIDER: str = os.getenv("AUTH_PROVIDER", "local")
+    KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "http://localhost:8081")      # as the browser sees it (token issuer)
+    KEYCLOAK_REALM: str = os.getenv("KEYCLOAK_REALM", "irep")
+    KEYCLOAK_AUDIENCE: str = os.getenv("KEYCLOAK_AUDIENCE", "irep-api")
+
+    @property
+    def KEYCLOAK_ISSUER(self) -> str:
+        return f"{self.KEYCLOAK_URL.rstrip('/')}/realms/{self.KEYCLOAK_REALM}"
+
     # Outbox dispatch: "thread" drains it inside the API process (dev, no broker);
     # "celery" leaves it to apps/workers (pilot/production); "off" disables both.
     OUTBOX_RUNNER: str = os.getenv(

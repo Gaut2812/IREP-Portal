@@ -48,6 +48,29 @@ def decode_access_token(token: str) -> Optional[TokenPayload]:
     except JWTError:
         return None
 
+def keycloak_mode() -> bool:
+    return settings.AUTH_PROVIDER.lower() == "keycloak"
+
+
+def _payload_from_token(token: str) -> Optional[TokenPayload]:
+    """Local HS256 token, or (AUTH_PROVIDER=keycloak) a Keycloak RS256 token.
+
+    In Keycloak mode a local token is honoured only for parents, who still
+    sign in with the API's OTP until Keycloak gets SMS OTP.
+    """
+    if keycloak_mode():
+        try:
+            alg = jwt.get_unverified_header(token).get("alg")
+        except JWTError:
+            return None
+        if alg == "RS256":
+            from core.keycloak import get_verifier
+            return get_verifier().payload(token)   # raises 401/403 itself
+        local = decode_access_token(token)
+        return local if local and local.role == "parent" else None
+    return decode_access_token(token)
+
+
 DEMO_PROFILES = {
     "student": dict(sub="usr_priya_01", email="priya.r@demo.edu", role="student", name="Priya R", avatar="PR"),
     "trainer": dict(sub="usr_arun_01", email="arun.k@demo.edu", role="trainer", name="Arun Kumar", avatar="AK"),
@@ -76,7 +99,7 @@ async def get_current_user(
     Playwright specs working without a login round-trip. In production an
     invalid token is always a 401.
     """
-    payload = decode_access_token(token) if token else None
+    payload = _payload_from_token(token) if token else None
     if payload:
         return payload
 

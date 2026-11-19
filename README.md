@@ -85,6 +85,18 @@ Sign-in rules:
 | 35 | Trainer message hub | `/trainer/messages` (parents: `/parent/messages`) |
 | 36 | Mock interviews | `/student/interviews` |
 
+## Sign-in with Keycloak (optional in development)
+
+The default (`AUTH_PROVIDER=local`) is the API's own sign-in described above. To use Keycloak, as the pilot and production do:
+
+```bash
+docker compose -f infra/keycloak/docker-compose.yml up -d     # realm "irep" on http://localhost:8081
+appspienv\Scripts\python appspi\seed\sync_keycloak.py # demo users from the portal database
+set AUTH_PROVIDER=keycloak                                    # then start the API as usual
+```
+
+Students, trainers and college admins then press **Sign in with IREP account** and sign in on the Keycloak page. Parents keep the mobile OTP. The Keycloak admin console is at http://localhost:8081/admin, with the dev-only login `admin` / `admin`.
+
 ## External engines
 
 Each external service sits behind an adapter. The default is a local fake, so the portal runs with no extra infrastructure; set the variable in `.env` to use the real service.

@@ -1,3 +1,5 @@
+import { refreshKeycloakToken } from "@/lib/oidc";
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 export const WS_BASE = API_BASE.replace(/^http/, "ws");
 
@@ -44,7 +46,16 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  let res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+
+  // Keycloak access tokens are short-lived: refresh once and retry before signing out.
+  if (res.status === 401 && !endpoint.startsWith("/auth/") && typeof window !== "undefined") {
+    const fresh = await refreshKeycloakToken();
+    if (fresh) {
+      localStorage.setItem("irep_token", fresh);
+      res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers: { ...headers, Authorization: `Bearer ${fresh}` } });
+    }
+  }
 
   if (res.status === 401 && !endpoint.startsWith("/auth/") && typeof window !== "undefined" && localStorage.getItem("irep_token")) {
     localStorage.removeItem("irep_token");

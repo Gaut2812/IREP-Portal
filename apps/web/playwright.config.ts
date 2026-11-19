@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Local Windows dev uses the API venv; CI (Linux) sets API_PYTHON or falls back to `python`.
+const apiPython =
+  process.env.API_PYTHON ?? (process.platform === "win32" ? "../api/venv/Scripts/python.exe" : "python");
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -20,7 +24,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: '"../api/venv/Scripts/python.exe" "../api/start_api.py"',
+      command: `"${apiPython}" "../api/start_api.py"`,
       url: "http://localhost:8000/health",
       reuseExistingServer: true,
       timeout: 60000,

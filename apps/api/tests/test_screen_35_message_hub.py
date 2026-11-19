@@ -89,6 +89,7 @@ def test_tamil_view_keeps_the_original_and_is_cached():
         db.close()
 
 
+@pytest.mark.link("L19")
 def test_reply_notifies_parent_by_in_app_and_sms():
     client.post("/api/v1/threads/th_lakshmi/messages", json={"text": "Yes, extra coaching is at 10 AM on Saturday."}, headers=ARUN)
     db = SessionLocal()
@@ -115,11 +116,13 @@ def test_thread_access_is_limited_to_its_participants():
     assert client.get("/api/v1/threads/th_ramesh/messages", headers=PRIYA).status_code == 403
 
 
+@pytest.mark.link("L19")
 def test_parent_can_only_start_threads_with_their_childs_trainers():
     assert client.post("/api/v1/threads", json={"to_user_id": "usr_pooja_01"}, headers=RAMESH).status_code == 403
     assert client.post("/api/v1/threads", json={"to_user_id": "usr_arun_01"}, headers=RAMESH).json()["thread_id"] == "th_ramesh"
 
 
+@pytest.mark.link("L18")
 def test_moderation_remove_requires_a_reason_and_is_recorded():
     q = client.get("/api/v1/trainer/moderation", headers=ARUN).json()
     assert [i["reason"] for i in q["items"]] == ["External test answers leak link", "Inappropriate comment"]

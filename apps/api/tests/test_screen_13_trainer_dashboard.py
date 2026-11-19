@@ -93,6 +93,7 @@ def test_rule_engine_flags_karthik_for_attendance_and_score():
         db.close()
 
 
+@pytest.mark.link("L03")
 def test_parent_call_action_notifies_parent_once():
     db = SessionLocal()
     try:

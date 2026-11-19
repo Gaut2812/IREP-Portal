@@ -117,6 +117,7 @@ def test_student_cannot_enter_before_trainer_or_window(fresh_room):
         assert client.post(f"/api/v1/sessions/{SESSION}/join", headers=PRIYA).status_code == 409
 
 
+@pytest.mark.link("L04")
 def test_full_class_flow(fresh_room):
     # trainer opens the room
     r = client.post(f"/api/v1/sessions/{SESSION}/join", headers=ARUN)

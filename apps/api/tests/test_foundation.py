@@ -68,6 +68,7 @@ def test_role_guard_rejects_wrong_role():
     ("trainer", "arun.k@demo.edu"),
     ("college", "admin@demo.edu"),
 ])
+@pytest.mark.link("L01")
 def test_demo_login_each_role(role, identifier):
     res = client.post("/api/v1/auth/login", json={"role": role, "identifier": identifier, "password": "password123"})
     assert res.status_code == 200
@@ -190,6 +191,7 @@ def test_notification_centre_roundtrip():
     assert client.post(f"/api/v1/notifications/{nid}/read", headers=_token("usr_arun_01", "trainer")).status_code == 404
 
 
+@pytest.mark.link("L38")
 def test_audit_log_is_written():
     db = SessionLocal()
     try:

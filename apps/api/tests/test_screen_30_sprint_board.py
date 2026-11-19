@@ -79,6 +79,7 @@ def test_move_reorders_and_persists():
     assert client.patch("/api/v1/tasks/task_03/move", json={"column": "archive"}, headers=PRIYA).status_code == 422
 
 
+@pytest.mark.link("L14")
 def test_done_requires_approved_pull_request():
     r = client.patch("/api/v1/tasks/task_08/move", json={"column": "done"}, headers=PRIYA)
     assert r.status_code == 409

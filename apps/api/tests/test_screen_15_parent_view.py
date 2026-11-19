@@ -13,6 +13,7 @@ from main import app
 from core.database import SessionLocal
 from core.security import create_access_token
 from models.schema import MonthlyCard, Rsvp, AuditLog
+import pytest
 
 client = TestClient(app)
 
@@ -79,6 +80,7 @@ def test_only_released_cards_are_shown():
         db.close()
 
 
+@pytest.mark.link("L38")
 def test_rsvp_persists_and_is_audited():
     res = client.post("/api/v1/parent/events/evt_demo_day/rsvp", json={"status": "yes", "guests": 2}, headers=RAMESH)
     assert res.status_code == 200 and res.json()["rsvp_status"] == "yes"

@@ -76,6 +76,7 @@ def test_get_pr_detail_with_diff_and_checks(trainer_auth_headers):
     assert len(data["comments"]) >= 1
     assert "Arun Kumar" in data["comments"][0]["author_name"]
 
+@pytest.mark.link("L14")
 def test_approve_pr_advances_sprint_task_and_verifies_portfolio(trainer_auth_headers):
     # Approve PR #39 (linked to task_08 on Sprint Board & proj_clinic_02 in Portfolio)
     action_payload = {
@@ -114,6 +115,7 @@ def test_approve_pr_advances_sprint_task_and_verifies_portfolio(trainer_auth_hea
     finally:
         db.close()
 
+@pytest.mark.link("L14")
 def test_request_changes_pr_moves_task_to_in_progress(trainer_auth_headers):
     action_payload = {
         "action": "request_changes",

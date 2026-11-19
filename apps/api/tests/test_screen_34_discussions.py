@@ -93,6 +93,7 @@ def test_announcement_only_group_is_read_only_for_students():
     assert client.post(f"/api/v1/messages/{mid}/react", headers=PRIYA).json()["my_reaction"] is True
 
 
+@pytest.mark.link("L18")
 def test_post_code_snippet_filter_react_and_report():
     r = client.post("/api/v1/groups/grp_doubts/messages", json={"message_text": "How do I plot a confusion matrix?", "code_snippet": "from sklearn.metrics import confusion_matrix"}, headers=PRIYA)
     assert r.status_code == 200

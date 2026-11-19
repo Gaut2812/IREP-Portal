@@ -7,6 +7,9 @@ from core.config import settings
 
 # Format database URL for sync engine if sqlite+aiosqlite was specified
 db_url = settings.DATABASE_URL.replace("sqlite+aiosqlite:///", "sqlite:///")
+# SQLAlchemy 2.1 maps a bare postgresql:// URL to psycopg 3; we ship psycopg2.
+if db_url.startswith("postgresql://"):
+    db_url = "postgresql+psycopg2://" + db_url[len("postgresql://"):]
 
 connect_args = {}
 if "sqlite" in db_url:

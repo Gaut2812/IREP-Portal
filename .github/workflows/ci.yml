@@ -134,7 +134,7 @@ jobs:
         working-directory: apps/web
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/e2e-links.json
-        run: pnpm exec playwright test --reporter=line,json
+        run: pnpm exec playwright test --reporter=line,json,github   # github: failures become public check annotations
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -185,7 +185,7 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
           pnpm exec playwright install --with-deps chromium
-          pnpm exec playwright test -c playwright.keycloak.config.ts
+          pnpm exec playwright test -c playwright.keycloak.config.ts --reporter=line,github
 
   link-gate:
     name: Link gate (docs/INTERCONNECT.md)

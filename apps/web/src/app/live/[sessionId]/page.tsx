@@ -51,6 +51,7 @@ export default function LiveClassroomPage() {
   const [error, setError] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
   const [joinUrl, setJoinUrl] = useState<string | null>(null);
+  const [joinProvider, setJoinProvider] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mic, setMic] = useState(false);
@@ -111,9 +112,12 @@ export default function LiveClassroomPage() {
   const join = useCallback(async () => {
     setBusy(true);
     try {
-      const res = await fetchApi<{ join_url: string | null }>(`/sessions/${sessionId}/join`, { method: "POST" });
+      const res = await fetchApi<{ join_url: string | null; provider?: string }>(`/sessions/${sessionId}/join`, { method: "POST" });
       setJoined(true);
       setJoinUrl(res.join_url);
+      setJoinProvider(res.provider ?? null);
+      // Teams cannot be embedded (Master Plan): open the Teams app / web client
+      if (res.provider === "teams" && res.join_url) window.open(res.join_url, "_blank", "noopener");
       await load();
     } catch (err: any) {
       setToast(err?.detail || t("live_class.action_failed"));
@@ -277,7 +281,15 @@ export default function LiveClassroomPage() {
         {/* Stage */}
         <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden min-w-0">
           <div className="flex-1 bg-[#141A29] rounded-2xl border border-[#2D3748] p-4 flex flex-col overflow-hidden">
-            {joinUrl ? (
+            {joinUrl && joinProvider === "teams" ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center" data-testid="teams-join">
+                <p className="text-sm text-[#E2E8F0] font-semibold">{t("live_class.teams_opened")}</p>
+                <a href={joinUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 bg-[#5B5FC7] text-white text-xs font-bold rounded-xl" data-testid="teams-join-link">
+                  {t("live_class.join_in_teams")}
+                </a>
+                <p className="text-[11px] text-[#94A3B8] max-w-sm">{t("live_class.teams_attendance_note")}</p>
+              </div>
+            ) : joinUrl ? (
               <iframe src={joinUrl} title={st.title} className="flex-1 w-full rounded-xl bg-black" allow="camera; microphone; display-capture; fullscreen" />
             ) : (
               <>

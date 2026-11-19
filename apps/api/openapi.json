@@ -3683,6 +3683,138 @@
         }
       }
     },
+    "/api/v1/trainer/sessions/{session_id}/teams-unmatched": {
+      "get": {
+        "tags": [
+          "Live Classroom"
+        ],
+        "summary": "Teams Unmatched",
+        "operationId": "teams_unmatched_api_v1_trainer_sessions__session_id__teams_unmatched_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trainer/sessions/{session_id}/teams-unmatched/confirm": {
+      "post": {
+        "tags": [
+          "Live Classroom"
+        ],
+        "summary": "Teams Confirm",
+        "operationId": "teams_confirm_api_v1_trainer_sessions__session_id__teams_unmatched_confirm_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmAttendeeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/live/{session_id}/polls": {
       "post": {
         "tags": [
@@ -4448,6 +4580,59 @@
         ],
         "summary": "Trigger Lab Cull",
         "operationId": "trigger_lab_cull_api_v1_admin_jobs_labs_cull_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/jobs/teams": {
+      "post": {
+        "tags": [
+          "Admin Jobs"
+        ],
+        "summary": "Trigger Teams Sync",
+        "description": "Queue Teams meeting creation for upcoming sessions and attendance pulls\nfor ended ones (the Celery beat runs the same for every college).",
+        "operationId": "trigger_teams_sync_api_v1_admin_jobs_teams_post",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -6751,6 +6936,24 @@
           "text"
         ],
         "title": "CommentIn"
+      },
+      "ConfirmAttendeeIn": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "student_id": {
+            "type": "string",
+            "title": "Student Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "student_id"
+        ],
+        "title": "ConfirmAttendeeIn"
       },
       "EventRsvpRequest": {
         "properties": {

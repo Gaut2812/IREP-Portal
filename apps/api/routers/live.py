@@ -21,6 +21,7 @@ from services.live_class import (
 from services.live_sessions import join_enabled
 from services.realtime import hub, publish_sync
 from services.audit import record_audit
+from services.teams import confirm_unmatched, queue_attendance_pull
 
 router = APIRouter(tags=["Live Classroom"])
 
@@ -179,6 +180,13 @@ def join_session(session_id: str, current_user: TokenPayload = Depends(require_r
             record_audit(db, current_user, "live.start", "session", s.id)
     elif not m.started_at and not join_enabled(s, now):
         raise HTTPException(status_code=409, detail="The room opens 10 minutes before the session starts")
+    if m.provider == "teams":
+        # attendance comes from the Teams report; the click is kept for support only
+        record_join_event(db, s, current_user.sub, "joined", now, source="click")
+        db.commit()
+        if not m.join_url:
+            raise HTTPException(status_code=409, detail="The Teams meeting is still being set up. Try again in a minute.")
+        return {"success": True, "session_id": s.id, "join_url": m.join_url, "provider": "teams", "meeting_state": _meeting_state(m)}
     record_join_event(db, s, current_user.sub, "joined", now)
     db.commit()
     _publish(s.id, "participants")
@@ -203,6 +211,16 @@ def end_session(session_id: str, current_user: TokenPayload = Depends(require_ro
     if not m.started_at:
         raise HTTPException(status_code=409, detail="The session has not started")
     now = _now()
+    if m.provider == "teams":
+        # Teams publishes the attendance report a few minutes after the meeting:
+        # the outbox pulls it and applies the 75% rule then.
+        if not m.ended_at:
+            m.ended_at = now
+        queue_attendance_pull(db, s)
+        record_audit(db, current_user, "live.end", "session", s.id, {"attendance": "pending_teams_report"})
+        db.commit()
+        _publish(s.id, "ended")
+        return {"success": True, "attendance": {"pending": True}}
     if not m.ended_at:
         m.ended_at = now
         get_live_adapter().end_meeting(m.external_meeting_id)
@@ -210,6 +228,38 @@ def end_session(session_id: str, current_user: TokenPayload = Depends(require_ro
     record_audit(db, current_user, "live.end", "session", s.id, summary)
     db.commit()
     _publish(s.id, "ended")
+    return {"success": True, "attendance": summary}
+
+
+# ---- Teams attendance: names the report could not match (trainer confirms) ----
+class ConfirmAttendeeIn(BaseModel):
+    index: int
+    student_id: str
+
+
+@router.get("/trainer/sessions/{session_id}/teams-unmatched")
+def teams_unmatched(session_id: str, current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    s = _session_for_user(session_id, current_user, db)
+    m = db.execute(select(LiveMeeting).where(LiveMeeting.session_id == s.id)).scalar_one_or_none()
+    rows = (m.unmatched_attendees or []) if m else []
+    return {"session_id": s.id, "pulled_at": m.attendance_pulled_at.isoformat() if m and m.attendance_pulled_at else None,
+            "unmatched": [{"index": i, "name": r["name"], "email": r.get("email"), "minutes": r.get("minutes", 0)} for i, r in enumerate(rows)]}
+
+
+@router.post("/trainer/sessions/{session_id}/teams-unmatched/confirm")
+def teams_confirm(session_id: str, req: ConfirmAttendeeIn, current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    s = _session_for_user(session_id, current_user, db)
+    m = db.execute(select(LiveMeeting).where(LiveMeeting.session_id == s.id)).scalar_one_or_none()
+    student = db.execute(select(Student).where(Student.id == req.student_id, Student.college_id == current_user.college_id,
+                                               Student.batch_id == s.batch_id)).scalar_one_or_none()
+    if m is None or student is None:
+        raise HTTPException(status_code=404, detail="Session or student not found in this batch")
+    try:
+        summary = confirm_unmatched(db, s, m, req.index, student)
+    except IndexError:
+        raise HTTPException(status_code=404, detail="That attendee is no longer waiting for confirmation")
+    record_audit(db, current_user, "attendance.teams_confirmed", "session", s.id, {"student_id": student.id})
+    db.commit()
     return {"success": True, "attendance": summary}
 
 

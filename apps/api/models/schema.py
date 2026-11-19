@@ -56,6 +56,7 @@ class Trainer(TenantModel):
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
     designation: Mapped[str] = mapped_column(String(128), default="Senior Technical Trainer")
     specialization: Mapped[str] = mapped_column(String(128), default="AI & Cloud Systems")
+    teams_upn: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)   # licensed Teams organizer account
 
 class ParentStudent(TenantModel):
     __tablename__ = "parent_student"
@@ -919,7 +920,7 @@ class LiveMeeting(TenantModel):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), unique=True, index=True)
-    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb
+    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb, teams
     external_meeting_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     started_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
@@ -931,6 +932,13 @@ class LiveMeeting(TenantModel):
     flow_title: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     flow_steps: Mapped[list] = mapped_column(JSON, default=list)
     finalized: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Microsoft Teams (LIVE_CLASS_ADAPTER=teams): Graph calendar event with a Teams meeting
+    join_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    organizer_upn: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    graph_event_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    graph_online_meeting_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    attendance_pulled_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    unmatched_attendees: Mapped[list] = mapped_column(JSON, default=list)   # Teams names the trainer must confirm
 
 
 class JoinEvent(TenantModel):

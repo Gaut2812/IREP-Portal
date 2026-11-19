@@ -602,7 +602,10 @@
     "error_title": "Could not open the classroom",
     "retry": "Try again",
     "action_failed": "Something went wrong. Try again.",
-    "present_on_end": "{p} present · {a} absent"
+    "present_on_end": "{p} present · {a} absent",
+    "teams_opened": "Your class opened in Microsoft Teams.",
+    "join_in_teams": "Join in Teams",
+    "teams_attendance_note": "Attendance comes from the Teams report after class: stay for at least 75% of the session."
   },
   "labs": {
     "title": "Virtual Labs",

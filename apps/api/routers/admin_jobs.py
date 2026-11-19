@@ -42,3 +42,19 @@ def trigger_lab_cull(
     stopped = cull(db, current_user.college_id)
     db.commit()
     return {"success": True, "stopped": stopped}
+
+
+@router.post("/teams")
+def trigger_teams_sync(
+    current_user: TokenPayload = Depends(require_role(["college_admin", "super_admin"])),
+    db: Session = Depends(get_db),
+):
+    """Queue Teams meeting creation for upcoming sessions and attendance pulls
+    for ended ones (the Celery beat runs the same for every college)."""
+    from core.config import settings
+    if settings.LIVE_CLASS_ADAPTER.lower() != "teams":
+        return {"success": True, "skipped": "LIVE_CLASS_ADAPTER is not teams"}
+    from services.teams import queue_due_work
+    out = queue_due_work(db, college_id=current_user.college_id)
+    db.commit()
+    return {"success": True, **out}

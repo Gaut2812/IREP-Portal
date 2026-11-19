@@ -15,6 +15,8 @@ async def lifespan(app: FastAPI):
             )
         if settings.AUTH_PROVIDER.lower() != "keycloak":
             raise RuntimeError("Production requires AUTH_PROVIDER=keycloak (Master Plan: Keycloak at every stage).")
+        if settings.LIVE_CLASS_ADAPTER.lower() == "teams" and not (settings.GRAPH_TENANT_ID and settings.GRAPH_CLIENT_ID and settings.GRAPH_CLIENT_SECRET):
+            raise RuntimeError("LIVE_CLASS_ADAPTER=teams needs GRAPH_TENANT_ID, GRAPH_CLIENT_ID and GRAPH_CLIENT_SECRET.")
     # Development: keep the local SQLite schema in sync with the models.
     if settings.ENVIRONMENT.lower() != "production":
         from core.database import engine

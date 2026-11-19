@@ -81,8 +81,22 @@ class BBBAdapter(LiveClassAdapter):
                                   "role": "MODERATOR" if role in ("trainer", "college_admin") else "VIEWER", "redirect": "true"})
 
 
+class TeamsAdapter(LiveClassAdapter):
+    """Microsoft Teams via Graph calendar events (services/teams.py).
+    The event is created by the outbox worker; the join URL lives on LiveMeeting."""
+    name = "teams"
+
+    def create_meeting(self, session: SessionItem) -> str:
+        return f"irep-{session.id}"          # also the Graph transactionId
+
+    def join_url(self, meeting_id, user_id, full_name, role):
+        return None                           # router returns LiveMeeting.join_url
+
+
 def get_live_adapter() -> LiveClassAdapter:
     name = (getattr(settings, "LIVE_CLASS_ADAPTER", None) or "fake").lower()
+    if name == "teams":
+        return TeamsAdapter()
     if name == "bbb" and settings.BBB_SECRET:
         return BBBAdapter(settings.BBB_URL, settings.BBB_SECRET)
     return FakeLiveClassAdapter()
@@ -146,9 +160,10 @@ def session_window(session: SessionItem, meeting: Optional[LiveMeeting]) -> Tupl
 
 def user_presence(db: Session, session: SessionItem, user_id: str, now: datetime.datetime,
                   meeting: Optional[LiveMeeting] = None) -> dict:
-    events = db.execute(
-        select(JoinEvent.event, JoinEvent.at).where(JoinEvent.session_id == session.id, JoinEvent.user_id == user_id)
-    ).all()
+    q = select(JoinEvent.event, JoinEvent.at).where(JoinEvent.session_id == session.id, JoinEvent.user_id == user_id)
+    if meeting is not None and meeting.provider == "teams":
+        q = q.where(JoinEvent.source == "teams")     # a "Join in Teams" click is not attendance
+    events = db.execute(q).all()
     start, end = session_window(session, meeting)
     until = min(now, meeting.ended_at) if meeting and meeting.ended_at else now
     intervals = presence_intervals([(e, a) for e, a in events], until)
@@ -203,7 +218,11 @@ def ensure_meeting(db: Session, session: SessionItem) -> LiveMeeting:
     if not m:
         adapter = get_live_adapter()
         m = LiveMeeting(id=f"lm_{session.id}"[:64], college_id=session.college_id, session_id=session.id,
-                        provider=adapter.name, external_meeting_id=adapter.create_meeting(session), flow_steps=[])
+                        provider=adapter.name, external_meeting_id=adapter.create_meeting(session), flow_steps=[],
+                        unmatched_attendees=[])
         db.add(m)
         db.flush()
+        if adapter.name == "teams":
+            from services.teams import queue_create
+            queue_create(db, session, m)       # Graph call happens in the outbox worker
     return m

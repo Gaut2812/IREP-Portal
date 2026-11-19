@@ -104,7 +104,7 @@ Each external service sits behind an adapter. The default is a local fake, so th
 | Variable | Fake (default) | Real |
 | --- | --- | --- |
 | `JUDGE0_ADAPTER` | in-process runner | `judge0` (`JUDGE0_URL`) |
-| `LIVE_CLASS_ADAPTER` | in-portal classroom | `bbb` (`BBB_URL`, `BBB_SECRET`) |
+| `LIVE_CLASS_ADAPTER` | in-portal classroom | `teams` (Microsoft Graph: `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`, organizer per trainer in `trainers.teams_upn`); `bbb` is legacy |
 | `LAB_ADAPTER` | simulated lab sessions | `docker` |
 | `TRANSLATE_ADAPTER` | seeded Tamil pairs + glossary, cached | `libretranslate` (`TRANSLATE_URL`) |
 | `REALTIME_ADAPTER` | in-process WebSocket hub | `valkey` |

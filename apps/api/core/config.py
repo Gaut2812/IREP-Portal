@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     BBB_URL: str = os.getenv("BBB_URL", "http://localhost:8080/bigbluebutton")
     BBB_SECRET: str = os.getenv("BBB_SECRET", "bbb_demo_secret_2026")
     LIVE_CLASS_ADAPTER: str = os.getenv("LIVE_CLASS_ADAPTER", "fake")
+    # Microsoft Teams via Graph (LIVE_CLASS_ADAPTER=teams): app-only client credentials.
+    # The tenant admin must grant Calendars.ReadWrite, OnlineMeetings.Read.All and
+    # OnlineMeetingArtifact.Read.All and set an application access policy (Master Plan).
+    GRAPH_TENANT_ID: str = os.getenv("GRAPH_TENANT_ID", "")
+    GRAPH_CLIENT_ID: str = os.getenv("GRAPH_CLIENT_ID", "")
+    GRAPH_CLIENT_SECRET: str = os.getenv("GRAPH_CLIENT_SECRET", "")
+    GRAPH_BASE_URL: str = os.getenv("GRAPH_BASE_URL", "https://graph.microsoft.com/v1.0")
+    GRAPH_LOGIN_URL: str = os.getenv("GRAPH_LOGIN_URL", "https://login.microsoftonline.com")
+    TEAMS_DEFAULT_ORGANIZER: str = os.getenv("TEAMS_DEFAULT_ORGANIZER", "")   # used when a trainer has no teams_upn
+    TEAMS_REPORT_DELAY_SECONDS: int = int(os.getenv("TEAMS_REPORT_DELAY_SECONDS", "600"))
     LAB_ADAPTER: str = os.getenv("LAB_ADAPTER", "fake")
     TRANSLATE_ADAPTER: str = os.getenv("TRANSLATE_ADAPTER", "fake")
     TRANSLATE_URL: str = os.getenv("TRANSLATE_URL", "http://localhost:5000")

@@ -78,6 +78,7 @@ def _backoff(attempts: int) -> datetime.timedelta:
 def _load_handlers() -> None:
     # import modules that register handlers so a bare worker process sees them
     import services.notifications  # noqa: F401
+    import services.teams  # noqa: F401
 
 
 def dispatch_pending(session_factory: Callable[[], Session], limit: int = 100) -> dict:

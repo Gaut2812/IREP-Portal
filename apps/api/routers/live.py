@@ -115,7 +115,7 @@ def build_state(db: Session, s: SessionItem, user: TokenPayload, now: Optional[d
     poll = db.execute(select(LivePoll).filter_by(session_id=s.id).order_by(LivePoll.created_at.desc())).scalars().first()
     poll_payload = None
     if poll:
-        counts = dict(db.execute(select(LivePollVote.option_key, func.count(LivePollVote.id)).filter_by(poll_id=poll.id).group_by(LivePollVote.option_key)).all())
+        counts = dict(db.execute(select(LivePollVote.option_key, func.count(LivePollVote.id)).where(LivePollVote.poll_id == poll.id).group_by(LivePollVote.option_key)).all())
         total = sum(counts.values())
         mine = db.execute(select(LivePollVote.option_key).filter_by(poll_id=poll.id, user_id=user.sub)).scalar_one_or_none()
         poll_payload = {

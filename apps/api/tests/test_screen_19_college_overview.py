@@ -39,7 +39,7 @@ def test_overview_matches_source_tables():
         assert d["kpis"]["certifications"]["value"] == certs == 184
         interns = db.execute(select(func.count(Internship.id)).filter_by(college_id="col_demo_001")).scalar_one()
         assert d["kpis"]["internships"]["value"] == interns == 73
-        bands = dict(db.execute(select(Student.readiness_band, func.count(Student.id)).filter_by(college_id="col_demo_001").group_by(Student.readiness_band)).all())
+        bands = dict(db.execute(select(Student.readiness_band, func.count(Student.id)).where(Student.college_id == "col_demo_001").group_by(Student.readiness_band)).all())
         for row in d["readiness_distribution"]:
             assert row["count"] == bands.get(row["band"], 0)
         assert sum(r["percentage"] for r in d["readiness_distribution"]) in (99, 100, 101)

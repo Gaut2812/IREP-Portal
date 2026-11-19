@@ -1,2 +1,2 @@
 -r ../api/requirements.txt
-celery[redis]>=5.4
+celery[redis]==5.7.0

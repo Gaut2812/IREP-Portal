@@ -1,3 +1,4 @@
+import sqlite3
 import datetime
 from sqlalchemy import create_engine, DateTime, String, event
 from sqlalchemy.engine import Engine
@@ -20,13 +21,13 @@ engine = create_engine(
 # Enable SQLite foreign key enforcement
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
-    try:
-        # Check if underlying connection supports SQLite PRAGMA
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
-    except Exception:
-        pass
+    # SQLite only. Running a PRAGMA on PostgreSQL fails and leaves the new
+    # connection inside an aborted transaction, which breaks every query.
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 SessionLocal = sessionmaker(
     bind=engine,

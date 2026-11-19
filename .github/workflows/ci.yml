@@ -50,7 +50,7 @@ jobs:
           path: api-links.json
 
   migrations-postgres:
-    name: Migrations on PostgreSQL 16
+    name: PostgreSQL 16 (migrations, seed, API suite)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -81,6 +81,13 @@ jobs:
           python -m alembic check
           python -m alembic downgrade base
           python -m alembic upgrade head
+      - name: Seed and run the full API suite on PostgreSQL
+        env:
+          ENVIRONMENT: testing
+          JUDGE0_ADAPTER: fake
+        run: |
+          python seed/run_seed.py
+          python -m pytest tests -q
 
   web:
     name: Web typecheck, build and E2E

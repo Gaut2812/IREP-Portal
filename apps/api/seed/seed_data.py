@@ -475,31 +475,52 @@ def seed_reviews_data(db, college_id="col_demo_001"):
 
     db.commit()
 
+def find_foreign_key_violations(conn, limit_per_fk: int = 3):
+    """Orphan rows for every ForeignKey in the models (portable anti-join)."""
+    from sqlalchemy import and_, select as _select
+    import models.schema  # noqa: F401  (registers every table)
+    bad = []
+    for table in Base.metadata.sorted_tables:
+        for fk in table.foreign_key_constraints:
+            parent = fk.referred_table
+            child_cols = [e.parent for e in fk.elements]
+            parent_cols = [e.column for e in fk.elements]
+            q = (_select(*child_cols)
+                 .select_from(table.outerjoin(parent, and_(*[c == p for c, p in zip(child_cols, parent_cols)])))
+                 .where(and_(*[c.isnot(None) for c in child_cols]), parent_cols[0].is_(None))
+                 .limit(limit_per_fk))
+            for row in conn.execute(q):
+                bad.append((table.name, fk.name or ",".join(c.name for c in child_cols), tuple(row)))
+    return bad
+
+
 def init_db_and_seed():
     print("Creating tables...", flush=True)
     from core.db_init import ensure_schema
     ensure_schema(engine)
         
     db = SessionLocal()
-    if engine.dialect.name == "sqlite":
-        # The models declare ForeignKeys but no relationship(), so the unit of
-        # work does not order parent rows before child rows inside a flush, and
-        # a first-time seed into an empty database trips row-by-row FK checks.
-        # Switch row-level checks off for this session only and verify the
-        # whole database with foreign_key_check before every commit instead,
-        # so an orphan row still fails the seed.
-        from sqlalchemy import event
+    # The models declare ForeignKeys but no relationship(), so the unit of work
+    # does not order parent rows before child rows inside a flush, and a
+    # first-time seed into an empty database trips row-by-row FK checks.
+    # Switch row-level checks off for this session only and verify every
+    # foreign key before each commit instead, so an orphan row still fails.
+    from sqlalchemy import event
 
-        @event.listens_for(db, "after_begin")
-        def _relax_fks(session, transaction, connection):
+    @event.listens_for(db, "after_begin")
+    def _relax_fks(session, transaction, connection):
+        if engine.dialect.name == "sqlite":
             # pysqlite has not opened its transaction yet, so this PRAGMA applies
             connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        elif engine.dialect.name == "postgresql":
+            # transaction-scoped; needs a superuser (the demo database container)
+            connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
 
-        @event.listens_for(db, "before_commit")
-        def _verify_fks(session):
-            bad = session.connection().exec_driver_sql("PRAGMA foreign_key_check").fetchall()
-            if bad:
-                raise RuntimeError(f"Seed left {len(bad)} foreign-key violations, e.g. {bad[:3]}")
+    @event.listens_for(db, "before_commit")
+    def _verify_fks(session):
+        bad = find_foreign_key_violations(session.connection())
+        if bad:
+            raise RuntimeError(f"Seed left {len(bad)} foreign-key violations, e.g. {bad[:3]}")
     try:
         # Check if already seeded
         result = db.execute(select(College).filter_by(id="col_demo_001")).scalar_one_or_none()
@@ -1198,9 +1219,8 @@ def init_db_and_seed():
         db.commit()
     finally:
         db.close()
-        if engine.dialect.name == "sqlite":
-            # drop pooled connections that had FK checks switched off
-            engine.dispose()
+        # drop pooled connections that had FK checks switched off
+        engine.dispose()
 
 if __name__ == "__main__":
     init_db_and_seed()

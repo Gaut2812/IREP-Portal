@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     TRANSLATE_URL: str = os.getenv("TRANSLATE_URL", "http://localhost:5000")
     GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "dev_github_webhook_secret")
     
+    # Outbox dispatch: "thread" drains it inside the API process (dev, no broker);
+    # "celery" leaves it to apps/workers (pilot/production); "off" disables both.
+    OUTBOX_RUNNER: str = os.getenv(
+        "OUTBOX_RUNNER", "celery" if os.getenv("ENVIRONMENT", "development").lower() == "production" else "thread"
+    )
+    OUTBOX_POLL_SECONDS: float = float(os.getenv("OUTBOX_POLL_SECONDS", "2"))
+    OUTBOX_MAX_ATTEMPTS: int = int(os.getenv("OUTBOX_MAX_ATTEMPTS", "5"))
+    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")  # Valkey speaks the Redis protocol
+
     # AI Reviewer
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     GEMINI_TIMEOUT_SECONDS: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "5.0"))

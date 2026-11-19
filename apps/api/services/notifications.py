@@ -15,6 +15,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from models.schema import Notification, User
+from services.outbox import emit, handler as outbox_handler
 
 
 class NotificationAdapter(ABC):
@@ -53,14 +54,17 @@ def notify_user(
     channels: Iterable[str] = ("in_app",),
     college_id: Optional[str] = None,
 ) -> List[Notification]:
-    """Create one notification row per channel for a user and return them."""
+    """Create one notification row per channel for a user and return them.
+
+    The in-app row is the delivery. SMS/email rows start as ``queued`` and are
+    sent by the outbox worker after the caller's transaction commits.
+    """
     user = db.execute(select(User).filter_by(id=user_id)).scalar_one_or_none()
     if not user:
         return []
-    adapter = get_notification_adapter()
     created: List[Notification] = []
     for channel in channels:
-        status = "delivered" if channel == "in_app" else adapter.deliver(user, channel, title_en, body_en)
+        status = "delivered" if channel == "in_app" else "queued"
         n = Notification(
             id=f"ntf_{uuid.uuid4().hex[:20]}",
             college_id=college_id or user.college_id,
@@ -76,7 +80,24 @@ def notify_user(
         )
         db.add(n)
         created.append(n)
+        if channel != "in_app":
+            emit(db, "notification.deliver", {"notification_id": n.id},
+                 college_id=n.college_id, entity_type="notification", entity_id=n.id)
     return created
+
+
+@outbox_handler("notification.deliver")
+def _deliver_queued_notification(db: Session, event) -> None:
+    """Send one queued SMS/email. Idempotent: an already-sent row is skipped."""
+    n = db.get(Notification, event.payload["notification_id"])
+    if n is None or n.delivery_status != "queued":
+        return
+    user = db.get(User, n.user_id)
+    if user is None:
+        n.delivery_status = "failed"
+        return
+    # raises on gateway errors -> the outbox retries with backoff
+    n.delivery_status = get_notification_adapter().deliver(user, n.channel, n.title_en, n.body_en)
 
 
 def notify_users(db: Session, user_ids: Iterable[str], title_en: str, body_en: Optional[str] = None, **kwargs) -> int:

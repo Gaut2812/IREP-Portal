@@ -299,7 +299,8 @@ def send_broadcast(req: BroadcastIn, current_user: TokenPayload = Depends(requir
             if rows:
                 report["parents"] += 1
                 report["parents_in_app"] += sum(1 for n in rows if n.channel == "in_app")
-                report["parents_sms"] += sum(1 for n in rows if n.channel == "sms" and n.delivery_status == "delivered")
+                # SMS is handed to the outbox here and sent after commit
+                report["parents_sms"] += sum(1 for n in rows if n.channel == "sms" and n.delivery_status == "queued")
     report["total_recipients"] = report["students"] + report["parents"]
     b = Broadcast(id=f"bc_{uuid.uuid4().hex[:16]}", college_id=current_user.college_id, author_user_id=current_user.sub, audience=req.audience,
                   batch_ids=json.dumps(batch_ids), title=req.title, body=req.body, delivery=json.dumps(report))

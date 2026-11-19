@@ -20,7 +20,13 @@ async def lifespan(app: FastAPI):
         ensure_schema(engine)
     from services.realtime import register_event_loop
     register_event_loop()
+    # Outbox: drain in-process unless a Celery worker (apps/workers) owns it
+    from services import outbox
+    if settings.OUTBOX_RUNNER == "thread":
+        from core.database import SessionLocal
+        outbox.start_background_dispatcher(SessionLocal)
     yield
+    outbox.stop_background_dispatcher()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

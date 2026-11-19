@@ -633,6 +633,24 @@ class AuditLog(TenantModel):
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 
+class OutboxEvent(TenantModel):
+    """Transactional outbox (Master Plan S1): written in the same transaction
+    as the state change; side effects (SMS, email, push, fan-out) run in the
+    worker after commit. See services/outbox.py."""
+    __tablename__ = "outbox_events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)  # notification.deliver, audit.<action>, ...
+    entity_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", index=True)  # pending, done, failed
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    available_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, default=datetime.datetime.utcnow, index=True)
+    processed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 class OtpAttempt(TenantModel):
     __tablename__ = "otp_attempts"
 

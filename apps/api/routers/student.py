@@ -633,7 +633,10 @@ def request_coding_hint(
         ).order_by(CodingHintUsage.hint_number)
     ).scalars().all()
 
-    next_hint_idx = len(hint_records)
+    # Hint 1 is shown for free on the problem page (see get_coding_problem), so
+    # the first request unlocks hint 2, never hint 1 again.
+    shown = max(len(hint_records), 1)
+    next_hint_idx = shown
     if next_hint_idx >= len(PROBLEM_HINTS):
         # All hints exhausted
         return {
@@ -643,21 +646,23 @@ def request_coding_hint(
             "hints_used": len(PROBLEM_HINTS),
             "max_hints": len(PROBLEM_HINTS)
         }
-        
+
     hint_text = PROBLEM_HINTS[next_hint_idx]
     if student_id is not None:
         # trainers preview hints without consuming a student's hint quota
-        new_usage = CodingHintUsage(
-            id=f"hint_{uuid.uuid4().hex[:20]}",
-            college_id=current_user.college_id,
-            problem_id=prob.id,
-            student_id=student_id,
-            hint_number=next_hint_idx + 1,
-            hint_text=hint_text
-        )
-        db.add(new_usage)
+        to_record = [] if hint_records else [0]          # record the free hint 1 once
+        to_record.append(next_hint_idx)
+        for idx in to_record:
+            db.add(CodingHintUsage(
+                id=f"hint_{uuid.uuid4().hex[:20]}",
+                college_id=current_user.college_id,
+                problem_id=prob.id,
+                student_id=student_id,
+                hint_number=idx + 1,
+                hint_text=PROBLEM_HINTS[idx],
+            ))
         db.commit()
-    
+
     return {
         "success": True,
         "hint": hint_text,

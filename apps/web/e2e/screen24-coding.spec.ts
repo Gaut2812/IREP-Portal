@@ -43,13 +43,12 @@ test.describe("Screen 24 - Coding Lab (/student/coding/:problemId)", () => {
   test("should unlock progressive AI hints on request", async ({ page }) => {
     await page.goto("/student/coding/prob_connected_components");
 
-    // Click ask hint button
-    const askHintBtn = page.getByRole("button", { name: /\+ Ask for another hint/i });
-    if (await askHintBtn.isVisible()) {
-      await askHintBtn.click();
-      // Should show Hint 2
-      await expect(page.getByText(/Hint 2:/i)).toBeVisible();
-    }
+    // Hint 1 is shown for free; asking unlocks hint 2 (wait for the page, do not skip)
+    const askHintBtn = page.getByTestId("request-hint-button");
+    await expect(askHintBtn).toBeVisible();
+    await expect(page.getByText(/Hint 1:/i)).toBeVisible();
+    await askHintBtn.click();
+    await expect(page.getByText(/Hint 2:/i)).toBeVisible();
   });
 
   test("should submit code and display 18 / 18 hidden tests passed", async ({ page }) => {

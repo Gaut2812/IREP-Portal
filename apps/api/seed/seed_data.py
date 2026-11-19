@@ -545,6 +545,12 @@ def init_db_and_seed():
                 ))
             db.commit()
 
+            # Restore demo state: hints unlocked by tests or demos start over
+            from models.schema import CodingHintUsage
+            from sqlalchemy import delete as _delete
+            db.execute(_delete(CodingHintUsage).where(CodingHintUsage.student_id == "std_priya_01"))
+            db.commit()
+
             # Ensure weekly DSA problems are seeded
             from seed.seed_weekly_dsa import seed_weekly_problems
             seeded_w = seed_weekly_problems(db, college_id="col_demo_001")

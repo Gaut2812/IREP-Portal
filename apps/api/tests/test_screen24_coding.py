@@ -137,3 +137,20 @@ def test_list_coding_problems(db, student_user):
     assert "problems" in res
     assert len(res["problems"]) >= 1
     assert any(p["id"] == "prob_connected_components" for p in res["problems"])
+
+
+def test_hints_unlock_in_order_after_the_free_first_hint(db, student_user):
+    from sqlalchemy import delete
+    db.execute(delete(CodingHintUsage).where(CodingHintUsage.student_id == "std_priya_01",
+                                             CodingHintUsage.problem_id == "prob_connected_components"))
+    db.commit()
+    shown = student.get_coding_problem("prob_connected_components", current_user=student_user, db=db)
+    first_hint = shown["ai_reviewer"]["revealed_hints"][0]
+    r2 = student.request_coding_hint("prob_connected_components", req=student.HintRequest(current_count=1), current_user=student_user, db=db)
+    assert r2["success"] and r2["hint_number"] == 2 and r2["hint"] != first_hint
+    r3 = student.request_coding_hint("prob_connected_components", req=student.HintRequest(current_count=2), current_user=student_user, db=db)
+    assert r3["hint_number"] == 3 and r3["hints_used"] == 3
+    done = student.request_coding_hint("prob_connected_components", req=student.HintRequest(current_count=3), current_user=student_user, db=db)
+    assert done["success"] is False
+    again = student.get_coding_problem("prob_connected_components", current_user=student_user, db=db)
+    assert again["ai_reviewer"]["revealed_hints"] == [first_hint, r2["hint"], r3["hint"]]

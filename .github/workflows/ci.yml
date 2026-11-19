@@ -16,7 +16,7 @@ jobs:
     name: API tests (SQLite, fresh database)
     runs-on: ubuntu-latest
     env:
-      ENVIRONMENT: testing
+      ENVIRONMENT: development   # demo OTP is returned only in development
       JUDGE0_ADAPTER: fake
       DATABASE_URL: sqlite:///irep_ci.db
     defaults:
@@ -83,7 +83,7 @@ jobs:
           python -m alembic upgrade head
       - name: Seed and run the full API suite on PostgreSQL
         env:
-          ENVIRONMENT: testing
+          ENVIRONMENT: development   # demo OTP is returned only in development
           JUDGE0_ADAPTER: fake
         run: |
           python seed/run_seed.py
@@ -93,7 +93,7 @@ jobs:
     name: Web typecheck, build and E2E
     runs-on: ubuntu-latest
     env:
-      ENVIRONMENT: testing
+      ENVIRONMENT: development   # demo OTP is returned only in development
       JUDGE0_ADAPTER: fake
       DATABASE_URL: sqlite:///irep_ci.db
       API_PYTHON: python

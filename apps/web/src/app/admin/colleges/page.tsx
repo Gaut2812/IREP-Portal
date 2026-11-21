@@ -8,6 +8,10 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi, ApiError } from "@/lib/api";
 import { Building2, Plus } from "lucide-react";
+import type { RequestBody } from "@irep/api-client";
+
+/** The create form is typed against the API contract (packages/api-client). */
+type NewCollege = RequestBody<"/api/v1/admin/colleges", "post">;
 
 interface CollegeRow {
   id: string; name: string; code: string; city: string | null; state: string | null;
@@ -21,7 +25,7 @@ const STATUS_STYLE: Record<string, string> = {
   suspended: "bg-[#FEE2E2] text-[#991B1B]",
 };
 
-const EMPTY = { name: "", code: "", city: "", state: "Tamil Nadu" };
+const EMPTY: NewCollege = { name: "", code: "", city: "", state: "Tamil Nadu" };
 
 export default function AdminCollegesPage() {
   const { t } = useLanguage();

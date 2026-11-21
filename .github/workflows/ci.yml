@@ -121,6 +121,10 @@ jobs:
       - name: Install web dependencies
         working-directory: apps/web
         run: pnpm install --frozen-lockfile
+      - name: packages/api-client matches openapi.json
+        run: |
+          npx --yes openapi-typescript@7.13.0 apps/api/openapi.json -o packages/api-client/src/schema.d.ts
+          git diff --exit-code packages/api-client || (echo "Regenerate: cd packages/api-client && npm run generate" && exit 1)
       - name: Typecheck
         working-directory: apps/web
         run: pnpm exec tsc --noEmit

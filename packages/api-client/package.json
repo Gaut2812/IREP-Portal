@@ -1,0 +1,10 @@
+{
+  "name": "@irep/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript types generated from apps/api/openapi.json (Master Plan: packages/api-client)",
+  "types": "src/index.ts",
+  "scripts": {
+    "generate": "npx --yes openapi-typescript@7.13.0 ../../apps/api/openapi.json -o src/schema.d.ts"
+  }
+}

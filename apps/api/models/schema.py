@@ -656,6 +656,20 @@ class AuditLog(TenantModel):
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 
+class NotificationPreference(TenantModel):
+    """Screen 44: per-user delivery preferences. In-app is always on; language
+    lives on users.language_pref (one source of truth)."""
+    __tablename__ = "notification_preferences"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), unique=True, index=True)
+    email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    sms_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    push_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    quiet_start_hour: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)   # local hour 0-23, e.g. 21
+    quiet_end_hour: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)     # e.g. 7 (wraps midnight)
+
+
 class ConsentRecord(TenantModel):
     """Screen 48: one row per consent decision (append-only; a withdrawal is a
     new row). The current state is the latest row per (student, purpose)."""

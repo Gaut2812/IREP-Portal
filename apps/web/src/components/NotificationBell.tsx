@@ -160,6 +160,10 @@ export const NotificationBell: React.FC = () => {
               );
             })}
           </div>
+          <Link href="/notifications" onClick={() => setOpen(false)} data-testid="notifications-see-all"
+            className="block text-center px-3 py-2 border-t border-[#E2E8F0] text-[11px] font-semibold text-[#2B5CD0] hover:bg-[#F8FAFC]">
+            {t("notifications.see_all")}
+          </Link>
         </div>
       )}
     </div>

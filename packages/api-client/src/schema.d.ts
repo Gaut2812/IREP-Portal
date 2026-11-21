@@ -1160,9 +1160,30 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Notifications */
+        /**
+         * List Notifications
+         * @description Screen 44 list: newest first, filter by kind or unread, paged with a created_at cursor.
+         */
         get: operations["list_notifications_api_v1_notifications_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Preferences Endpoint */
+        get: operations["get_preferences_endpoint_api_v1_notifications_preferences_get"];
+        /** Set Preferences */
+        put: operations["set_preferences_api_v1_notifications_preferences_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2737,6 +2758,21 @@ export interface components {
         PollVoteRequest: {
             /** Option */
             option: string;
+        };
+        /** PreferencesIn */
+        PreferencesIn: {
+            /** Email Enabled */
+            email_enabled: boolean;
+            /** Sms Enabled */
+            sms_enabled: boolean;
+            /** Push Enabled */
+            push_enabled: boolean;
+            /** Quiet Start Hour */
+            quiet_start_hour?: number | null;
+            /** Quiet End Hour */
+            quiet_end_hour?: number | null;
+            /** Language */
+            language: string;
         };
         /** ProctorEventRequest */
         ProctorEventRequest: {
@@ -5254,6 +5290,9 @@ export interface operations {
             query?: {
                 lang?: string;
                 kind?: string | null;
+                unread_only?: boolean;
+                /** @description cursor: created_at of the last item seen */
+                before?: string | null;
                 limit?: number;
             };
             header?: {
@@ -5263,6 +5302,72 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preferences_endpoint_api_v1_notifications_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_preferences_api_v1_notifications_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferencesIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

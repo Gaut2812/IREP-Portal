@@ -87,6 +87,7 @@ Sign-in rules:
 | 34 | Discussion groups | `/student/discussions` |
 | 35 | Trainer message hub | `/trainer/messages` (parents: `/parent/messages`) |
 | 36 | Mock interviews | `/student/interviews` |
+| 44 | Notification centre (every role; delivery preferences) | `/notifications` |
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
 

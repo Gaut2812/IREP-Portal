@@ -4274,6 +4274,7 @@
           "Notification Centre"
         ],
         "summary": "List Notifications",
+        "description": "Screen 44 list: newest first, filter by kind or unread, paged with a created_at cursor.",
         "operationId": "list_notifications_api_v1_notifications_get",
         "security": [
           {
@@ -4308,6 +4309,35 @@
             }
           },
           {
+            "name": "unread_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Unread Only"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "cursor: created_at of the last item seen",
+              "title": "Before"
+            },
+            "description": "cursor: created_at of the last item seen"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -4334,6 +4364,118 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/preferences": {
+      "get": {
+        "tags": [
+          "Notification Centre"
+        ],
+        "summary": "Get Preferences Endpoint",
+        "operationId": "get_preferences_endpoint_api_v1_notifications_preferences_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Notification Centre"
+        ],
+        "summary": "Set Preferences",
+        "operationId": "set_preferences_api_v1_notifications_preferences_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesIn"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -10083,6 +10225,61 @@
           "option"
         ],
         "title": "PollVoteRequest"
+      },
+      "PreferencesIn": {
+        "properties": {
+          "email_enabled": {
+            "type": "boolean",
+            "title": "Email Enabled"
+          },
+          "sms_enabled": {
+            "type": "boolean",
+            "title": "Sms Enabled"
+          },
+          "push_enabled": {
+            "type": "boolean",
+            "title": "Push Enabled"
+          },
+          "quiet_start_hour": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 23.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quiet Start Hour"
+          },
+          "quiet_end_hour": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 23.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quiet End Hour"
+          },
+          "language": {
+            "type": "string",
+            "pattern": "^(en|ta)$",
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email_enabled",
+          "sms_enabled",
+          "push_enabled",
+          "language"
+        ],
+        "title": "PreferencesIn"
       },
       "ProctorEventRequest": {
         "properties": {

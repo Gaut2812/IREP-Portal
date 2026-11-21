@@ -83,6 +83,7 @@ def test_one_running_lab_then_stop_records_usage():
         db.close()
 
 
+@pytest.mark.link("L08")
 def test_cyber_range_approval_gate():
     r = client.post("/api/v1/student/labs/lab_cyber_range/launch", headers=PRIYA)
     assert r.status_code == 403 and r.json()["detail"]["reason"] == "approval"

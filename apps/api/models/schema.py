@@ -659,6 +659,22 @@ class AuditLog(TenantModel):
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 
+class LeaveRequest(TenantModel):
+    """Screens 10 -> 43 (link L09): a parent's leave request; changes attendance only when a trainer approves it."""
+    __tablename__ = "leave_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_leave_student"), index=True)
+    requested_by: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_leave_requested_by"))
+    start_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)   # pending, approved, denied
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
 class ScheduleChangeRequest(TenantModel):
     """Screens 05 -> 06 (link L11): a trainer's proposed schedule change, approved by the college."""
     __tablename__ = "schedule_change_requests"

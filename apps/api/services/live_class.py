@@ -185,25 +185,31 @@ def finalize_session(db: Session, session: SessionItem, meeting: Optional[LiveMe
     """Meeting ended: compute presence for every student in the batch and upsert
     attendance (Present at >= 75% of scheduled time). Manual overrides win."""
     students = db.execute(select(Student).filter_by(batch_id=session.batch_id, college_id=session.college_id)).scalars().all()
-    present = absent = 0
+    present = absent = excused = 0
+    from services.leave import covered_by_leave
     for st in students:
         p = user_presence(db, session, st.user_id, now, meeting)
         status = "Present" if p["marked_present"] else "Absent"
+        if status == "Absent" and covered_by_leave(db, st.id, session.scheduled_start.date()):
+            status = "Excused"                      # approved leave (screen 43)
         row = db.execute(select(SessionAttendance).filter_by(session_id=session.id, student_id=st.id)).scalar_one_or_none()
         if row and row.source == "manual":
             continue
+        source = "leave" if status == "Excused" else "auto"
         if row:
-            row.status, row.minutes_present, row.source, row.marked_at = status, p["minutes_present"], "auto", now
+            row.status, row.minutes_present, row.source, row.marked_at = status, p["minutes_present"], source, now
         else:
             db.add(SessionAttendance(id=("att_" + session.id + "_" + st.id)[:64], college_id=session.college_id, session_id=session.id,
-                                     student_id=st.id, minutes_present=p["minutes_present"], status=status, source="auto", marked_at=now))
+                                     student_id=st.id, minutes_present=p["minutes_present"], status=status, source=source, marked_at=now))
         if status == "Present":
             present += 1
+        elif status == "Excused":
+            excused += 1
         else:
             absent += 1
     if meeting:
         meeting.finalized = True
-    return {"present": present, "absent": absent}
+    return {"present": present, "absent": absent, "excused": excused}
 
 
 def record_join_event(db: Session, session: SessionItem, user_id: str, event: str, at: datetime.datetime, source: str = "portal") -> JoinEvent:

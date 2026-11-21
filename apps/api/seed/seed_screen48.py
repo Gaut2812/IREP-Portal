@@ -8,7 +8,7 @@ from sqlalchemy import delete, select
 
 import re
 
-from models.schema import (ConsentRecord, DataRequest, JoinEvent, LiveMeeting, ParentStudent, RosterChangeRequest,
+from models.schema import (ConsentRecord, DataRequest, JoinEvent, LeaveRequest, LiveMeeting, ParentStudent, RosterChangeRequest,
                            ScheduleChangeRequest, SessionAttendance, SessionItem, TrainerNote)
 
 
@@ -31,6 +31,7 @@ def seed_screen48(db, college_id: str = "col_demo_001") -> None:
     db.execute(delete(TrainerNote).where(TrainerNote.college_id == college_id))
     # screens 05/06: schedule requests and the sessions their approvals created (ids sess_<16 hex>)
     db.execute(delete(ScheduleChangeRequest).where(ScheduleChangeRequest.college_id == college_id))
+    db.execute(delete(LeaveRequest).where(LeaveRequest.college_id == college_id))           # screens 10/43
     made = [i for i in db.execute(select(SessionItem.id).where(SessionItem.college_id == college_id)).scalars()
             if re.fullmatch(r"sess_[0-9a-f]{16}", i)]
     if made:

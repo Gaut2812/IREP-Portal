@@ -80,6 +80,7 @@ Sign-in rules:
 | 07 | Live classroom | `/live/{sessionId}` |
 | 08 | Live sessions & recordings | `/student/live` |
 | 09 | Attendance (trainer; overrides, check-in code) and student check-in | `/trainer/attendance`, `/student/checkin` |
+| 10 | Attendance (parent; month view, leave requests) | `/parent/attendance` |
 | 12 | Student dashboard | `/student` |
 | 13 | Trainer dashboard | `/trainer` |
 | 15 | Parent view (mobile first) | `/parent` |
@@ -92,6 +93,7 @@ Sign-in rules:
 | 35 | Trainer message hub | `/trainer/messages` (parents: `/parent/messages`) |
 | 36 | Mock interviews | `/student/interviews` |
 | 44 | Notification centre (every role; delivery preferences) | `/notifications` |
+| 43 | Approvals (trainer; leave and Cyber Range access) | `/trainer/approvals` |
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
 

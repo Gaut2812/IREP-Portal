@@ -157,3 +157,19 @@ def test_other_batch_and_tenant_cannot_access():
     assert client.post("/api/v1/student/sessions/sess_thu_rag/remind", headers=other).status_code == 404
     assert client.get("/api/v1/student/live", headers=_token("usr_priya_01", "student", college_id="col_other_999")).status_code == 404
     assert client.get("/api/v1/student/live", headers=_token("usr_ramesh_01", "parent")).status_code == 403
+
+
+def test_demo_week_rolls_forward_once_its_last_class_has_ended():
+    """Saturday afternoon (after the 10:00-13:00 class) behaves like Sunday: the
+    demo shows the coming week, so there is always a next class."""
+    from services.live_sessions import rebase_week_sessions
+    sat = datetime.date(2026, 11, 21)                      # a Saturday
+    db = SessionLocal()
+    try:
+        rebase_week_sessions(db, "col_demo_001", now=datetime.datetime.combine(sat, datetime.time(9, 0)))
+        assert db.get(SessionItem, "sess_mon_unionfind").scheduled_start.date() == datetime.date(2026, 11, 16)
+        rebase_week_sessions(db, "col_demo_001", now=datetime.datetime.combine(sat, datetime.time(14, 0)))
+        assert db.get(SessionItem, "sess_mon_unionfind").scheduled_start.date() == datetime.date(2026, 11, 23)
+        db.rollback()                                      # leave the demo calendar as the seed set it
+    finally:
+        db.close()

@@ -50,7 +50,10 @@ class Settings(BaseSettings):
     GRAPH_LOGIN_URL: str = os.getenv("GRAPH_LOGIN_URL", "https://login.microsoftonline.com")
     TEAMS_DEFAULT_ORGANIZER: str = os.getenv("TEAMS_DEFAULT_ORGANIZER", "")   # used when a trainer has no teams_upn
     TEAMS_REPORT_DELAY_SECONDS: int = int(os.getenv("TEAMS_REPORT_DELAY_SECONDS", "600"))
-    LAB_ADAPTER: str = os.getenv("LAB_ADAPTER", "fake")
+    LAB_ADAPTER: str = os.getenv("LAB_ADAPTER", "fake")           # fake (dev), docker (dev), jupyterhub (pilot, production)
+    JUPYTERHUB_URL: str = os.getenv("JUPYTERHUB_URL", "http://localhost:8001")             # as the API reaches the hub
+    JUPYTERHUB_PUBLIC_URL: str = os.getenv("JUPYTERHUB_PUBLIC_URL", "")                    # as students' browsers reach it
+    JUPYTERHUB_API_TOKEN: str = os.getenv("JUPYTERHUB_API_TOKEN", "")                      # the hub's "irep-labs" service token
     TRANSLATE_ADAPTER: str = os.getenv("TRANSLATE_ADAPTER", "fake")
     TRANSLATE_URL: str = os.getenv("TRANSLATE_URL", "http://localhost:5000")
     GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "dev_github_webhook_secret")

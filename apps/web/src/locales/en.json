@@ -86,7 +86,8 @@
     "audit_consent": "Audit & consent",
     "support_desk": "Support desk",
     "checkin": "Class check-in",
-    "approvals": "Approvals"
+    "approvals": "Approvals",
+    "lab_board": "Lab board"
   },
   "student": {
     "readiness_score": "Readiness score",
@@ -683,8 +684,25 @@
     "workspace_expires": "Auto-stops at {t}",
     "workspace_back": "Back to Virtual Labs",
     "workspace_terminal": "Terminal",
-    "workspace_hint": "This development build runs labs without containers. With LAB_ADAPTER=docker each lab runs in its own isolated container.",
-    "workspace_ended": "This lab session has ended."
+    "workspace_hint": "Demo mode: no lab server is connected, so this terminal is simulated. With JupyterHub (LAB_ADAPTER=jupyterhub) you get a real Linux workspace.",
+    "workspace_ended": "This lab session has ended.",
+    "engine_loading": "Loading engine…",
+    "engine_ready": "Ready",
+    "engine_error": "Could not load",
+    "engine_failed": "The in-browser engine could not load. Check your connection and reload the page.",
+    "sql_title": "PostgreSQL in your browser",
+    "sql_editor": "SQL editor",
+    "python_title": "Python in your browser",
+    "python_editor": "Python editor",
+    "run": "Run",
+    "starting": "Starting your workspace. This usually takes under a minute…",
+    "open_workspace": "Open workspace",
+    "open_sandbox": "Open cloud sandbox",
+    "open_failed": "Could not open the workspace. Try again.",
+    "server_hint": "Your workspace opens in a new tab. Keep this page open: it shows your time left and stops the lab.",
+    "external_hint": "The cloud sandbox opens in a new tab. Your credits are counted while this session runs.",
+    "browser_hint": "This lab runs entirely in your browser. Your work is not saved when you close the tab, so copy anything you want to keep.",
+    "fake_terminal": "this demo terminal only knows pwd, whoami, echo and clear"
   },
   "board": {
     "title": "Company Simulation · {t}",
@@ -1560,5 +1578,22 @@
     "no_tests": "No practice tests for your batch yet.",
     "due_on": "due",
     "best": "best"
+  },
+  "lab_board": {
+    "title": "Lab board",
+    "load_failed": "Could not load the lab board. Try again.",
+    "live": "live sessions",
+    "idle": "idle for 15+ minutes",
+    "reason_ph": "Note to the student when you stop a lab (optional)",
+    "stopped": "Stopped the lab for",
+    "student": "Student",
+    "lab": "Lab",
+    "running": "Running",
+    "idle_col": "Idle",
+    "left": "Left",
+    "none": "No one in your batches has a lab running.",
+    "starting": "starting",
+    "min": "min",
+    "stop": "Stop"
   }
 }

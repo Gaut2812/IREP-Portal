@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
-from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent, college_structure, college_settings, trainer_batches, schedule, attendance, leave_approvals, content_library, events, monthly_cards, support, assessments
+from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent, college_structure, college_settings, trainer_batches, schedule, attendance, leave_approvals, content_library, events, monthly_cards, support, assessments, labs
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -13,6 +13,8 @@ async def lifespan(app: FastAPI):
                 "Production environment requires a live Judge0 execution cluster. "
                 "JUDGE0_ADAPTER must be 'judge0' with valid JUDGE0_URL and JUDGE0_AUTH_TOKEN."
             )
+        if settings.LAB_ADAPTER.lower() != "jupyterhub" or not settings.JUPYTERHUB_URL or not settings.JUPYTERHUB_API_TOKEN:
+            raise RuntimeError("Production requires LAB_ADAPTER=jupyterhub with JUPYTERHUB_URL and JUPYTERHUB_API_TOKEN (no fake or local docker labs).")
         if settings.AUTH_PROVIDER.lower() != "keycloak":
             raise RuntimeError("Production requires AUTH_PROVIDER=keycloak (Master Plan: Keycloak at every stage).")
         if settings.LIVE_CLASS_ADAPTER.lower() == "teams" and not (settings.GRAPH_TENANT_ID and settings.GRAPH_CLIENT_ID and settings.GRAPH_CLIENT_SECRET):
@@ -76,6 +78,7 @@ app.include_router(events.router, prefix=settings.API_V1_PREFIX)
 app.include_router(monthly_cards.router, prefix=settings.API_V1_PREFIX)
 app.include_router(support.router, prefix=settings.API_V1_PREFIX)
 app.include_router(assessments.router, prefix=settings.API_V1_PREFIX)
+app.include_router(labs.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():

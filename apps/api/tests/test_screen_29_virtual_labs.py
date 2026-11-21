@@ -53,7 +53,8 @@ def _lab(d, lab_id):
 
 def test_catalog_matches_pdf5_state():
     d = client.get("/api/v1/student/labs", headers=PRIYA).json()
-    assert [l["name"] for l in d["labs"]] == ["Linux Sandbox", "Docker & Kubernetes Lab", "Cloud Sandbox", "AI Notebook Lab", "Cyber Range", "Full-Stack Workspace"]
+    assert [l["name"] for l in d["labs"]] == ["Linux Sandbox", "Docker & Kubernetes Lab", "Cloud Sandbox", "AI Notebook Lab", "Cyber Range", "Full-Stack Workspace",
+                                                 "SQL Playground", "Python Playground"]   # PDF 5 order, then the browser labs
     assert [c["label"] for c in _lab(d, "lab_cloud")["chips"]] == ["Sem 5+", "Credits: 68%"]
     assert _lab(d, "lab_docker_k8s")["footer"] == "Last used: yesterday"
     assert [c["label"] for c in _lab(d, "lab_ai_notebook")["chips"]] == ["AI & DS", "Ready"]

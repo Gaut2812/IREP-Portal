@@ -1201,7 +1201,7 @@ def get_attempt_result(
 from models.schema import LabSession, LabApproval, BatchTrainer, Trainer
 from services.lab_orchestrator import (
     launch as orchestrate_launch, stop_session, cull, lock_reason, approval_for, usage, quota_for, period_of,
-    running_minutes, LabLaunchError, MONTHLY_LAB_MINUTES, IDLE_LIMIT_MIN,
+    running_minutes, LabLaunchError, MONTHLY_LAB_MINUTES, IDLE_LIMIT_MIN, beacon_token,
 )
 
 
@@ -1264,6 +1264,9 @@ def _session_payload(s: LabSession, lab: VirtualLabItem, now: datetime.datetime)
         "expires_at": s.expires_at.isoformat(), "minutes_left": max(0, int((s.expires_at - now).total_seconds() // 60)),
         "idle_limit_min": IDLE_LIMIT_MIN, "open_url": f"/lab/{s.id}", "provider": s.provider,
         "started_at": s.started_at.isoformat(), "stop_reason": s.stop_reason,
+        "runtime": lab.runtime or "server", "browser_kit": lab.browser_kit,
+        "beacon_token": beacon_token(s) if (lab.runtime == "browser" and s.status == "running") else None,
+        "can_connect": s.status == "running" and (lab.runtime in ("external",) or (lab.runtime or "server") == "server" and s.provider == "jupyterhub"),
     }
 
 
@@ -1277,9 +1280,10 @@ def get_virtual_labs(
     if cull(db, student.college_id, now):
         db.commit()
     labs = db.execute(select(VirtualLabItem).filter_by(college_id=student.college_id).order_by(VirtualLabItem.id)).scalars().all()
-    order = ["lab_linux", "lab_docker_k8s", "lab_cloud", "lab_ai_notebook", "lab_cyber_range", "lab_fullstack"]
+    order = ["lab_linux", "lab_docker_k8s", "lab_cloud", "lab_ai_notebook", "lab_cyber_range", "lab_fullstack", "lab_sql_browser", "lab_python_browser"]
     labs = sorted(labs, key=lambda l: order.index(l.id) if l.id in order else 99)
-    running = db.execute(select(LabSession).filter_by(student_id=student.id, status="running")).scalars().all()
+    running = db.execute(select(LabSession).where(LabSession.student_id == student.id,
+                                                  LabSession.status.in_(["running", "starting"]))).scalars().all()
     lab_by_id = {l.id: l for l in labs}
     period = period_of(now)
     minutes_used = usage(db, student, "lab_minutes", period) + sum(running_minutes(r, now) for r in running if lab_by_id.get(r.lab_id) and lab_by_id[r.lab_id].meter == "lab_minutes")

@@ -7,7 +7,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import {
-  Terminal, Container, Cloud, Cpu, ShieldAlert, Code, Play, StopCircle, ExternalLink, Lock, AlertCircle, RefreshCw, CheckCircle2, X, Clock,
+  Terminal, Container, Cloud, Cpu, ShieldAlert, Code, Play, StopCircle, ExternalLink, Lock, AlertCircle, RefreshCw, CheckCircle2, X, Clock, Database,
 } from "lucide-react";
 
 interface Chip { label: string; type: string }
@@ -23,7 +23,7 @@ interface LabsData {
   queue: { waiting: number; label: string };
 }
 
-const ICONS: Record<string, React.ComponentType<{ className?: string }>> = { terminal: Terminal, container: Container, cloud: Cloud, cpu: Cpu, shield: ShieldAlert, code: Code };
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = { terminal: Terminal, container: Container, cloud: Cloud, cpu: Cpu, shield: ShieldAlert, code: Code, database: Database };
 const CHIP: Record<string, string> = { green: "chip-green", amber: "chip-amber", purple: "chip-purple", red: "chip-red", blue: "chip-blue" };
 const FILTERS: { key: string; label: string }[] = [
   { key: "All labs", label: "labs.filter_all" }, { key: "Software Engineering", label: "labs.filter_se" }, { key: "AI & Data Science", label: "labs.filter_ai" },

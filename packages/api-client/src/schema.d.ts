@@ -3470,6 +3470,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/student/lab-sessions/{session_id}/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Connect
+         * @description A short-lived URL into the student's own running workspace (JupyterHub) or external sandbox.
+         */
+        get: operations["connect_api_v1_student_lab_sessions__session_id__connect_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/labs/beacon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Beacon
+         * @description Browser-lab heartbeat. Authenticated by a token scoped to one session, so it also works
+         *     from navigator.sendBeacon (text/plain body) when the tab closes.
+         */
+        post: operations["beacon_api_v1_labs_beacon_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trainer/labs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lab Board
+         * @description Live lab sessions in the trainer's batches (no workspace contents, only who, which lab and for how long).
+         */
+        get: operations["lab_board_api_v1_trainer_labs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trainer/lab-sessions/{session_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trainer Stop */
+        post: operations["trainer_stop_api_v1_trainer_lab_sessions__session_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -4401,6 +4479,11 @@ export interface components {
              * @default primary
              */
             role: string;
+        };
+        /** TrainerStopIn */
+        TrainerStopIn: {
+            /** Reason */
+            reason?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -11719,6 +11802,127 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_api_v1_student_lab_sessions__session_id__connect_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    beacon_api_v1_labs_beacon_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    lab_board_api_v1_trainer_labs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trainer_stop_api_v1_trainer_lab_sessions__session_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrainerStopIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

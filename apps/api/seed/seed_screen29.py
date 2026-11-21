@@ -7,21 +7,41 @@ import uuid
 
 from sqlalchemy import select, delete
 
-from models.schema import VirtualLabItem, LabSession, LabApproval, UsageLedger
+from models.schema import VirtualLabItem, LabSession, LabApproval, Notification, UsageLedger
 
 LAB_CONFIG = {
-    "lab_linux": dict(min_semester=2, allowed_tracks=None, session_minutes=120, meter="lab_minutes", icon="terminal", image="ubuntu:24.04", network="none", default_file="~/practice.sh"),
-    "lab_docker_k8s": dict(min_semester=5, allowed_tracks=None, session_minutes=120, meter="lab_minutes", icon="container", image="irep/docker-k8s:1", network="none", default_file="deploy.yaml"),
-    "lab_cloud": dict(min_semester=5, allowed_tracks=None, session_minutes=120, meter="cloud_credits", icon="cloud", image=None, network="none", default_file="main.tf"),
-    "lab_ai_notebook": dict(min_semester=2, allowed_tracks=["AI & Data Science"], session_minutes=120, meter="lab_minutes", icon="cpu", image="jupyter/scipy-notebook", network="none", default_file="rag_notes_demo.ipynb"),
-    "lab_cyber_range": dict(min_semester=5, allowed_tracks=None, session_minutes=90, meter="lab_minutes", icon="shield", image="irep/cyber-range:1", network="isolated", default_file="targets.txt"),
-    "lab_fullstack": dict(min_semester=3, allowed_tracks=None, session_minutes=120, meter="lab_minutes", icon="code", image="irep/fullstack:1", network="none", default_file="server.js"),
+    "lab_linux": dict(runtime="server", profile="linux", min_semester=2, allowed_tracks=None, session_minutes=120, meter="lab_minutes", icon="terminal", image="ubuntu:24.04", network="none", default_file="~/practice.sh"),
+    "lab_docker_k8s": dict(runtime="server", profile="docker-k8s", min_semester=5, allowed_tracks=None, session_minutes=120, meter="lab_minutes", icon="container", image="irep/docker-k8s:1", network="none", default_file="deploy.yaml"),
+    "lab_cloud": dict(runtime="external", external_url="https://awsacademy.instructure.com/", min_semester=5, allowed_tracks=None, session_minutes=120, meter="cloud_credits", icon="cloud", image=None, network="none", default_file="main.tf"),
+    "lab_ai_notebook": dict(runtime="server", profile="ai-cpu", min_semester=2, allowed_tracks=["AI & Data Science"], session_minutes=120, meter="lab_minutes", icon="cpu", image="jupyter/scipy-notebook", network="none", default_file="rag_notes_demo.ipynb"),
+    "lab_cyber_range": dict(runtime="server", profile="cyber-range", min_semester=5, allowed_tracks=None, session_minutes=90, meter="lab_minutes", icon="shield", image="irep/cyber-range:1", network="isolated", default_file="targets.txt"),
+    "lab_fullstack": dict(runtime="server", profile="fullstack", min_semester=3, allowed_tracks=None, session_minutes=120, meter="lab_minutes", icon="code", image="irep/fullstack:1", network="none", default_file="server.js"),
+}
+# Browser labs (labs track): run in the student's browser, metered by signed beacons
+BROWSER_LABS = {
+    "lab_sql_browser": dict(name="SQL Playground", category="Software Engineering", icon="database", runtime="browser", browser_kit="sql",
+                            description="PostgreSQL in your browser (PGlite): create tables, insert rows and practise queries. Nothing to install.",
+                            footer_text="Runs in your browser", eligibility_chip="Sem 2+", min_semester=2, session_minutes=90,
+                            default_file="practice.sql"),
+    "lab_python_browser": dict(name="Python Playground", category="Software Engineering", icon="code", runtime="browser", browser_kit="python",
+                               description="Python 3 in your browser (Pyodide) for intro exercises, with NumPy available. Nothing to install.",
+                               footer_text="Runs in your browser", eligibility_chip="Sem 1+", min_semester=1, session_minutes=90,
+                               default_file="practice.py"),
 }
 PRIYA = "std_priya_01"
 DEMO_SESSION = "ls_demo_priya_notebook"
 
 
 def seed_screen29(db, college_id: str = "col_demo_001") -> None:
+    for lab_id, cfg in BROWSER_LABS.items():
+        lab = db.execute(select(VirtualLabItem).filter_by(id=lab_id)).scalar_one_or_none()
+        if lab is None:
+            lab = VirtualLabItem(id=lab_id, college_id=college_id)
+            db.add(lab)
+        for k, v in cfg.items():
+            setattr(lab, k, v)
+        lab.allowed_tracks, lab.meter, lab.requires_approval, lab.image, lab.network = None, "lab_minutes", False, None, "none"
+        lab.status_chip, lab.tag_color, lab.is_active_session = "Ready", "green", False
     for lab_id, cfg in LAB_CONFIG.items():
         lab = db.execute(select(VirtualLabItem).filter_by(id=lab_id)).scalar_one_or_none()
         if lab:
@@ -33,6 +53,7 @@ def seed_screen29(db, college_id: str = "col_demo_001") -> None:
     now = datetime.datetime.now()
     period = now.strftime("%Y-%m")
     # restore Priya's demo state
+    db.execute(delete(Notification).where(Notification.college_id == college_id, Notification.kind == "lab"))
     db.execute(delete(LabApproval).where(LabApproval.student_id == PRIYA, LabApproval.lab_id == "lab_cyber_range"))
     # sessions launched by tests or demos are removed (with the usage they logged)
     extra = db.execute(select(LabSession.id).where(LabSession.student_id == PRIYA, LabSession.id.not_in([DEMO_SESSION, "ls_demo_priya_docker"]))).scalars().all()

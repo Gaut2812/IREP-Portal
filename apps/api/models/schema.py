@@ -343,6 +343,11 @@ class VirtualLabItem(TenantModel):
     meter: Mapped[str] = mapped_column(String(16), default="lab_minutes")          # lab_minutes | cloud_credits
     icon: Mapped[str] = mapped_column(String(16), default="terminal")
     image: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)       # container image for the docker adapter
+    # Labs track (S9+): one launcher for server labs, browser labs with signed beacons, external sandboxes
+    runtime: Mapped[str] = mapped_column(String(16), default="server", server_default="server")   # server, browser, external
+    profile: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)      # JupyterHub profile slug (server labs)
+    browser_kit: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # sql, python (browser labs)
+    external_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # e.g. AWS Academy Learner Lab
     network: Mapped[str] = mapped_column(String(32), default="none")              # none | isolated (cyber range)
     default_file: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 

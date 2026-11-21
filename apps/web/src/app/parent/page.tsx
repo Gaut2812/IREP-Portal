@@ -9,6 +9,10 @@ import { fetchApi } from "@/lib/api";
 import { Heart, MessageSquare, AlertCircle, RefreshCw, CheckCircle2, WifiOff, ExternalLink, Calendar, Award, Users } from "lucide-react";
 
 interface Overview {
+  /** Screen 48: without parent-data consent the API returns only ward id/name and the consent text */
+  consent_required?: boolean;
+  consent_state?: "missing" | "withdrawn";
+  consent?: { purpose: string; title: string; body: string };
   ward: { id: string; name: string; semester: number; branch: string; track: string; details: string; batch: string; college: string };
   kpis: {
     readiness_score: number; readiness_delta: number; readiness_band: string; readiness_band_label: string;
@@ -59,6 +63,20 @@ export default function ParentViewPage() {
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
+  const [consentBusy, setConsentBusy] = useState(false);
+  const grantConsent = async () => {
+    if (!data?.consent) return;
+    setConsentBusy(true);
+    try {
+      await fetchApi("/consent", { method: "POST", body: JSON.stringify({ purpose: data.consent.purpose, status: "granted", student_id: data.ward.id }) });
+      await load();
+    } catch (err: any) {
+      setError(err?.detail || err?.message || "error");
+    } finally {
+      setConsentBusy(false);
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -71,7 +89,11 @@ export default function ParentViewPage() {
       const res = await fetchApi<Overview>(`/parent/children/${id}/overview?lang=${language}`);
       setData(res);
       setCachedAt(null);
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: new Date().toISOString(), lang: language, id, data: res })); } catch { /* ignore */ }
+      try {
+        // never keep an offline copy of a child's data without consent
+        if (res.consent_required) localStorage.removeItem(CACHE_KEY);
+        else localStorage.setItem(CACHE_KEY, JSON.stringify({ at: new Date().toISOString(), lang: language, id, data: res }));
+      } catch { /* ignore */ }
     } catch (err: any) {
       // Offline or API down: show the last cached summary if there is one
       try {
@@ -167,7 +189,19 @@ export default function ParentViewPage() {
             <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 text-center text-xs text-[#64748B]">{t("parent_view.no_child")}</div>
           )}
 
-          {!loading && !error && data && k && (
+          {!loading && !error && data?.consent_required && data.consent && (
+            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-5 space-y-3" data-testid="consent-card">
+              <h2 className="text-base font-bold text-[#0F1F3A]">{data.consent.title}</h2>
+              <p className="text-xs text-[#475569] leading-relaxed">{data.consent.body}</p>
+              <p className="text-[11px] text-[#64748B]">{data.ward.name}</p>
+              <button type="button" disabled={consentBusy} onClick={grantConsent} data-testid="consent-agree"
+                className="w-full py-2.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-xl disabled:opacity-50">
+                {t("parent_view.consent_agree")}
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && data && !data.consent_required && k && (
             <>
               {/* Readiness card */}
               <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-4 rounded-2xl" data-testid="readiness-card">

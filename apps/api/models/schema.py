@@ -656,6 +656,39 @@ class AuditLog(TenantModel):
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 
+class ConsentRecord(TenantModel):
+    """Screen 48: one row per consent decision (append-only; a withdrawal is a
+    new row). The current state is the latest row per (student, purpose)."""
+    __tablename__ = "consent_records"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    subject_student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    granted_by_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False, index=True)   # services/consent.PURPOSES
+    status: Mapped[str] = mapped_column(String(16), nullable=False)                # granted, withdrawn
+    method: Mapped[str] = mapped_column(String(24), nullable=False)                # otp_parent, paper_form_upload, in_app
+    evidence_ref: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    recorded_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, default=datetime.datetime.utcnow, index=True)
+
+
+class DataRequest(TenantModel):
+    """Screen 48 / link L27: a college admin's export or deletion request for one student."""
+    __tablename__ = "data_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)                  # export, deletion
+    subject_student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    requested_by: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="received", index=True)  # received, in_progress, completed, rejected
+    due_on: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    result_ref: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # storage key of the export file
+    result_summary: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
 class OutboxEvent(TenantModel):
     """Transactional outbox (Master Plan S1): written in the same transaction
     as the state change; side effects (SMS, email, push, fan-out) run in the

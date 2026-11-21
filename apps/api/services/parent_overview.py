@@ -43,6 +43,24 @@ def build_parent_overview(db: Session, student: Student, child_name: str, curren
                           today: Optional[datetime.date] = None) -> dict:
     today = today or datetime.date.today()
     college_id = student.college_id
+    # Screen 48 / DPDP: nothing about the child is shown to a parent before
+    # the parent-data consent is granted (or after it is withdrawn).
+    from services.consent import current as consent_state
+    state = consent_state(db, student.id, "parent_data_processing")
+    if state != "granted":
+        return {
+            "consent_required": True,
+            "consent_state": state or "missing",
+            "ward": {"id": student.id, "name": child_name},
+            "consent": {
+                "purpose": "parent_data_processing",
+                "title": "உங்கள் பிள்ளையின் தரவைப் பார்க்க ஒப்புதல் தேவை" if lang == "ta" else "Your consent is needed to see your child's progress",
+                "body": ("வருகை, மதிப்பெண்கள், திட்டங்கள் மற்றும் பயிற்சியாளர் செய்திகளை உங்களுக்குக் காட்ட IREP உங்கள் பிள்ளையின் தரவைச் செயலாக்குகிறது. "
+                         "நீங்கள் எப்போது வேண்டுமானாலும் ஒப்புதலைத் திரும்பப் பெறலாம்.") if lang == "ta" else
+                        ("IREP processes your child's attendance, scores, projects and trainer messages to show them to you. "
+                         "You can withdraw this consent at any time."),
+            },
+        }
     card = latest_released_card(db, student)
 
     certs = db.execute(select(Certificate).filter_by(student_id=student.id, college_id=college_id)).scalars().all()
@@ -86,6 +104,7 @@ def build_parent_overview(db: Session, student: Student, child_name: str, curren
         }
 
     return {
+        "consent_required": False,
         "ward": {
             "id": student.id, "name": child_name, "semester": student.semester, "branch": student.branch, "track": student.track,
             "details": f"Sem {student.semester} · {student.branch}", "batch": student.batch_name, "college": "Demo Engineering College",

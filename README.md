@@ -86,6 +86,7 @@ Sign-in rules:
 | 35 | Trainer message hub | `/trainer/messages` (parents: `/parent/messages`) |
 | 36 | Mock interviews | `/student/interviews` |
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
+| 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
 
 ## Sign-in with Keycloak (optional in development)
 

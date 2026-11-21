@@ -16,12 +16,15 @@ export default function TrainerLabBoard() {
   const [reason, setReason] = useState("");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState<{ students: number; exercises: { id: string; lab: string; title: string; passed: number; tried: number }[] } | null>(null);
 
   const load = useCallback(async () => {
     try { setData(await fetchApi("/trainer/labs")); } catch (e) { setError(e instanceof ApiError ? String(e.detail) : t("lab_board.load_failed")); }
   }, [t]);
 
   useEffect(() => {
+    fetchApi<{ students: number; exercises: { id: string; lab: string; title: string; passed: number; tried: number }[] }>("/trainer/labs/exercises")
+      .then(setProgress).catch(() => setProgress(null));
     load();
     const id = setInterval(load, 30000);
     return () => clearInterval(id);
@@ -73,6 +76,19 @@ export default function TrainerLabBoard() {
               </tbody>
             </table>
           </div>
+          {progress && progress.exercises.length > 0 && (
+            <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-x-auto">
+              <h2 className="px-3 pt-3 text-xs font-black text-[#0F1F3A]">{t("lab_board.exercises")} · {progress.students} {t("lab_board.students")}</h2>
+              <table className="w-full text-xs mt-2" data-testid="exercise-progress">
+                <thead><tr className="text-left text-[#64748B] border-b border-[#E2E8F0]"><th className="px-3 py-1.5">{t("lab_board.lab")}</th><th>{t("lab_board.exercise")}</th><th>{t("lab_board.passed")}</th><th>{t("lab_board.tried")}</th></tr></thead>
+                <tbody>
+                  {progress.exercises.map((e) => (
+                    <tr key={e.id} className="border-b border-[#F1F5F9]"><td className="px-3 py-1.5">{e.lab}</td><td>{e.title}</td><td className="font-bold text-[#166534]">{e.passed}</td><td>{e.tried}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </AppShell>
     </RoleGuard>

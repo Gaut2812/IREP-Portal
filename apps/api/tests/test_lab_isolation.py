@@ -54,7 +54,8 @@ def test_profiles_get_limits_and_unknown_ones_are_refused(monkeypatch):
     c, scope = _load_hub(monkeypatch)
     for profile in ("linux", "ai-cpu", "fullstack"):
         sp = _spawn(scope, c, profile)
-        assert sp.mem_limit and sp.cpu_limit and sp.extra_create_kwargs == {"user": "1000"}
+        assert sp.mem_limit and sp.cpu_limit and sp.extra_create_kwargs["user"] == "1000"
+        assert sp.extra_create_kwargs["labels"] == {"irep.session": "ls_x"}             # cAdvisor metering (S13)
         assert sp.extra_host_config["memswap_limit"] == sp.mem_limit and "runtime" not in sp.extra_host_config
     for refused in ("docker-k8s", "cyber-range", "root"):
         with pytest.raises(ValueError):
@@ -75,6 +76,8 @@ def test_lab_networks_have_no_way_out_except_the_registry_cache():
     on_egress = [n for n, svc in compose["services"].items() if "irep-labs-egress" in (svc.get("networks") or {})]
     assert on_egress == ["registry-cache"]
     assert all(not svc.get("privileged") for svc in compose["services"].values())
+    assert compose["services"]["cadvisor"]["networks"] == ["irep-labs-hub"]                # metering: never on the lab network
+    assert all(v.endswith(":ro") for v in compose["services"]["cadvisor"]["volumes"])
 
 
 def test_cyber_range_is_isolated(monkeypatch):

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
+import { SpectateBar } from "@/components/labs/SpectateBar";
 import { fetchApi, WS_BASE } from "@/lib/api";
 import {
   Mic, MicOff, Video, VideoOff, Hand, MessageSquare, BarChart2, Cpu, LogOut, ArrowDown, ThumbsUp,
@@ -25,6 +26,7 @@ interface LiveState {
   qa: { id: string; author: string; text: string; upvotes: number; my_upvote: boolean; answered_at: string | null }[];
   attendance: { minutes_present: number; total_minutes: number; threshold_minutes: number; threshold_pct: number; marked_present: boolean; joined_at: string | null; is_in_room: boolean } | null;
   attendance_on_track: boolean | null;
+  spectate: { url: string; label: string | null } | null;
 }
 
 const FLOW_STYLE: Record<string, string> = {
@@ -276,6 +278,7 @@ export default function LiveClassroomPage() {
           )}
         </div>
       </header>
+      <SpectateBar sessionId={sessionId} spectate={st.spectate} isTrainer={isTrainer} onChange={load} />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Stage */}

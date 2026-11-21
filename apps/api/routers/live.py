@@ -157,6 +157,8 @@ def build_state(db: Session, s: SessionItem, user: TokenPayload, now: Optional[d
         "participants": participants[:5], "more_participants": max(0, len(participants) - 5), "participant_count": len(participants),
         "poll": poll_payload, "qa": qa,
         "attendance": presence, "attendance_on_track": on_track,
+        # S13: the trainer's read-only lab view for this class (hidden once the class has ended)
+        "spectate": {"url": s.spectate_url, "label": s.spectate_label} if s.spectate_url and state != "ended" else None,
     }
 
 

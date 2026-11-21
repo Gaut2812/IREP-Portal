@@ -19,6 +19,16 @@ test.describe("Labs track: browser labs and the trainer lab board", () => {
     await expect(page.getByTestId("sql-output")).toContainText("Asha");
     await expect(page.getByTestId("sql-output")).toContainText("82");
 
+    // S13 exercise checker: the answer is checked on the server, which never sends it to the page
+    await expect(page.getByTestId("exercise-score")).toHaveText("0/35");
+    await page.getByTestId("exercise-item").first().click();
+    await page.getByTestId("sql-editor").fill("SELECT name FROM marks WHERE score >= 80;");
+    await page.getByTestId("sql-run").click();
+    await expect(page.getByTestId("sql-output")).toContainText("Meera");
+    await page.getByTestId("exercise-check").click();
+    await expect(page.getByTestId("exercise-verdict")).toHaveText("Correct! Well done.");
+    await expect(page.getByTestId("exercise-score")).toHaveText("10/35");
+
     const ctx = await browser.newContext();
     const trainer = await ctx.newPage();
     await loginAs(trainer, "trainer");

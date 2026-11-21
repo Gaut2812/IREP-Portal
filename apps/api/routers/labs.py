@@ -111,3 +111,146 @@ def trainer_stop(session_id: str, req: TrainerStopIn, current_user: TokenPayload
     record_audit(db, current_user, "lab.stop_by_trainer", "lab_session", s.id, {"student_id": s.student_id, "minutes": minutes, "reason": reason})
     db.commit()
     return {"status": s.status, "minutes": minutes}
+
+
+# ------------------------------------------------------------------ S13: exercises with checkers
+
+class CheckIn(BaseModel):
+    rows: Optional[list] = None          # sql: the result rows the browser got
+    output: Optional[str] = Field(default=None, max_length=20000)   # python: what the program printed
+
+
+def _exercise_out(e, lang: str, result) -> dict:
+    ta = lang == "ta"
+    return {"id": e.id, "position": e.position, "title": e.title_ta if ta and e.title_ta else e.title_en,
+            "prompt": e.prompt_ta if ta and e.prompt_ta else e.prompt_en, "setup": e.setup, "points": e.points,
+            "passed": bool(result and result.passed), "attempts": result.attempts if result else 0}
+
+
+@router.get("/student/labs/{lab_id}/exercises")
+def lab_exercises(lab_id: str, lang: str = "en", current_user: TokenPayload = Depends(require_role(["student"])), db: Session = Depends(get_db)):
+    from models.schema import LabExercise, LabExerciseResult
+    from services.lab_orchestrator import lock_reason
+    student = get_student_for_user(current_user, db)
+    lab = db.execute(select(VirtualLabItem).where(VirtualLabItem.id == lab_id, VirtualLabItem.college_id == student.college_id)).scalar_one_or_none()
+    if lab is None:
+        raise HTTPException(status_code=404, detail="Lab not found")
+    locked = lock_reason(db, student, lab, datetime.datetime.now())
+    if locked and locked[0] in ("semester", "track"):
+        raise HTTPException(status_code=403, detail=locked[1])
+    exs = db.execute(select(LabExercise).where(LabExercise.lab_id == lab.id, LabExercise.college_id == student.college_id)
+                     .order_by(LabExercise.position)).scalars().all()
+    results = {r.exercise_id: r for r in db.execute(select(LabExerciseResult).where(
+        LabExerciseResult.student_id == student.id, LabExerciseResult.exercise_id.in_([e.id for e in exs] or ["_"]))).scalars()}
+    rows = [_exercise_out(e, lang, results.get(e.id)) for e in exs]
+    return {"lab_id": lab.id, "kit": lab.browser_kit, "exercises": rows,
+            "score": sum(r["points"] for r in rows if r["passed"]), "max_score": sum(r["points"] for r in rows)}
+
+
+@router.post("/student/lab-exercises/{exercise_id}/check")
+def check_exercise(exercise_id: str, req: CheckIn, current_user: TokenPayload = Depends(require_role(["student"])), db: Session = Depends(get_db)):
+    """A practice check: needs a running session of the exercise's lab; the expected result stays here."""
+    import uuid
+    from models.schema import LabExercise, LabExerciseResult
+    from services.lab_checkers import check
+    student = get_student_for_user(current_user, db)
+    e = db.execute(select(LabExercise).where(LabExercise.id == exercise_id, LabExercise.college_id == student.college_id)).scalar_one_or_none()
+    if e is None:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    running = db.execute(select(LabSession.id).where(LabSession.student_id == student.id, LabSession.lab_id == e.lab_id,
+                                                     LabSession.status == "running")).first()
+    if not running:
+        raise HTTPException(status_code=409, detail="Open the lab first, then check your answer there")
+    lab = db.get(VirtualLabItem, e.lab_id)
+    submitted = req.rows if lab.browser_kit == "sql" else req.output
+    if submitted is None:
+        raise HTTPException(status_code=422, detail="Send rows (SQL) or output (Python)")
+    passed = check(lab.browser_kit or "", e.expected, submitted, e.ordered)
+    r = db.execute(select(LabExerciseResult).where(LabExerciseResult.student_id == student.id,
+                                                   LabExerciseResult.exercise_id == e.id)).scalar_one_or_none()
+    if r is None:
+        r = LabExerciseResult(id=f"exr_{uuid.uuid4().hex[:16]}", college_id=student.college_id, student_id=student.id, exercise_id=e.id)
+        db.add(r)
+    r.attempts = (r.attempts or 0) + 1
+    if passed and not r.passed:
+        r.passed, r.passed_at = True, datetime.datetime.utcnow()
+    for s in db.execute(select(LabSession).where(LabSession.id == running[0])).scalars():
+        s.last_active_at = datetime.datetime.now()
+    db.commit()
+    return {"passed": passed, "attempts": r.attempts, "points": e.points if passed else 0}
+
+
+@router.get("/trainer/labs/exercises")
+def exercise_progress(current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    """How many of the trainer's students passed each exercise (counts only)."""
+    from sqlalchemy import func
+    from models.schema import LabExercise, LabExerciseResult
+    students = _trainer_students(db, current_user)
+    exs = db.execute(select(LabExercise, VirtualLabItem.name).join(VirtualLabItem, VirtualLabItem.id == LabExercise.lab_id)
+                     .where(LabExercise.college_id == current_user.college_id).order_by(VirtualLabItem.name, LabExercise.position)).all()
+    counts = {}
+    for ex_id, passed, n in db.execute(select(LabExerciseResult.exercise_id, LabExerciseResult.passed, func.count(LabExerciseResult.id))
+                                       .where(LabExerciseResult.student_id.in_(list(students) or ["_"]))
+                                       .group_by(LabExerciseResult.exercise_id, LabExerciseResult.passed)).all():
+        counts.setdefault(ex_id, {"passed": 0, "tried": 0})
+        counts[ex_id]["tried"] += n
+        if passed:
+            counts[ex_id]["passed"] += n
+    return {"students": len(students), "exercises": [
+        {"id": e.id, "lab": lab, "title": e.title_en, "passed": counts.get(e.id, {}).get("passed", 0),
+         "tried": counts.get(e.id, {}).get("tried", 0)} for e, lab in exs]}
+
+
+# ------------------------------------------------------------------ S13: metering job
+
+@router.post("/admin/jobs/labs/meter")
+def run_meter(current_user: TokenPayload = Depends(require_role(["college_admin", "super_admin"])), db: Session = Depends(get_db)):
+    from services.lab_metering import meter
+    out = meter(db)
+    db.commit()
+    return out
+
+
+# ------------------------------------------------------------------ S13: spectate links on the class page
+
+class SpectateIn(BaseModel):
+    url: str = Field(min_length=10, max_length=512)
+    label: Optional[str] = Field(default=None, max_length=128)
+
+
+def spectate_allowed(url: str) -> bool:
+    from urllib.parse import urlparse
+    from core.config import settings
+    u = urlparse(url)
+    hosts = {h.strip().lower() for h in (settings.SPECTATE_ALLOWED_HOSTS or "").split(",") if h.strip()}
+    for base in (settings.JUPYTERHUB_PUBLIC_URL, settings.JUPYTERHUB_URL):
+        if base:
+            hosts.add((urlparse(base).hostname or "").lower())
+    host = (u.hostname or "").lower()
+    if settings.ENVIRONMENT.lower() != "production" and host in ("localhost", "127.0.0.1"):
+        return u.scheme in ("http", "https")
+    return u.scheme == "https" and host in hosts
+
+
+@router.put("/trainer/sessions/{session_id}/spectate")
+def set_spectate(session_id: str, req: SpectateIn, current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    """Post a read-only spectate link (e.g. a JupyterHub share of the trainer's lab) for students in this class."""
+    from urllib.parse import urlparse
+    from routers.live import _session_for_user
+    s = _session_for_user(session_id, current_user, db)
+    url = req.url.strip()
+    if not spectate_allowed(url):
+        raise HTTPException(status_code=422, detail="Use an https link on the lab hub (or a host your admin allowed)")
+    s.spectate_url, s.spectate_label = url, (req.label or "").strip() or None
+    record_audit(db, current_user, "class.spectate_posted", "session", s.id, {"host": urlparse(url).hostname})
+    db.commit()
+    return {"session_id": s.id, "spectate_url": s.spectate_url, "spectate_label": s.spectate_label}
+
+
+@router.delete("/trainer/sessions/{session_id}/spectate")
+def clear_spectate(session_id: str, current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    from routers.live import _session_for_user
+    s = _session_for_user(session_id, current_user, db)
+    s.spectate_url = s.spectate_label = None
+    db.commit()
+    return {"session_id": s.id, "spectate_url": None}

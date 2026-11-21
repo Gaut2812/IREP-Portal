@@ -52,6 +52,8 @@ pnpm install --frozen-lockfile   # apps/web/pnpm-lock.yaml is the lockfile CI us
 pnpm exec tsc --noEmit
 pnpm build
 pnpm exec playwright test        # starts API and web unless already running; re-seed first
+# if `next dev` already holds :3000, test the production build elsewhere: pnpm exec next start -p 3100, then
+# PLAYWRIGHT_TEST_BASE_URL=http://localhost:3100 pnpm exec playwright test
 pnpm exec playwright test -c playwright.keycloak.config.ts   # Keycloak sign-in; stop other APIs on :8000 first
 ```
 
@@ -125,5 +127,5 @@ Changes to auth, messaging policy, Microsoft Graph, labs, Judge0, migrations tha
 - Readiness v1 (L34): `services/readiness.run_nightly` (Celery beat 01:30 IST, or `POST /admin/jobs/readiness`) recomputes attendance from `session_attendance` (Excused left out), snapshots once a day with a monthly delta, then runs the at-risk rules. Parent calls (L31) in quiet hours wait in the outbox (`at_risk.parent_call`).
 - Not built yet (S1 plan): Keycloak SMS OTP for parents (pilot). Specs: `docs/screens/NN-*.md` before building a screen.
 - Study Buddy (25): `STUDY_BUDDY_ADAPTER=fake` (dev) or `anthropic` (Claude; production requires it; install `anthropic` on that server, it is not in requirements.txt yet). Redacts emails and phones; trainers see counts only (L21).
-- Labs track (docs/labs/README.md): browser labs (PGlite, Pyodide) with signed beacons; server labs via `LAB_ADAPTER=jupyterhub` (outbox `lab.start`/`lab.stop`, production refuses others); trainer lab board `/trainer/labs`. `infra/labs` (JupyterHub + DockerSpawner, profiles incl. Sysbox-only docker-k8s) and `infra/cyber-range` (own node; portal uses `CYBER_RANGE_HUB_URL` only) are written but not deployed: need review and dedicated nodes. Quotas (L36) come from the active MoU via `services/quotas.py`; `tests/test_lab_isolation.py` guards the infra hardening.
+- Labs track (docs/labs/README.md): browser labs (PGlite, Pyodide) with signed beacons; server labs via `LAB_ADAPTER=jupyterhub` (outbox `lab.start`/`lab.stop`, production refuses others); trainer lab board `/trainer/labs`. `infra/labs` (JupyterHub + DockerSpawner, profiles incl. Sysbox-only docker-k8s) and `infra/cyber-range` (own node; portal uses `CYBER_RANGE_HUB_URL` only) are written but not deployed: need review and dedicated nodes. Metering: cAdvisor via `LAB_METER_URL` (`services/lab_metering.py`); exercise checkers keep answers server-side; class spectate links (`/trainer/sessions/{id}/spectate`). Quotas (L36) come from the active MoU via `services/quotas.py`; `tests/test_lab_isolation.py` guards the infra hardening.
 - Live classes: `LIVE_CLASS_ADAPTER=teams` (`services/teams.py`, Graph mocked in tests) creates calendar events, opens "Join in Teams" and imports attendance (email, then "IREP-<register no> Name", else trainer confirms). Not yet exercised against a real tenant: needs the M365 licence and Graph consent decisions.

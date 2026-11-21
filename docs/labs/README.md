@@ -54,6 +54,10 @@ Master Plan: "one launcher (JupyterHub) behind one FastAPI labs service". Every 
 ## Still to do on the labs track
 
 - **Done in S11/S12:** Docker & Kubernetes profile, launch storm (`loadtest/lab_storm.py`), Cyber Range node, isolation test (`tests/test_lab_isolation.py`), MoU quotas (L36).
+- **Done in S13:**
+  - **Server-lab metering:** cAdvisor in `infra/labs`. `services/lab_metering.py` runs every 5 min (Celery `irep.labs.meter`, or `POST /admin/jobs/labs/meter`) when `LAB_METER_URL` is set. It records CPU seconds and peak memory per session, and CPU use counts as activity for the idle culler.
+  - **Exercise checkers:** `lab_exercises` (3 SQL, 2 Python seeded). The page sends its latest result; the expected answer stays on the server. These are practice checks, not marks: results run in the browser, so they feed readiness only once server-side checks exist (S15). Trainers see passed and tried counts on the lab board.
+  - **Spectate links:** a trainer posts a read-only link (https, on the lab hub or `SPECTATE_ALLOWED_HOSTS`) on a class, and students see it on the live class page until the class ends.
 - **Next on the hardware:** run the storm against the real hub; a Sysbox node for Docker & K8s; the range node.
 - **S13:** cAdvisor metering for server labs, grading checkers, and spectate links on the class page.
 - **S16:** k3s readiness.

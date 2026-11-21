@@ -13,6 +13,28 @@ export const PYODIDE_BASE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const loadModule = (url: string): Promise<any> => import(/* webpackIgnore: true */ /* turbopackIgnore: true */ url);
 
+// One engine per page: React may run an effect twice (development), and two PGlite or Pyodide
+// instances starting together fail ("Cannot compile WebAssembly.Module from an already read Response").
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let pglite: Promise<any> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let pyodide: Promise<any> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPGlite(): Promise<any> {
+  pglite ??= loadModule(PGLITE_URL).then(async (mod) => {
+    const pg = new mod.PGlite();
+    await pg.waitReady;
+    return pg;
+  }).catch((e) => { pglite = null; throw e; });
+  return pglite;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPyodide(): Promise<any> {
+  pyodide ??= loadModule(`${PYODIDE_BASE}pyodide.mjs`).then((mod) => mod.loadPyodide({ indexURL: PYODIDE_BASE }))
+    .catch((e) => { pyodide = null; throw e; });
+  return pyodide;
+}
+
 type Status = "loading" | "ready" | "error";
 
 function Shell({ status, title, children }: { status: Status; title: string; children: React.ReactNode }) {
@@ -30,7 +52,7 @@ function Shell({ status, title, children }: { status: Status; title: string; chi
   );
 }
 
-export function SqlLab({ onActivity }: { onActivity: () => void }) {
+export function SqlLab({ onActivity, setup, onResult }: { onActivity: () => void; setup?: string | null; onResult?: (rows: string[][]) => void }) {
   const { t } = useLanguage();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = useRef<any>(null);
@@ -41,15 +63,14 @@ export function SqlLab({ onActivity }: { onActivity: () => void }) {
 
   useEffect(() => {
     let alive = true;
-    loadModule(PGLITE_URL)
-      .then(async (mod) => {
-        const pg = new mod.PGlite();
-        await pg.waitReady;
+    getPGlite()
+      .then(async (pg) => {
+        if (setup) await pg.exec(setup);           // exercise data (S13), safe to run again
         if (alive) { db.current = pg; setStatus("ready"); }
       })
       .catch(() => alive && setStatus("error"));
     return () => { alive = false; };
-  }, []);
+  }, [setup]);
 
   const run = async () => {
     if (!db.current) return;
@@ -58,7 +79,9 @@ export function SqlLab({ onActivity }: { onActivity: () => void }) {
     try {
       const results = await db.current.exec(sql);
       const last = [...results].reverse().find((r: { fields: { name: string }[] }) => r.fields?.length) || results[results.length - 1];
-      setOut(last ? { fields: (last.fields || []).map((f: { name: string }) => f.name), rows: (last.rows || []).map((r: Record<string, unknown>) => Object.values(r)) } : null);
+      const rows: unknown[][] = last ? (last.rows || []).map((r: Record<string, unknown>) => Object.values(r)) : [];
+      setOut(last ? { fields: (last.fields || []).map((f: { name: string }) => f.name), rows } : null);
+      onResult?.(rows.map((r) => r.map((v) => (v === null ? "NULL" : String(v)))));
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
       setOut(null);
@@ -87,21 +110,19 @@ export function SqlLab({ onActivity }: { onActivity: () => void }) {
   );
 }
 
-export function PythonLab({ onActivity }: { onActivity: () => void }) {
+export function PythonLab({ onActivity, starter, onOutput }: { onActivity: () => void; starter?: string | null; onOutput?: (text: string) => void }) {
   const { t } = useLanguage();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const py = useRef<any>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [code, setCode] = useState("marks = [82, 74, 91]\nprint('Average:', sum(marks) / len(marks))");
+  useEffect(() => { if (starter) setCode(starter); }, [starter]);
   const [out, setOut] = useState("");
 
   useEffect(() => {
     let alive = true;
-    loadModule(`${PYODIDE_BASE}pyodide.mjs`)
-      .then(async (mod) => {
-        const inst = await mod.loadPyodide({ indexURL: PYODIDE_BASE });
-        if (alive) { py.current = inst; setStatus("ready"); }
-      })
+    getPyodide()
+      .then((inst) => { if (alive) { py.current = inst; setStatus("ready"); } })
       .catch(() => alive && setStatus("error"));
     return () => { alive = false; };
   }, []);
@@ -119,6 +140,7 @@ export function PythonLab({ onActivity }: { onActivity: () => void }) {
       lines.push(e instanceof Error ? e.message : String(e));
     }
     setOut(lines.join("\n"));
+    onOutput?.(lines.join("\n"));
   };
 
   return (

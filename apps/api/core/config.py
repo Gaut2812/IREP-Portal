@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     CYBER_RANGE_PUBLIC_URL: str = os.getenv("CYBER_RANGE_PUBLIC_URL", "")
     CYBER_RANGE_API_TOKEN: str = os.getenv("CYBER_RANGE_API_TOKEN", "")
     LAB_APPROVAL_DAYS: int = int(os.getenv("LAB_APPROVAL_DAYS", "30"))                      # Cyber Range access lasts this long
+    LAB_METER_URL: str = os.getenv("LAB_METER_URL", "")                                    # cAdvisor on the lab node (S13); empty = off
+    SPECTATE_ALLOWED_HOSTS: str = os.getenv("SPECTATE_ALLOWED_HOSTS", "")                   # extra hosts for class spectate links (comma-separated)
     TRANSLATE_ADAPTER: str = os.getenv("TRANSLATE_ADAPTER", "fake")
     # Screen 25 AI Study Buddy. "fake" (dev, deterministic hints) or "anthropic" (Claude API; needs the
     # `anthropic` package and ANTHROPIC_API_KEY). Minors' data: no names or ids are sent; emails and phones are redacted.

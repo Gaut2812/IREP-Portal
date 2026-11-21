@@ -642,7 +642,13 @@
     "present_on_end": "{p} present · {a} absent",
     "teams_opened": "Your class opened in Microsoft Teams.",
     "join_in_teams": "Join in Teams",
-    "teams_attendance_note": "Attendance comes from the Teams report after class: stay for at least 75% of the session."
+    "teams_attendance_note": "Attendance comes from the Teams report after class: stay for at least 75% of the session.",
+    "spectate_default_label": "Watch the trainer's lab",
+    "spectate_readonly": "read-only",
+    "spectate_remove": "Remove link",
+    "spectate_ph": "Paste a read-only link to your lab (https, on the lab hub)",
+    "spectate_post": "Share with the class",
+    "spectate_failed": "Could not share the link. Try again."
   },
   "labs": {
     "title": "Virtual Labs",
@@ -703,7 +709,12 @@
     "server_hint": "Your workspace opens in a new tab. Keep this page open: it shows your time left and stops the lab.",
     "external_hint": "The cloud sandbox opens in a new tab. Your credits are counted while this session runs.",
     "browser_hint": "This lab runs entirely in your browser. Your work is not saved when you close the tab, so copy anything you want to keep.",
-    "fake_terminal": "this demo terminal only knows pwd, whoami, echo and clear"
+    "fake_terminal": "this demo terminal only knows pwd, whoami, echo and clear",
+    "exercises": "Exercises",
+    "check_answer": "Check my answer",
+    "check_pass": "Correct! Well done.",
+    "check_fail": "Not yet. Run your query or program again and check the result.",
+    "check_note": "Run your answer in the lab first; the latest result is what gets checked. Practice only, not marks."
   },
   "board": {
     "title": "Company Simulation · {t}",
@@ -1598,7 +1609,12 @@
     "none": "No one in your batches has a lab running.",
     "starting": "starting",
     "min": "min",
-    "stop": "Stop"
+    "stop": "Stop",
+    "exercises": "Exercise progress",
+    "students": "students",
+    "exercise": "Exercise",
+    "passed": "Passed",
+    "tried": "Tried"
   },
   "buddy": {
     "title": "AI Study Buddy",

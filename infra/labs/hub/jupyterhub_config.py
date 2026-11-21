@@ -84,6 +84,9 @@ def pre_spawn(spawner):
     else:
         spawner.extra_create_kwargs = {"user": "1000"}
     spawner.extra_host_config = host
+    # cAdvisor metering (S13) matches containers to portal sessions by this label
+    spawner.extra_create_kwargs = {**spawner.extra_create_kwargs,
+                                   "labels": {"irep.session": str((spawner.user_options or {}).get("session", ""))}}
     spawner.environment = {**spawner.environment, "IREP_LAB_PROFILE": profile,
                            "IREP_LAB_SESSION": str((spawner.user_options or {}).get("session", ""))}
 

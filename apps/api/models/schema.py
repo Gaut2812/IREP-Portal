@@ -110,6 +110,9 @@ class SessionItem(TenantModel):
     # Screens 05/06: room booking and substitutes
     room: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     substitute_trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id"), nullable=True)
+    # Labs track S13: a read-only spectate link the trainer posts for this class (e.g. a JupyterHub share)
+    spectate_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    spectate_label: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
 class SessionAttendance(TenantModel):
     __tablename__ = "session_attendance"
@@ -1276,6 +1279,39 @@ class LabSession(TenantModel):
     last_active_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
     stopped_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     stop_reason: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)   # user, expired, idle, trainer
+    # S13 metering (server labs, cAdvisor): cumulative CPU, peak memory, last sample
+    cpu_seconds: Mapped[float] = mapped_column(Float, default=0, server_default="0")
+    mem_peak_mb: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    metered_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class LabExercise(TenantModel):
+    """S13 grading checkers: a lab exercise checked against an expected result kept on the server."""
+    __tablename__ = "lab_exercises"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    lab_id: Mapped[str] = mapped_column(String(64), ForeignKey("virtual_labs.id", name="fk_exercise_lab"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=1)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    prompt_en: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    setup: Mapped[Optional[str]] = mapped_column(Text, nullable=True)          # SQL run first (sql) or starter code (python)
+    expected: Mapped[list] = mapped_column(JSON, default=list)                 # sql: rows; python: output lines. Never sent to clients
+    ordered: Mapped[bool] = mapped_column(Boolean, default=False)              # sql: row order matters
+    points: Mapped[int] = mapped_column(Integer, default=10)
+
+
+class LabExerciseResult(TenantModel):
+    __tablename__ = "lab_exercise_results"
+    __table_args__ = (UniqueConstraint("student_id", "exercise_id", name="uq_exercise_result"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_exres_student"), index=True)
+    exercise_id: Mapped[str] = mapped_column(String(64), ForeignKey("lab_exercises.id", name="fk_exres_exercise"), index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    passed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class LabApproval(TenantModel):

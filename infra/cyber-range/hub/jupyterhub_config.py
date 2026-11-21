@@ -38,6 +38,7 @@ def pre_spawn(spawner):
     profile = (spawner.user_options or {}).get("profile", "cyber-range")
     if profile != "cyber-range":
         raise ValueError("This hub only runs the Cyber Range workstation")
+    spawner.extra_create_kwargs = {"user": "1000", "labels": {"irep.session": str((spawner.user_options or {}).get("session", ""))}}
 
 
 c.Spawner.pre_spawn_hook = pre_spawn

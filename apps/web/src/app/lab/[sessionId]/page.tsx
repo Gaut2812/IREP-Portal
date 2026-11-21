@@ -10,6 +10,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { API_BASE, ApiError, fetchApi } from "@/lib/api";
 import { PythonLab, SqlLab } from "@/components/labs/BrowserLabs";
+import { Exercise, ExercisePanel } from "@/components/labs/ExercisePanel";
 import { ArrowLeft, StopCircle, AlertCircle, Terminal, Info, ExternalLink, Loader2 } from "lucide-react";
 
 interface LabSession {
@@ -24,7 +25,7 @@ function fill(template: string, vars: Record<string, string | number>) {
 
 export default function LabWorkspacePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [s, setS] = useState<LabSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<string[]>([]);
@@ -32,6 +33,14 @@ export default function LabWorkspacePage() {
   const [opening, setOpening] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const lastBeacon = useRef(0);
+  // S13 exercises (browser labs): the latest result is what "Check my answer" sends
+  const [exercises, setExercises] = useState<{ exercises: Exercise[]; score: number; max_score: number } | null>(null);
+  const [selectedEx, setSelectedEx] = useState<string | null>(null);
+  const [verdict, setVerdict] = useState<"pass" | "fail" | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [exercisesLoaded, setExercisesLoaded] = useState(false);   // mount the SQL engine once, with its setup
+  const lastRows = useRef<string[][] | null>(null);
+  const lastOutput = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +53,34 @@ export default function LabWorkspacePage() {
   }, [sessionId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadExercises = useCallback(async (labId: string) => {
+    try {
+      const r = await fetchApi<{ exercises: Exercise[]; score: number; max_score: number }>(`/student/labs/${labId}/exercises?lang=${language}`);
+      setExercises(r);
+      setSelectedEx((cur) => cur ?? r.exercises.find((e) => !e.passed)?.id ?? r.exercises[0]?.id ?? null);
+    } catch { setExercises(null); }
+    setExercisesLoaded(true);
+  }, [language]);
+  useEffect(() => { if (s?.runtime === "browser") loadExercises(s.lab_id); }, [s?.runtime, s?.lab_id, loadExercises]);
+
+  const checkAnswer = async () => {
+    if (!selectedEx || !s) return;
+    setChecking(true);
+    setVerdict(null);
+    try {
+      const body = s.browser_kit === "sql" ? { rows: lastRows.current ?? [] } : { output: lastOutput.current ?? "" };
+      const r = await fetchApi<{ passed: boolean }>(`/student/lab-exercises/${selectedEx}/check`, { method: "POST", body: JSON.stringify(body) });
+      setVerdict(r.passed ? "pass" : "fail");
+      await loadExercises(s.lab_id);
+    } catch (err) {
+      setError(err instanceof ApiError ? String(err.detail) : "error");
+    } finally {
+      setChecking(false);
+    }
+  };
+  const sqlSetup = exercises ? Array.from(new Set(exercises.exercises.map((e) => e.setup).filter(Boolean))).join(";\n") || null : null;
+  const starter = exercises?.exercises.find((e) => e.id === selectedEx)?.setup ?? null;
 
   // a server that is still starting: poll until the outbox has started it
   useEffect(() => {
@@ -146,8 +183,20 @@ export default function LabWorkspacePage() {
                 </div>
               )}
 
-              {s.status === "running" && s.runtime === "browser" && s.browser_kit === "sql" && <SqlLab onActivity={activity} />}
-              {s.status === "running" && s.runtime === "browser" && s.browser_kit === "python" && <PythonLab onActivity={activity} />}
+              {s.status === "running" && s.runtime === "browser" && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                  <div className="lg:col-span-2">
+                    {s.browser_kit === "sql" && exercisesLoaded && (
+                      <SqlLab onActivity={activity} setup={sqlSetup} onResult={(rows) => { lastRows.current = rows; setVerdict(null); }} />
+                    )}
+                    {s.browser_kit === "python" && <PythonLab onActivity={activity} starter={starter} onOutput={(o) => { lastOutput.current = o; setVerdict(null); }} />}
+                  </div>
+                  {exercises && exercises.exercises.length > 0 && (
+                    <ExercisePanel exercises={exercises.exercises} score={exercises.score} maxScore={exercises.max_score} selected={selectedEx}
+                      onSelect={(id) => { setSelectedEx(id); setVerdict(null); }} onCheck={checkAnswer} busy={checking} verdict={verdict} />
+                  )}
+                </div>
+              )}
 
               {s.status === "running" && s.runtime !== "browser" && s.provider === "fake" && (
                 <div className="bg-[#1B2236] rounded-xl border border-[#2D3748] overflow-hidden">

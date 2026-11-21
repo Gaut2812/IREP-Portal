@@ -24,6 +24,7 @@ app.conf.update(
         "drain-outbox": {"task": "irep.outbox.dispatch", "schedule": settings.OUTBOX_POLL_SECONDS},
         "teams-due-work": {"task": "irep.teams.queue_due_work", "schedule": 900.0},
         "readiness-nightly": {"task": "irep.readiness.nightly", "schedule": crontab(hour=1, minute=30)},
+        "labs-meter": {"task": "irep.labs.meter", "schedule": 300.0},
     },
 )
 
@@ -68,3 +69,15 @@ def readiness_nightly() -> dict:
             out[college_id] = run_nightly(db, college_id)
             db.commit()
     return out
+
+
+@app.task(name="irep.labs.meter", ignore_result=True)
+def labs_meter() -> dict:
+    """Every 5 min: cAdvisor sample for server labs (CPU, memory, activity). Off when LAB_METER_URL is empty."""
+    from core.database import SessionLocal
+    from services.lab_metering import meter
+
+    with SessionLocal() as db:
+        out = meter(db)
+        db.commit()
+        return out

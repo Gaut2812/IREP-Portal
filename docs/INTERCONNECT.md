@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 42, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum and templates; banks in S9), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 22, 42, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum, templates and the problem and question bank), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -42,7 +42,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L10 | 26 Student certificates | 43 Approvals | Both | External certificate proof; decision | Student uploads proof | Gap fix | planned |
 | L11 | 05 Schedule | 06 Timetable | Both | Proposed sessions; approval or clash warning | Any schedule change | Inferred | active |
 | L12 | 46 Content library | 11 My courses | One way | Curriculum, lessons, notes by semester and track | Content published | Gap fix | active |
-| L13 | 22 Assessments | 24 Coding Lab, 23 Practice tests | Both | Problems, tests, trainer notes; results back to 22 | Trainer publishes | PDF | planned |
+| L13 | 22 Assessments | 24 Coding Lab, 23 Practice tests | Both | Problems, tests, trainer notes; results back to 22 | Trainer publishes | PDF | active |
 | L14 | 30 Sprint board | 31 Code reviews | Both | Pull-request queue; review result and change requests | Pull request opened | PDF | active |
 | L15 | 32 Portfolio | 33 Parent projects | One way | Public projects, links and demo videos | Student sets visibility | Inferred | active |
 | L16 | 36 Student interviews | 37 Trainer interviews | Both | Slots, rubric scores, feedback, recording | Booking, then scoring | PDF | planned |
@@ -71,7 +71,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L34 | 24, 23, 30, 36 and attendance (09) | 12, 13, 14, 15, 19, 39 | One way | One readiness score and band shown everywhere | Nightly and on events | PDF | active |
 | L35 | All data | 19, 39, 28, 20 | One way | Aggregates only; no private trainer notes or chats | On read | PDF | active |
 | L36 | 47 Usage and billing | 29, 25, 08 | One way | Quotas for lab hours, AI calls and recording storage | Every metered use | Gap fix | planned |
-| L37 | 46 Content library | 22, 24, 44 | One way | Question bank, problem bank, notification templates | Content published | Gap fix | planned |
+| L37 | 46 Content library | 22, 24, 44 | One way | Question bank, problem bank, notification templates | Content published | Gap fix | active |
 | L38 | Every sensitive action | 48 Audit; consent records for 15 and 32 | One way | Audit trail and consent | Every sensitive action | Gap fix | active |
 | L39 | Every screen | 44 Notification centre, 49 Support | One way | Alerts in; report-a-problem out | Any alert or report | Gap fix | active |
 
@@ -108,7 +108,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **13 Trainer dashboard** (built): ↔ 12 · L02 · → 15 · L03 · ← 25 · L21 · ← L34
 - **14 At-risk students** (built): ← 25 · L21 · ← L34 · → 18, 15 · L31 parent call and alert
 - **21 Reports** (built): → 16 · L22 approved monthly card. *Release rule: card released only after trainer approval.*
-- **22 Assessments** (S9): ↔ 24, 23 · L13 · ← 46 · L37 question and problem banks
+- **22 Assessments** (built): ↔ 24, 23 · L13 · ← 46 · L37 question and problem banks
 - **31 Code reviews** (built): ↔ 30 · L14 PR queue in, review result out
 - **35 Message Hub** (built): ↔ 18 · L19 · ↔ 34 · L18 · ↔ 41 · L20
 - **37 Mock interviews** (S15): ↔ 36 · L16 · ← 38 · L17

@@ -25,6 +25,9 @@ from schemas.coding import (
     CodingSubmissionPublic, SubmissionResultPublic
 )
 
+from services.assessments import caller_student, get_for_caller, visible_to
+from core.security import normalize_role
+
 router = APIRouter(prefix="/student", tags=["Student Screens"])
 
 # --- SCREEN 12: Student Dashboard (PDF 2) ---
@@ -211,7 +214,10 @@ def list_coding_problems(
     db: Session = Depends(get_db)
 ):
     ordered_probs = _get_ordered_problems(db, current_user.college_id)
-    
+    if normalize_role(current_user.role) == "student":           # screen 22 publishing (L13)
+        me = caller_student(db, current_user)
+        ordered_probs = [p for p in ordered_probs if visible_to(p, me)]
+
     # Query solved problems for this student
     accepted_submissions = db.execute(
         select(CodingSubmission.problem_id).filter_by(
@@ -246,9 +252,7 @@ def get_coding_problem(
     db: Session = Depends(get_db)
 ):
     # Tenant scoped query
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(
@@ -336,9 +340,7 @@ def run_code_sample(
     current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found for this tenant")
@@ -423,9 +425,7 @@ def review_student_code(
     current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found for this tenant")
@@ -445,9 +445,7 @@ def submit_code(
     current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found for this tenant")
@@ -615,9 +613,7 @@ def request_coding_hint(
     current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found")
@@ -709,17 +705,8 @@ def get_practice_test(
             name="Priya R"
         )
 
-    # Tenant-scoped test lookup
-    test = db.execute(
-        select(PracticeTest).filter_by(id=test_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
-    
-    if not test:
-        test = db.execute(select(PracticeTest).filter_by(id=test_id)).scalar_one_or_none()
-    if not test:
-        test = db.execute(select(PracticeTest).filter_by(college_id=current_user.college_id)).scalars().first()
-    if not test:
-        raise HTTPException(status_code=404, detail="Practice test not found")
+    # Tenant-scoped, and for students published to their batch (screen 22); never another college's test
+    test = get_for_caller(db, PracticeTest, test_id, current_user)
 
     questions = db.execute(
         select(PracticeQuestion)
@@ -809,9 +796,7 @@ def start_or_resume_attempt(
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
-    test = db.execute(select(PracticeTest).filter_by(id=test_id)).scalar_one_or_none()
-    if not test:
-        test = db.execute(select(PracticeTest)).first()[0]
+    test = get_for_caller(db, PracticeTest, test_id, current_user)
 
     now = datetime.datetime.utcnow()
 

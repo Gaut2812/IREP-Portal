@@ -145,6 +145,12 @@ class CodingProblem(TenantModel):
     starter_code: Mapped[str] = mapped_column(Text, default="")
     trainer_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     trainer_author: Mapped[str] = mapped_column(String(128), default="Arun K.")
+    # Screen 22 (L13): published to batches (None = every batch); the platform tenant holds the IREP bank (L37)
+    status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)  # draft, published
+    batch_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    due_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # bank item it was imported from
 
     # Relationships
     test_cases: Mapped[List["TestCase"]] = relationship(
@@ -241,6 +247,12 @@ class PracticeTest(TenantModel):
     duration_min: Mapped[int] = mapped_column(Integer, default=30)
     total_questions: Mapped[int] = mapped_column(Integer, default=30)
     sections_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Screen 22 (L13): published to batches (None = every batch); the platform tenant holds the IREP bank (L37)
+    status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)  # draft, published
+    batch_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    due_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # bank item it was imported from
 
 class PracticeQuestion(TenantModel):
     __tablename__ = "practice_questions"

@@ -2,7 +2,7 @@
 
 **Sprint:** S6. **Status:** 46 is new (gap fix); 11 is feature-only.
 **Routes:** `/admin/content` (46), `/student/courses` and `/student/courses/{id}` (11).
-**Flow:** "Content publishing" (steps 1, 2, 6, 7). The question and problem banks for 22 and 24 (L37's other half) come with Assessments in S9.
+**Flow:** "Content publishing" (steps 1, 2, 6, 7). The question and problem banks (L37's other half) arrived with Assessments in S9.
 
 ## Links
 
@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | L12 | 46 → 11 | Curriculum, lessons and notes by semester and track, when published | active |
 | L33 | 11 → 12 | Course progress feeds the dashboard skill bars | active |
-| L37 | 46 → 44 | Tamil and English notification templates | active for templates. 46 → 22/24 banks are planned (S9), so the link row stays `planned` until then |
+| L37 | 46 → 22, 24, 44 | Notification templates (S6); problem and question bank (S9, see docs/screens/22-assessments.md) | active |
 
 ## Ownership and tenancy
 

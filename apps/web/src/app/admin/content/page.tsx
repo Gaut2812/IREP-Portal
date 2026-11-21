@@ -7,6 +7,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
 import { BookPlus, FileText, Send } from "lucide-react";
+import { BankPanel } from "@/components/admin/BankPanel";
 
 interface CourseRow { id: string; title_en: string; title_ta: string | null; track: string; semester: number; skill_key: string; status: string; lessons: number }
 interface LessonRow { id: string; position: number; title_en: string; title_ta: string | null; body_en: string; body_ta: string | null; duration_min: number }
@@ -14,7 +15,7 @@ interface Template { key: string; title_en: string; title_ta: string | null; bod
 
 export default function ContentLibraryPage() {
   const { t } = useLanguage();
-  const [tab, setTab] = useState<"courses" | "templates">("courses");
+  const [tab, setTab] = useState<"courses" | "templates" | "bank">("courses");
   const [courses, setCourses] = useState<CourseRow[]>([]);
   const [skills, setSkills] = useState<string[]>([]);
   const [selected, setSelected] = useState<string>("");
@@ -101,7 +102,7 @@ export default function ContentLibraryPage() {
       <AppShell pageTitle={t("content.title")}>
         <div className="p-4 md:p-6 space-y-4 max-w-6xl">
           <div className="flex gap-2" role="tablist">
-            {(["courses", "templates"] as const).map((k) => (
+            {(["courses", "templates", "bank"] as const).map((k) => (
               <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} data-testid={`content-tab-${k}`}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold ${tab === k ? "bg-[#2B5CD0] text-white" : "border border-[#CBD5E1]"}`}>{t(`content.tab_${k}`)}</button>
             ))}
@@ -192,6 +193,8 @@ export default function ContentLibraryPage() {
               </ul>
             </div>
           )}
+
+          {tab === "bank" && <BankPanel />}
         </div>
       </AppShell>
     </RoleGuard>

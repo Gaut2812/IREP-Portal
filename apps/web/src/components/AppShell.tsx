@@ -53,7 +53,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.dashboard"), href: "/student", icon: LayoutDashboard },
     { label: t("nav.my_courses"), href: "/student/courses", icon: BookOpen },
     { label: t("nav.coding_lab"), href: "/student/coding/prob_connected_components", icon: Code2 },
-    { label: t("nav.practice_tests"), href: "/student/tests/test_service_aptitude", icon: FileCheck2 },
+    { label: t("nav.practice_tests"), href: "/student/tests", icon: FileCheck2 },
     { label: t("nav.virtual_labs"), href: "/student/labs", icon: Cpu },
     { label: t("nav.sprint_board"), href: "/student/projects/board", icon: KanbanSquare },
     { label: t("nav.mock_interviews"), href: "/student/interviews", icon: Video },

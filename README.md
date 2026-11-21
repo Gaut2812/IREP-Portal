@@ -91,7 +91,8 @@ Sign-in rules:
 | 19 | College dashboard | `/college` |
 | 20 | MoU reports (college; aggregates and MoU terms) | `/college/reports` |
 | 21 | Monthly reports (trainer; approve and release cards) | `/trainer/reports` |
-| 23 | Practice test | `/student/tests/{id}` |
+| 22 | Assessments (trainer; publish problems and tests to batches, results, IREP bank) | `/trainer/assessments` |
+| 23 | Practice tests (published to my batch) | `/student/tests`, `/student/tests/{id}` |
 | 24 | Coding lab | `/student/coding/{problemId}` |
 | 29 | Virtual labs | `/student/labs` |
 | 30 | Sprint board | `/student/projects/{teamId}/board` |

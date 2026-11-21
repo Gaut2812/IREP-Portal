@@ -50,7 +50,11 @@ def test_pilot_configuration_passes_with_demo_adapters_outside_the_pilot():
 
 
 def test_development_defaults_are_refused_in_production():
-    found = "\n".join(problems(settings.model_copy(update={"ENVIRONMENT": "production"})))
+    dev = {"ENVIRONMENT": "production", "AUTH_PROVIDER": "local", "DATABASE_URL": "sqlite:///irep.db",
+           "PUBLIC_BASE_URL": "http://localhost:3000", "NOTIFY_ADAPTER": "fake", "SMTP_HOST": "",
+           "OUTBOX_RUNNER": "thread", "JWT_SECRET_KEY": "irep_super_secret_jwt_key_2026_antigravity",
+           "GITHUB_WEBHOOK_SECRET": "dev_github_webhook_secret"}      # same on SQLite and the PostgreSQL CI job
+    found = "\n".join(problems(settings.model_copy(update=dev)))
     for needle in ("AUTH_PROVIDER must be keycloak", "JWT_SECRET_KEY", "PUBLIC_BASE_URL", "PostgreSQL",
                    "NOTIFY_ADAPTER must be live", "SMTP_HOST", "OUTBOX_RUNNER", "GITHUB_WEBHOOK_SECRET"):
         assert needle in found, needle

@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
-from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent
+from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent, college_structure
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,6 +65,7 @@ app.include_router(discussions.router, prefix=settings.API_V1_PREFIX)
 app.include_router(messages_hub.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin_colleges.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit_consent.router, prefix=settings.API_V1_PREFIX)
+app.include_router(college_structure.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():

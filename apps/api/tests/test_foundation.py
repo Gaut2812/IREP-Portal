@@ -150,7 +150,8 @@ def test_cohort_matches_mockup_figures():
     try:
         assert db.execute(select(func.count(Student.id)).filter_by(college_id="col_demo_001")).scalar_one() == 612
         per_branch = dict(db.execute(
-            select(Branch.name, func.count(Student.id)).join(Student, Student.branch_id == Branch.id).group_by(Branch.name)
+            select(Branch.name, func.count(Student.id)).join(Student, Student.branch_id == Branch.id)
+            .where(Branch.college_id == "col_demo_001").group_by(Branch.name)
         ).all())
         assert per_branch == {"CSE": 228, "IT": 164, "AI & DS": 142, "Cybersecurity": 78}
         arun = db.execute(

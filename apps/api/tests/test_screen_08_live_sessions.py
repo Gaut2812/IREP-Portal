@@ -99,6 +99,13 @@ def test_reminder_is_idempotent_and_notifies():
     db = SessionLocal()
     try:
         db.execute(delete(SessionReminder).where(SessionReminder.user_id == "usr_priya_01", SessionReminder.session_id == "sess_sat_track_project"))
+        # the demo week is Mon-Sat of the current week: on a Saturday after 10:00 this
+        # session has started, so make sure it is in the future for this test
+        sat = db.get(SessionItem, "sess_sat_track_project")
+        original = (sat.scheduled_start, sat.scheduled_end)
+        if sat.scheduled_start <= datetime.datetime.now() + datetime.timedelta(minutes=30):
+            sat.scheduled_start = datetime.datetime.now().replace(second=0, microsecond=0) + datetime.timedelta(hours=1)
+            sat.scheduled_end = sat.scheduled_start + datetime.timedelta(minutes=180)
         db.commit()
         before = db.execute(select(func.count(Notification.id)).filter_by(user_id="usr_priya_01", kind="reminder")).scalar_one()
     finally:
@@ -115,6 +122,13 @@ def test_reminder_is_idempotent_and_notifies():
         db.close()
     d = client.get("/api/v1/student/live", headers=PRIYA).json()
     assert next(r for r in d["week_sessions"] if r["id"] == "sess_sat_track_project")["reminder_set"] is True
+    db = SessionLocal()
+    try:
+        sat = db.get(SessionItem, "sess_sat_track_project")
+        sat.scheduled_start, sat.scheduled_end = original
+        db.commit()
+    finally:
+        db.close()
 
 
 def test_signed_recording_url():

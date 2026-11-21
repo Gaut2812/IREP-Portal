@@ -81,6 +81,10 @@ def list_at_risk_flags(
             "parent_notified": f.parent_notified, "flagged_on": f.flagged_on.isoformat() if f.flagged_on else None,
         }
     rows = [row(f) for f in flags]
+    from services.study_buddy import calls_by_student
+    ai = calls_by_student(db, {f.student_id for f in flags}, days=7)          # L21
+    for r in rows:
+        r["ai_calls_7d"] = ai.get(r["student_id"], 0)
     summary = {"open": sum(1 for f in flags if f.status != "resolved"),
                "high": sum(1 for f in flags if f.status != "resolved" and f.severity == "high"),
                "parents_alerted": sum(1 for f in flags if f.parent_notified)}

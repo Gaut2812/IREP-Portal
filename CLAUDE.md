@@ -116,12 +116,13 @@ Changes to auth, messaging policy, Microsoft Graph, labs, Judge0, migrations tha
 
 ## Current state (keep this short and true)
 
-- Built: 01, 02, 03, 04, 05, 06, 07, 09, 10, 43, 08, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 42, 44, 45, 46, 48, 49 (IREP staff: `staff@irep.demo`, role `irep_admin`, web role `admin`).
+- Built: 01, 02, 03, 04, 05, 06, 07, 09, 10, 43, 08, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 29, 30, 31, 32, 33, 34, 35, 36, 42, 44, 45, 46, 48, 49 (IREP staff: `staff@irep.demo`, role `irep_admin`, web role `admin`).
 - Done in S1: outbox, workers, migrations baseline, link gate, Keycloak (realm, roles, tenancy claims, web PKCE sign-in).
 - Consent gate: parent-facing overview (15) needs a granted `parent_data_processing` consent (`services/consent.py`); seed grants it for demo pairs. Files go through `services/storage.py` (local dir in dev).
 - Roles: `placement_officer` uses the college UI (sign-in card "College"). Deactivated accounts cannot sign in; tokens already issued stay valid until expiry (known gap, see docs/screens/02).
 - `packages/api-client`: generated types; after any route or model change run `cd packages/api-client && npm run generate` (CI fails if stale). Web imports them type-only: `import type { RequestBody } from "@irep/api-client"`.
 - Readiness v1 (L34): `services/readiness.run_nightly` (Celery beat 01:30 IST, or `POST /admin/jobs/readiness`) recomputes attendance from `session_attendance` (Excused left out), snapshots once a day with a monthly delta, then runs the at-risk rules. Parent calls (L31) in quiet hours wait in the outbox (`at_risk.parent_call`).
 - Not built yet (S1 plan): Keycloak SMS OTP for parents (pilot). Specs: `docs/screens/NN-*.md` before building a screen.
+- Study Buddy (25): `STUDY_BUDDY_ADAPTER=fake` (dev) or `anthropic` (Claude; production requires it; install `anthropic` on that server, it is not in requirements.txt yet). Redacts emails and phones; trainers see counts only (L21).
 - Labs track (docs/labs/README.md): browser labs (PGlite, Pyodide) with signed beacons; server labs via `LAB_ADAPTER=jupyterhub` (outbox `lab.start`/`lab.stop`, production refuses others); trainer lab board `/trainer/labs`. `infra/labs` (JupyterHub + DockerSpawner, profiles) is written but not deployed: needs review and a dedicated lab node.
 - Live classes: `LIVE_CLASS_ADAPTER=teams` (`services/teams.py`, Graph mocked in tests) creates calendar events, opens "Join in Teams" and imports attendance (email, then "IREP-<register no> Name", else trainer confirms). Not yet exercised against a real tenant: needs the M365 licence and Graph consent decisions.

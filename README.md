@@ -94,6 +94,7 @@ Sign-in rules:
 | 22 | Assessments (trainer; publish problems and tests to batches, results, IREP bank) | `/trainer/assessments` |
 | 23 | Practice tests (published to my batch) | `/student/tests`, `/student/tests/{id}` |
 | 24 | Coding lab | `/student/coding/{problemId}` |
+| 25 | AI Study Buddy (student; hints, daily cap, Tamil) | `/student/buddy` |
 | 29 | Virtual labs | `/student/labs` |
 | 30 | Sprint board | `/student/projects/{teamId}/board` |
 | 34 | Discussion groups | `/student/discussions` |
@@ -101,6 +102,7 @@ Sign-in rules:
 | 36 | Mock interviews | `/student/interviews` |
 | 44 | Notification centre (every role; delivery preferences) | `/notifications` |
 | 43 | Approvals (trainer; leave and Cyber Range access) | `/trainer/approvals` |
+| 34+ | Moderation words (college; block or flag) | `/college/moderation` |
 | 42 | Events (college; invitations, RSVP counts, placement posts) | `/college/events` |
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
 | 46 | Content library and notification templates (IREP staff) | `/admin/content` |

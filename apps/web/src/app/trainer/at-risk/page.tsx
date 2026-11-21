@@ -10,7 +10,7 @@ import { AlertTriangle, CheckCircle2, Phone } from "lucide-react";
 
 interface Flag {
   id: string; student_id: string; name: string; score: number | null; band: string | null; attendance_pct: number | null; batch: string | null;
-  issue: string; severity: string; status: string; suggested_action: string; action_label: string; parent_notified: boolean; flagged_on: string | null;
+  issue: string; severity: string; status: string; suggested_action: string; action_label: string; parent_notified: boolean; flagged_on: string | null; ai_calls_7d?: number;
 }
 interface History { actions: { type: string; note: string | null; by: string | null; at: string | null }[] }
 
@@ -100,7 +100,7 @@ export default function AtRiskPage() {
                     <AlertTriangle className={`w-4 h-4 shrink-0 ${f.severity === "high" ? "text-[#DC2626]" : "text-[#D97706]"}`} />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-bold text-[#0F1F3A] truncate">{f.name}</div>
-                      <div className="text-[11px] text-[#64748B]">{f.issue} · {t("at_risk.score")} {f.score ?? "—"} · {t("at_risk.attendance")} {f.attendance_pct ?? "—"}%{f.batch ? ` · ${f.batch}` : ""}</div>
+                      <div className="text-[11px] text-[#64748B]">{f.issue} · {t("at_risk.score")} {f.score ?? "—"} · {t("at_risk.attendance")} {f.attendance_pct ?? "—"}%{f.batch ? ` · ${f.batch}` : ""}{` · ${t("at_risk.ai_calls")} ${f.ai_calls_7d ?? 0}`}</div>
                     </div>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sev[f.severity] || sev.low}`}>{t(`at_risk.sev_${f.severity}`)}</span>
                     {f.parent_notified && <Phone className="w-3.5 h-3.5 text-[#2BB3A0]" aria-label={t("at_risk.parent_alerted")} />}

@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     JUPYTERHUB_PUBLIC_URL: str = os.getenv("JUPYTERHUB_PUBLIC_URL", "")                    # as students' browsers reach it
     JUPYTERHUB_API_TOKEN: str = os.getenv("JUPYTERHUB_API_TOKEN", "")                      # the hub's "irep-labs" service token
     TRANSLATE_ADAPTER: str = os.getenv("TRANSLATE_ADAPTER", "fake")
+    # Screen 25 AI Study Buddy. "fake" (dev, deterministic hints) or "anthropic" (Claude API; needs the
+    # `anthropic` package and ANTHROPIC_API_KEY). Minors' data: no names or ids are sent; emails and phones are redacted.
+    STUDY_BUDDY_ADAPTER: str = os.getenv("STUDY_BUDDY_ADAPTER", "fake")
+    STUDY_BUDDY_MODEL: str = os.getenv("STUDY_BUDDY_MODEL", "claude-opus-5-5")
     TRANSLATE_URL: str = os.getenv("TRANSLATE_URL", "http://localhost:5000")
     GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "dev_github_webhook_secret")
     

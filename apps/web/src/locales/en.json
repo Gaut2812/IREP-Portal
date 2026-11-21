@@ -87,7 +87,8 @@
     "support_desk": "Support desk",
     "checkin": "Class check-in",
     "approvals": "Approvals",
-    "lab_board": "Lab board"
+    "lab_board": "Lab board",
+    "moderation": "Moderation"
   },
   "student": {
     "readiness_score": "Readiness score",
@@ -1438,7 +1439,8 @@
     "act_extra_saturday": "Extra Saturday",
     "act_mentor": "Mentor",
     "act_note": "Note",
-    "act_resolve": "Resolved"
+    "act_resolve": "Resolved",
+    "ai_calls": "AI questions (7 days)"
   },
   "reports": {
     "trainer_title": "Monthly reports",
@@ -1595,5 +1597,33 @@
     "starting": "starting",
     "min": "min",
     "stop": "Stop"
+  },
+  "buddy": {
+    "title": "AI Study Buddy",
+    "load_failed": "Could not load Study Buddy. Try again.",
+    "ask_failed": "Could not get an answer. Try again.",
+    "privacy": "Don't share personal details. Your trainer sees how often you use this, not what you ask.",
+    "left_today": "questions left today",
+    "locked": "Study Buddy is paused while your practice test is running.",
+    "empty": "Ask about a concept, an error you are stuck on, or how to start a problem. You get hints, not finished answers.",
+    "thinking": "Thinking…",
+    "topic_ph": "Topic (optional), e.g. Arrays or SQL joins",
+    "ask_ph": "Ask in English or Tamil…",
+    "send": "Send",
+    "disclaimer": "AI can be wrong. Check with your trainer before you rely on an answer.",
+    "clear": "Clear my chat"
+  },
+  "mod": {
+    "title": "Moderation words",
+    "load_failed": "Could not load the list. Try again.",
+    "help": "Add words for your college's student groups. Block refuses the post. Flag lets it through and sends it to the trainers' moderation queue. Phone numbers, emails and links to other chat apps are always refused.",
+    "term_ph": "Word or phrase",
+    "action": "What happens",
+    "flag": "Flag for review",
+    "block": "Block",
+    "add": "Add",
+    "remove": "Remove",
+    "none": "No college words yet. The platform rules still apply.",
+    "err_term": "Enter a word (at least 2 characters)."
   }
 }

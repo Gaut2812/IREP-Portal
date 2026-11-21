@@ -48,6 +48,13 @@ def seed_screen22(db, college_id: str = "col_demo_001") -> None:
     tests = [t for t in db.execute(select(PracticeTest.id)).scalars() if GENERATED.match(t)]
     _purge(db, probs, tests)
     db.execute(delete(Notification).where(Notification.kind == "assessment"))
+    # screen 23 hygiene: attempts left by tests or demos (the seeded demo attempt stays)
+    stray = list(db.execute(select(TestAttempt.id).where(TestAttempt.id != "att_demo_priya")).scalars())
+    if stray:
+        db.execute(delete(AttemptAnswer).where(AttemptAnswer.attempt_id.in_(stray)))
+        db.execute(delete(ProctorEvent).where(ProctorEvent.attempt_id.in_(stray)))
+        db.execute(delete(TopicScore).where(TopicScore.attempt_id.in_(stray)))
+        db.execute(delete(TestAttempt).where(TestAttempt.id.in_(stray)))
     for model in (CodingProblem, PracticeTest):
         for item in db.execute(select(model).where(model.college_id == college_id)).scalars():
             item.status, item.batch_ids, item.due_at = "published", None, None

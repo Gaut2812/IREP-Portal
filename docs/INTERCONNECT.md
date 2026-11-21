@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 22, 42, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum, templates and the problem and question bank), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 22, 25 (cap from the MoU until 47), 42, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum, templates and the problem and question bank), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -50,7 +50,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L18 | 34 Discussions | 35 Messages | Both | Reports to the moderation queue; remove or keep back | One-tap report | PDF | active |
 | L19 | 35 Messages | 18 Message trainer | Both | One-to-one chat, translation, 24-hour reply promise | Message sent | PDF | active |
 | L20 | 35 Messages | 41 College messages | Both | Trainer and coordinator chat | Message sent | PDF, Gap fix | planned |
-| L21 | 25 Study Buddy | 14 At-risk, 13 Trainer dashboard | One way | AI usage counts for each student | Every AI call | PDF | planned |
+| L21 | 25 Study Buddy | 14 At-risk, 13 Trainer dashboard | One way | AI usage counts for each student | Every AI call | PDF | active |
 | L22 | 21 Reports | 16 Parent progress reports | One way | Approved monthly card and PDF | Trainer approves | PDF, plan | active |
 | L23 | 47 Usage and billing | 20 MoU reports | One way | Usage figures included in reports | Monthly | Gap fix | planned |
 | L24 | 04 Batches | 03 Branches and batches | Both | Structure and student lists down; roster changes up | Import, semester promotion | Inferred | active |
@@ -91,7 +91,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **12 Student dashboard** (built): ← 01 · L01 · ↔ 13 · L02 · ← L34 readiness · ← 42 · L29 upcoming · ← 11 · L33
 - **23 Practice tests** (built): ← 22 · L13 tests down, results back · → L34 readiness input
 - **24 Coding Lab** (built): ← 22 · L13 problems and trainer notes · ← 46 · L37 problem bank · → L34 readiness input
-- **25 AI Study Buddy** (after pilot): → 14, 13 · L21 AI usage counts · ← 47 · L36 AI-call quota and daily cap
+- **25 AI Study Buddy** (built, S10): → 14, 13 · L21 AI usage counts · ← 47 · L36 AI-call quota and daily cap
 - **26 Certificates** (S11): ↔ 43 · L10 proof up, decision down · → 27 · L32 · → 28 · L35 counts and proof status only. *Release rule: verified only after trainer approval.*
 - **29 Virtual labs** (built): ↔ 43 · L08 Cyber Range access · ← 47 · L36 lab-hour quota
 - **30 Sprint board** (built): ↔ 31 · L14 · → L34 readiness input

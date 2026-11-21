@@ -15,7 +15,7 @@ from models.schema import (
     Student, ParentStudent, BatchTrainer, Trainer,
 )
 from services.chat_policy import can_message
-from services.moderation import contains_blocked
+from services.moderation import REASONS as MOD_REASONS, check_text
 from services.notifications import notify_user
 from services.realtime import hub, publish_sync
 from services.audit import record_audit
@@ -156,8 +156,15 @@ def post_message(group_id: str, req: MessageIn, current_user: TokenPayload = Dep
         raise HTTPException(status_code=403, detail="This is an announcement-only group. Students can read and react.")
     if m.muted_until and m.muted_until > now:
         raise HTTPException(status_code=403, detail="A moderator has muted you in this group for now.")
-    if contains_blocked(req.message_text) or (req.code_snippet and contains_blocked(req.code_snippet)):
-        raise HTTPException(status_code=422, detail="Please rephrase: the message breaks the group rules (no insults, no graded-test answers).")
+    verdict = check_text(db, g.college_id, req.message_text) or (check_text(db, g.college_id, req.code_snippet) if req.code_snippet else None)
+    if verdict and verdict[0] == "block":
+        raise HTTPException(status_code=422, detail=MOD_REASONS[verdict[1]])
+    # flood control: the same text three times in two minutes
+    recent_same = db.execute(select(func.count(GroupMessage.id)).where(
+        GroupMessage.group_id == g.id, GroupMessage.sender_user_id == current_user.sub,
+        GroupMessage.message_text == req.message_text.strip(), GroupMessage.created_at >= now - datetime.timedelta(minutes=2))).scalar_one()
+    if recent_same >= 2:
+        raise HTTPException(status_code=429, detail="You already posted that. Wait for replies before posting it again.")
     user = db.execute(select(User).filter_by(id=current_user.sub)).scalar_one()
     role = "Trainer" if normalize_role(current_user.role) == "trainer" else "Student"
     msg = GroupMessage(id=f"msg_{uuid.uuid4().hex[:16]}", college_id=g.college_id, group_id=g.id, sender_user_id=user.id,
@@ -166,6 +173,12 @@ def post_message(group_id: str, req: MessageIn, current_user: TokenPayload = Dep
                        reactions_count=0)
     db.add(msg)
     m.last_read_at = m.last_seen_at = now
+    if verdict and verdict[0] == "flag":          # posted, and queued for the moderators (L18)
+        db.flush()
+        db.add(MessageReport(id=f"rep_{uuid.uuid4().hex[:14]}", college_id=g.college_id, message_id=msg.id, group_id=g.id,
+                             reporter_user_id="system", reason=f"Auto-flag: '{verdict[1]}'", status="open"))
+        for uid in db.execute(select(GroupMember.user_id).filter_by(group_id=g.id, role="moderator")).scalars().all():
+            notify_user(db, uid, f"Message flagged in {g.name}", f"Contains '{verdict[1]}'", kind="approval", link="/trainer/messages", college_id=g.college_id)
     db.commit()
     publish_sync(f"group:{g.id}", {"type": "message", "group_id": g.id, "message_id": msg.id})
     return {"success": True, "message_id": msg.id}
@@ -301,3 +314,44 @@ async def group_socket(websocket: WebSocket, group_id: str, token: Optional[str]
         pass
     finally:
         await hub.unsubscribe(channel, websocket)
+
+
+# ---------------------------------------------------------------- screen 34 (S10): the college's own terms
+
+class TermIn(BaseModel):
+    term: str = Field(min_length=2, max_length=64)
+    action: str = "flag"
+
+
+@router.get("/college/moderation/terms")
+def list_terms(current_user: TokenPayload = Depends(require_role(["college_admin"])), db: Session = Depends(get_db)):
+    from models.schema import ModerationTerm
+    rows = db.execute(select(ModerationTerm).where(ModerationTerm.college_id == current_user.college_id).order_by(ModerationTerm.term)).scalars().all()
+    return {"terms": [{"id": t.id, "term": t.term, "action": t.action} for t in rows]}
+
+
+@router.post("/college/moderation/terms", status_code=201)
+def add_term(req: TermIn, current_user: TokenPayload = Depends(require_role(["college_admin"])), db: Session = Depends(get_db)):
+    from models.schema import ModerationTerm
+    if req.action not in ("block", "flag"):
+        raise HTTPException(status_code=422, detail="action must be block or flag")
+    term = req.term.strip().lower()
+    if db.execute(select(ModerationTerm.id).where(ModerationTerm.college_id == current_user.college_id, ModerationTerm.term == term)).first():
+        raise HTTPException(status_code=409, detail="That term is already on the list")
+    t = ModerationTerm(id=f"mt_{uuid.uuid4().hex[:14]}", college_id=current_user.college_id, term=term, action=req.action, created_by=current_user.sub)
+    db.add(t)
+    record_audit(db, current_user, "moderation.term_added", "moderation_term", t.id, {"term": term, "action": req.action})
+    db.commit()
+    return {"id": t.id, "term": t.term, "action": t.action}
+
+
+@router.delete("/college/moderation/terms/{term_id}")
+def delete_term(term_id: str, current_user: TokenPayload = Depends(require_role(["college_admin"])), db: Session = Depends(get_db)):
+    from models.schema import ModerationTerm
+    t = db.execute(select(ModerationTerm).where(ModerationTerm.id == term_id, ModerationTerm.college_id == current_user.college_id)).scalar_one_or_none()
+    if t is None:
+        raise HTTPException(status_code=404, detail="Term not found")
+    db.delete(t)
+    record_audit(db, current_user, "moderation.term_removed", "moderation_term", term_id, {"term": t.term})
+    db.commit()
+    return {"deleted": term_id}

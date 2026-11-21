@@ -154,6 +154,7 @@ def build_trainer_dashboard(db: Session, trainer: Trainer, current_user: TokenPa
         "batch_readiness": batch_readiness,
         "today_schedule": {"date": sched_day.isoformat(), "label": sched_day.strftime("%a, %b %d"), "is_today": sched_day == today, "items": schedule},
         "students_needing_support": support_rows[:8],
+        "ai_usage": _ai_usage(db, batch_ids),                                   # L21: counts only, never chat content
         "thresholds": {"score_below": rules.score_below, "attendance_below": rules.attendance_below},
         "quick_actions": [
             {"key": "mark_attendance", "href": "/trainer/attendance", "variant": "blue"},
@@ -164,3 +165,14 @@ def build_trainer_dashboard(db: Session, trainer: Trainer, current_user: TokenPa
             {"key": "monthly_report", "href": "/trainer/reports", "variant": "teal"},
         ],
     }
+
+
+def _ai_usage(db: Session, batch_ids) -> dict:
+    """L21: Study Buddy calls in the last 7 days for the trainer's students (counts only)."""
+    from services.study_buddy import calls_by_student
+    rows = db.execute(select(Student.id, User.name).join(User, User.id == Student.user_id).where(Student.batch_id.in_(batch_ids))).all()
+    names = dict(rows)
+    counts = calls_by_student(db, names.keys(), days=7)
+    top = sorted(counts.items(), key=lambda kv: -kv[1])[:5]
+    return {"calls_7d": int(sum(counts.values())), "students_using": len(counts),
+            "top": [{"student_id": sid, "name": names.get(sid), "calls": n} for sid, n in top]}

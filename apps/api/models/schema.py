@@ -1076,6 +1076,22 @@ class Rsvp(TenantModel):
 
 
 # ---------------------------------------------------------------------------
+# Screen 25: AI Study Buddy (the student's own chat; trainers see counts only, L21)
+# ---------------------------------------------------------------------------
+
+class StudyBuddyMessage(TenantModel):
+    __tablename__ = "study_buddy_messages"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_buddy_student"), index=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)                 # user, assistant
+    content: Mapped[str] = mapped_column(Text, nullable=False)                    # stored as sent to the model (redacted)
+    topic: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)       # e.g. a coding problem id
+    lang: Mapped[str] = mapped_column(String(8), default="en")
+    provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)    # fake, anthropic
+
+
+# ---------------------------------------------------------------------------
 # Screen 49: support desk (links L39 report-a-problem, L28 replies)
 # ---------------------------------------------------------------------------
 
@@ -1472,6 +1488,17 @@ class MessageReport(TenantModel):
     reporter_user_id: Mapped[str] = mapped_column(String(64), index=True)
     reason: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)   # open, kept, removed
+
+
+class ModerationTerm(TenantModel):
+    """Screen 34 (S10): a college's own words. block = the post is refused; flag = it posts and goes to the L18 queue."""
+    __tablename__ = "moderation_terms"
+    __table_args__ = (UniqueConstraint("college_id", "term", name="uq_moderation_term"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    term: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(8), default="flag")      # block, flag
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 
 class ModerationAction(TenantModel):

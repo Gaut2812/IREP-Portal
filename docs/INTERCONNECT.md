@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 22, 25, 26, 27, 28, 42, 43 (leave, Cyber Range and certificate proofs), 44, 45, 46 (curriculum, templates and the problem and question bank), 47 (usage and quotas; billing in S16), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 22, 25, 26, 27, 28, 40, 41, 42, 43 (leave, Cyber Range and certificate proofs), 44, 45, 46 (curriculum, templates and the problem and question bank), 47 (usage and quotas; billing in S16), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -49,13 +49,13 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L17 | 38 Mock drives | 37 Trainer interviews | One way | Drive rounds reuse interview slots and tests | Drive created | Inferred | planned |
 | L18 | 34 Discussions | 35 Messages | Both | Reports to the moderation queue; remove or keep back | One-tap report | PDF | active |
 | L19 | 35 Messages | 18 Message trainer | Both | One-to-one chat, translation, 24-hour reply promise | Message sent | PDF | active |
-| L20 | 35 Messages | 41 College messages | Both | Trainer and coordinator chat | Message sent | PDF, Gap fix | planned |
+| L20 | 35 Messages | 41 College messages | Both | Trainer and coordinator chat | Message sent | PDF, Gap fix | active |
 | L21 | 25 Study Buddy | 14 At-risk, 13 Trainer dashboard | One way | AI usage counts for each student | Every AI call | PDF | active |
 | L22 | 21 Reports | 16 Parent progress reports | One way | Approved monthly card and PDF | Trainer approves | PDF, plan | active |
 | L23 | 47 Usage and billing | 20 MoU reports | One way | Usage figures included in reports | Monthly | Gap fix | active |
 | L24 | 04 Batches | 03 Branches and batches | Both | Structure and student lists down; roster changes up | Import, semester promotion | Inferred | active |
 | L25 | 45 Colleges | 03 Branches and batches | One way | New college, first admin, structure import | Admin creates a college | Gap fix | active |
-| L26 | 40 Survey | 02 Settings | Both | Survey sent; responses returned | College publishes a survey | Inferred | planned |
+| L26 | 40 Survey | 02 Settings | Both | Survey sent; responses returned | College publishes a survey | Inferred | active |
 | L27 | 48 Audit | 02 Settings | Both | Data export and deletion requests; audit trail | College admin requests | Gap fix | active |
 | L28 | 49 Support | 44 Notification centre | One way | Ticket replies as notifications | Support replies | Gap fix | active |
 
@@ -64,7 +64,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | ID | From | To | Direction | What moves | Trigger | Basis | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | L29 | 42 College events | 12, 34, 38 | One way | Upcoming list, placement-update posts; a mock drive is an event type (12 and 34 built and tested; 38 in S15) | Event published | Gap fix | planned |
-| L30 | 41 College messages | 34, 15 | One way | Announcement-only posts to students and parents | Announcement posted | PDF, Gap fix | planned |
+| L30 | 41 College messages | 34, 15 | One way | Announcement-only posts to students and parents | Announcement posted | PDF, Gap fix | active |
 | L31 | 14 At-risk | 18, 15 | One way | A flag creates a parent call and alert; the parent sees it in messages and the overview | Flag action | PDF | active |
 | L32 | 26 Student certificates | 27 Parent certificates | One way | Read-only copy of earned certificates | Certificate verified | Inferred | active |
 | L33 | 11 My courses | 12 Dashboard | One way | Course progress feeds the skill bars | Lesson progress | Inferred | active |
@@ -123,7 +123,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **18 Message trainer** (built): ↔ 35 · L19 · ← 14 · L31
 - **27 Certificates** (built): ← 26 · L32 read-only
 - **33 Projects and portfolio** (built): ← 32 · L15
-- **40 Feedback survey** (S14): ↔ 02 · L26
+- **40 Feedback survey** (built): ↔ 02 · L26
 
 ### College
 
@@ -135,7 +135,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **28 Certifications** (built): ← L35 counts, proofs and vouchers as aggregates
 - **38 Mock drives** (S15): → 37 · L17 · ← 42 · L29
 - **39 Placement readiness** (S15): ← L34 · ← L35
-- **41 Messages** (S14): ↔ 35 · L20 · → 34, 15 · L30 announcement-only posts
+- **41 Messages** (built): ↔ 35 · L20 · → 34, 15 · L30 announcement-only posts
 - **42 Events** (built): ↔ 17 · L05 · → 12, 34, 38 · L29
 
 ### Admin (IREP staff)

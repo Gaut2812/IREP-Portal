@@ -106,6 +106,8 @@ Sign-in rules:
 | 44 | Notification centre (every role; delivery preferences) | `/notifications` |
 | 43 | Approvals (trainer; leave and Cyber Range access) | `/trainer/approvals` |
 | 34+ | Moderation words (college; block or flag) | `/college/moderation` |
+| 40 | Feedback survey (parent; set up by the college) | `/parent/surveys`, `/college/surveys` |
+| 41 | College messages (trainer chats, announcements at scale) | `/college/messages` |
 | 42 | Events (college; invitations, RSVP counts, placement posts) | `/college/events` |
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
 | 46 | Content library and notification templates (IREP staff) | `/admin/content` |

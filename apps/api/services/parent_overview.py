@@ -113,9 +113,16 @@ def build_parent_overview(db: Session, student: Student, child_name: str, curren
                   AtRiskFlag.student_id == student.id, AtRiskFlag.college_id == college_id, AtRiskFlag.status != "resolved",
                   AtRiskFlag.parent_notified.is_(True)).order_by(AtRiskFlag.parent_notified_at.desc())).scalars()]
 
+    from services.broadcasts import for_parent      # L30: announcements from the college and trainers
+    announcements = [{"id": b.id, "title": b.title_ta if lang == "ta" and b.title_ta else b.title,
+                      "body": b.body_ta if lang == "ta" and b.body_ta else b.body, "from": b.author_role,
+                      "at": b.created_at.date().isoformat() if b.created_at else None}
+                     for b in for_parent(db, college_id, student.batch_id)]
+
     return {
         "consent_required": False,
         "support_alerts": alerts,
+        "announcements": announcements,
         "ward": {
             "id": student.id, "name": child_name, "semester": student.semester, "branch": student.branch, "track": student.track,
             "details": f"Sem {student.semester} · {student.branch}", "batch": student.batch_name, "college": "Demo Engineering College",

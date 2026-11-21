@@ -29,6 +29,8 @@ interface Overview {
   reply_promise_hours: number;
   /** L31: open flags the trainer raised with the parent */
   support_alerts?: { id: string; issue: string; next_step: string; since: string }[];
+  /** L30: announcements from the college and trainers */
+  announcements?: { id: string; title: string; body: string; from: string; at: string | null }[];
 }
 interface Child { id: string; name: string; semester: number; branch: string; batch_name: string }
 
@@ -212,6 +214,18 @@ export default function ParentViewPage() {
                   <div className="text-[11px] text-[#9A3412] mt-1 font-semibold">{t("parent_view.support_reply")}</div>
                 </Link>
               ))}
+              {(data.announcements || []).length > 0 && (
+                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 space-y-2" data-testid="announcements">
+                  <div className="text-xs font-black text-[#0F1F3A]">{t("parent_view.announcements")}</div>
+                  {(data.announcements || []).map((an) => (
+                    <div key={an.id} className="text-xs border-t border-[#F1F5F9] pt-2 first:border-0 first:pt-0" data-testid="announcement">
+                      <div className="font-bold text-[#0F1F3A]">{an.title}</div>
+                      <div className="text-[#475569]">{an.body}</div>
+                      <div className="text-[10px] text-[#94A3B8]">{an.from === "college" ? t("parent_view.from_college") : t("parent_view.from_trainer")}{an.at ? ` · ${an.at}` : ""}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Readiness card */}
               <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-4 rounded-2xl" data-testid="readiness-card">
                 <div className="flex items-center justify-between">

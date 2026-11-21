@@ -81,6 +81,7 @@ def _load_handlers() -> None:
     import services.teams  # noqa: F401
     import services.at_risk  # noqa: F401  (at_risk.parent_call held over quiet hours)
     import services.lab_orchestrator  # noqa: F401  (lab.start, lab.stop)
+    import services.broadcasts  # noqa: F401  (broadcast.chunk)
     import routers.admin_colleges  # noqa: F401  (identity.invite_user)
     import routers.audit_consent  # noqa: F401  (data_request.build_export)
 

@@ -3883,6 +3883,224 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/college/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** College Threads */
+        get: operations["college_threads_api_v1_college_threads_get"];
+        put?: never;
+        /** Start Thread */
+        post: operations["start_thread_api_v1_college_threads_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/message-contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** College Trainers */
+        get: operations["college_trainers_api_v1_college_message_contacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Announcements */
+        get: operations["list_announcements_api_v1_college_announcements_get"];
+        put?: never;
+        /** Announce */
+        post: operations["announce_api_v1_college_announcements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/announcements/{broadcast_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Announcement */
+        get: operations["announcement_api_v1_college_announcements__broadcast_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/labs/cloud-sandbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Cloud Sandbox */
+        get: operations["get_cloud_sandbox_api_v1_college_labs_cloud_sandbox_get"];
+        /**
+         * Set Cloud Sandbox
+         * @description The Cloud Sandbox lab opens this college's AWS Academy Learner Lab course.
+         */
+        put: operations["set_cloud_sandbox_api_v1_college_labs_cloud_sandbox_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/surveys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Surveys */
+        get: operations["list_surveys_api_v1_college_surveys_get"];
+        put?: never;
+        /** Create Survey */
+        post: operations["create_survey_api_v1_college_surveys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/surveys/{survey_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit Survey */
+        put: operations["edit_survey_api_v1_college_surveys__survey_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/surveys/{survey_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Survey
+         * @description L26: survey sent. Every linked parent in the college is notified (in-app and SMS).
+         */
+        post: operations["publish_survey_api_v1_college_surveys__survey_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/surveys/{survey_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close Survey */
+        post: operations["close_survey_api_v1_college_surveys__survey_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/surveys/{survey_id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Survey Results
+         * @description L26: responses returned, as aggregates. Comments come back without names, and nothing is
+         *     shown until enough parents answered that no one can be picked out.
+         */
+        get: operations["survey_results_api_v1_college_surveys__survey_id__results_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parent/surveys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Parent Surveys */
+        get: operations["parent_surveys_api_v1_parent_surveys_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parent/surveys/{survey_id}/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Respond */
+        post: operations["respond_api_v1_parent_surveys__survey_id__responses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -3929,6 +4147,31 @@ export interface components {
             email: string;
             /** Phone */
             phone?: string | null;
+        };
+        /** AnnouncementIn */
+        AnnouncementIn: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Title Ta */
+            title_ta?: string | null;
+            /** Body Ta */
+            body_ta?: string | null;
+            /**
+             * Audience
+             * @default both
+             */
+            audience: string;
+            /** Batch Ids */
+            batch_ids?: string[] | null;
+        };
+        /** AnswersIn */
+        AnswersIn: {
+            /** Answers */
+            answers: {
+                [key: string]: unknown;
+            };
         };
         /** AskIn */
         AskIn: {
@@ -4627,33 +4870,6 @@ export interface components {
             /** Due At */
             due_at?: string | null;
         };
-        /** QuestionIn */
-        QuestionIn: {
-            /** Question Text */
-            question_text: string;
-            /** Option A */
-            option_a: string;
-            /** Option B */
-            option_b: string;
-            /** Option C */
-            option_c: string;
-            /** Option D */
-            option_d: string;
-            /** Correct Option */
-            correct_option: string;
-            /**
-             * Section Name
-             * @default Quantitative
-             */
-            section_name: string;
-            /**
-             * Topic
-             * @default General
-             */
-            topic: string;
-            /** Explanation */
-            explanation?: string | null;
-        };
         /** QuestionRequest */
         QuestionRequest: {
             /** Text */
@@ -4729,6 +4945,11 @@ export interface components {
             /** Child Id */
             child_id?: string | null;
         };
+        /** SandboxIn */
+        SandboxIn: {
+            /** Url */
+            url: string;
+        };
         /** SendIn */
         SendIn: {
             /** Text */
@@ -4775,6 +4996,11 @@ export interface components {
             /** Blockers */
             blockers?: string | null;
         };
+        /** StartThreadIn */
+        StartThreadIn: {
+            /** Trainer User Id */
+            trainer_user_id: string;
+        };
         /** SubmitScores */
         SubmitScores: {
             /** Scores */
@@ -4801,6 +5027,17 @@ export interface components {
             } | null;
             /** Marked For Review */
             marked_for_review?: number[] | null;
+        };
+        /** SurveyIn */
+        SurveyIn: {
+            /** Title En */
+            title_en: string;
+            /** Title Ta */
+            title_ta?: string | null;
+            /** Closes On */
+            closes_on?: string | null;
+            /** Questions */
+            questions: components["schemas"]["routers__surveys__QuestionIn"][];
         };
         /** TemplateIn */
         TemplateIn: {
@@ -4838,7 +5075,7 @@ export interface components {
              */
             duration_min: number;
             /** Questions */
-            questions: components["schemas"]["QuestionIn"][];
+            questions: components["schemas"]["routers__assessments__QuestionIn"][];
         };
         /** ThreadIn */
         ThreadIn: {
@@ -4887,6 +5124,33 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** QuestionIn */
+        routers__assessments__QuestionIn: {
+            /** Question Text */
+            question_text: string;
+            /** Option A */
+            option_a: string;
+            /** Option B */
+            option_b: string;
+            /** Option C */
+            option_c: string;
+            /** Option D */
+            option_d: string;
+            /** Correct Option */
+            correct_option: string;
+            /**
+             * Section Name
+             * @default Quantitative
+             */
+            section_name: string;
+            /**
+             * Topic
+             * @default General
+             */
+            topic: string;
+            /** Explanation */
+            explanation?: string | null;
+        };
         /** DecisionIn */
         routers__audit_consent__DecisionIn: {
             /** Reason */
@@ -4922,6 +5186,24 @@ export interface components {
         routers__support__MessageIn: {
             /** Body */
             body: string;
+        };
+        /** QuestionIn */
+        routers__surveys__QuestionIn: {
+            /** Kind */
+            kind: string;
+            /** Text En */
+            text_en: string;
+            /** Text Ta */
+            text_ta?: string | null;
+            /** Options En */
+            options_en?: string[] | null;
+            /** Options Ta */
+            options_ta?: string[] | null;
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
         };
         /** DecisionIn */
         routers__trainer_batches__DecisionIn: {
@@ -13098,6 +13380,540 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    college_threads_api_v1_college_threads_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_thread_api_v1_college_threads_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartThreadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    college_trainers_api_v1_college_message_contacts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_announcements_api_v1_college_announcements_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    announce_api_v1_college_announcements_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnouncementIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    announcement_api_v1_college_announcements__broadcast_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                broadcast_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cloud_sandbox_api_v1_college_labs_cloud_sandbox_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_cloud_sandbox_api_v1_college_labs_cloud_sandbox_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SandboxIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_surveys_api_v1_college_surveys_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_survey_api_v1_college_surveys_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SurveyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_survey_api_v1_college_surveys__survey_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                survey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SurveyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_survey_api_v1_college_surveys__survey_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                survey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_survey_api_v1_college_surveys__survey_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                survey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    survey_results_api_v1_college_surveys__survey_id__results_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                survey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parent_surveys_api_v1_parent_surveys_get: {
+        parameters: {
+            query?: {
+                lang?: string;
+            };
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    respond_api_v1_parent_surveys__survey_id__responses_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                survey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

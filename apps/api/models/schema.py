@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, Date, ForeignKey, JSON
+from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, Date, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import TenantModel
 
@@ -482,6 +482,39 @@ class Broadcast(TenantModel):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     delivery: Mapped[str] = mapped_column(Text, default="{}")                # JSON delivery report
+    # S14: college announcements (41, L30) and fan-out at scale through the outbox, 500 per chunk
+    author_role: Mapped[str] = mapped_column(String(16), default="trainer", server_default="trainer")   # trainer, college
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    body_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="done", server_default="done")              # sending, done
+    recipients_total: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    delivered: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    chunks_total: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    chunks_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class Survey(TenantModel):
+    """Screen 02 (college settings) creates it, screen 40 (parent) answers it: link L26."""
+    __tablename__ = "surveys"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    questions: Mapped[list] = mapped_column(JSON, default=list)       # [{id, kind: rating|choice|text, text_en, text_ta, options_en, options_ta, required}]
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)   # draft, published, closed
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    closes_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class SurveyResponse(TenantModel):
+    __tablename__ = "survey_responses"
+    __table_args__ = (UniqueConstraint("survey_id", "parent_user_id", name="uq_survey_response"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    survey_id: Mapped[str] = mapped_column(String(64), ForeignKey("surveys.id", name="fk_response_survey"), index=True)
+    parent_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_response_parent"), index=True)
+    answers: Mapped[dict] = mapped_column(JSON, default=dict)          # {question_id: value}
 
 # Screen 15: Parent View Monthly Cards
 class ParentMonthlyRecord(TenantModel):

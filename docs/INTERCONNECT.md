@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 44, 45, 48.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 44, 45, 48.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -53,7 +53,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L21 | 25 Study Buddy | 14 At-risk, 13 Trainer dashboard | One way | AI usage counts for each student | Every AI call | PDF | planned |
 | L22 | 21 Reports | 16 Parent progress reports | One way | Approved monthly card and PDF | Trainer approves | PDF, plan | planned |
 | L23 | 47 Usage and billing | 20 MoU reports | One way | Usage figures included in reports | Monthly | Gap fix | planned |
-| L24 | 04 Batches | 03 Branches and batches | Both | Structure and student lists down; roster changes up | Import, semester promotion | Inferred | planned |
+| L24 | 04 Batches | 03 Branches and batches | Both | Structure and student lists down; roster changes up | Import, semester promotion | Inferred | active |
 | L25 | 45 Colleges | 03 Branches and batches | One way | New college, first admin, structure import | Admin creates a college | Gap fix | active |
 | L26 | 40 Survey | 02 Settings | Both | Survey sent; responses returned | College publishes a survey | Inferred | planned |
 | L27 | 48 Audit | 02 Settings | Both | Data export and deletion requests; audit trail | College admin requests | Gap fix | active |

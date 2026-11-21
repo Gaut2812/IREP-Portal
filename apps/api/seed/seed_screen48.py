@@ -6,7 +6,7 @@ import datetime
 
 from sqlalchemy import delete, select
 
-from models.schema import ConsentRecord, DataRequest, ParentStudent
+from models.schema import ConsentRecord, DataRequest, ParentStudent, RosterChangeRequest, TrainerNote
 
 
 def _cid(student_id: str, purpose: str) -> str:
@@ -23,6 +23,9 @@ def seed_screen48(db, college_id: str = "col_demo_001") -> None:
 
     db.execute(delete(ConsentRecord).where(ConsentRecord.college_id == college_id, ConsentRecord.id.not_in(list(wanted) or ["_"])))
     db.execute(delete(DataRequest).where(DataRequest.college_id == college_id))
+    # screen 04 demo hygiene: roster requests and trainer notes left by tests or demos
+    db.execute(delete(RosterChangeRequest).where(RosterChangeRequest.college_id == college_id))
+    db.execute(delete(TrainerNote).where(TrainerNote.college_id == college_id))
     for cid, (student_id, by, purpose, method) in wanted.items():
         row = db.get(ConsentRecord, cid)
         if row is None:

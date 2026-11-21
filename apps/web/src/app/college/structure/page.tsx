@@ -11,6 +11,7 @@ import { ArrowUpCircle, FileUp, GitBranch, Plus, UserCheck } from "lucide-react"
 interface BatchRow { id: string; short_name: string; name: string; semester: number; academic_year: string; track: string; students: number; trainers: { trainer_id: string; name: string; role: string }[] }
 interface BranchRow { id: string; name: string; code: string; track: string; hod_name: string | null; batches: BatchRow[] }
 interface Structure { students_total: number; unassigned_students: number; branches: BranchRow[] }
+interface RosterReq { id: string; kind: "move" | "remove"; student_name: string | null; from_batch: string | null; to_batch: string | null; reason: string; status: string; decision_note: string | null }
 interface ImportResult { dry_run: boolean; can_import?: boolean; imported?: boolean; summary: { rows: number; errors: number; new: number; updated: number; parents_linked: number }; errors: { row: number; register_no: string; error: string }[] }
 
 function currentYear(): string {
@@ -31,15 +32,18 @@ export default function CollegeStructurePage() {
   const [mapForm, setMapForm] = useState({ trainer_id: "", role: "primary" });
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [rosterReqs, setRosterReqs] = useState<RosterReq[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [s, tr] = await Promise.all([
+      const [s, tr, rr] = await Promise.all([
         fetchApi<Structure>("/college/structure"),
         fetchApi<{ trainers: { id: string; name: string }[] }>("/college/trainers"),
+        fetchApi<{ items: RosterReq[] }>("/college/roster-requests"),
       ]);
       setData(s);
       setTrainers(tr.trainers);
+      setRosterReqs(rr.items);
       setError("");
     } catch (e) {
       setError(e instanceof ApiError ? e.detail : t("structure.load_failed"));
@@ -199,6 +203,30 @@ export default function CollegeStructurePage() {
               </ul>
             </section>
           ))}
+
+          {rosterReqs.some((r) => r.status === "open") && (
+            <section className="bg-white rounded-xl border border-[#FDE68A] p-4 space-y-2" data-testid="roster-requests">
+              <h2 className="text-sm font-black text-[#0F1F3A]">{t("structure.roster_requests")}</h2>
+              <ul className="divide-y divide-[#F1F5F9] text-xs">
+                {rosterReqs.filter((r) => r.status === "open").map((r) => (
+                  <li key={r.id} className="py-2 flex flex-wrap items-center justify-between gap-2" data-testid="roster-request">
+                    <div>
+                      <span className="font-bold">{r.student_name}</span> · {r.kind === "move" ? `${r.from_batch} → ${r.to_batch}` : `${t("structure.remove_from")} ${r.from_batch}`}
+                      <div className="text-[11px] text-[#64748B]">{r.reason}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" disabled={busy} data-testid="roster-approve" onClick={() => run(async () => { await fetchApi(`/college/roster-requests/${r.id}/approve`, { method: "POST" }); })}
+                        className="px-2.5 py-1 bg-[#2B5CD0] text-white font-bold rounded">{t("structure.approve")}</button>
+                      <button type="button" disabled={busy} data-testid="roster-reject" onClick={() => {
+                        const reason = window.prompt(t("structure.reject_reason"));
+                        if (reason && reason.trim().length >= 5) run(async () => { await fetchApi(`/college/roster-requests/${r.id}/reject`, { method: "POST", body: JSON.stringify({ reason: reason.trim() }) }); });
+                      }} className="px-2.5 py-1 border border-[#CBD5E1] font-bold rounded">{t("structure.reject")}</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3" data-testid="import-section">
             <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><FileUp className="w-4 h-4 text-[#2B5CD0]" />{t("structure.import_title")}</h2>

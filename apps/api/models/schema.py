@@ -656,6 +656,33 @@ class AuditLog(TenantModel):
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 
+class TrainerNote(TenantModel):
+    """Screen 04: private trainer note on a student (trainers of the student's batch only, §5.4)."""
+    __tablename__ = "trainer_notes"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    author_trainer_id: Mapped[str] = mapped_column(String(64), ForeignKey("trainers.id"), index=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class RosterChangeRequest(TenantModel):
+    """Screen 04 -> 03 (link L24 up): a trainer asks the college to move or remove a student."""
+    __tablename__ = "roster_change_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    from_batch_id: Mapped[str] = mapped_column(String(64), ForeignKey("batches.id"))
+    to_batch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("batches.id"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)                    # move, remove
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    requested_by_trainer_id: Mapped[str] = mapped_column(String(64), ForeignKey("trainers.id"))
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)     # open, approved, rejected
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
 class NotificationPreference(TenantModel):
     """Screen 44: per-user delivery preferences. In-app is always on; language
     lives on users.language_pref (one source of truth)."""

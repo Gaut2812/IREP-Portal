@@ -8,7 +8,7 @@
 | Link | Direction | What moves | Status |
 | --- | --- | --- | --- |
 | L21 | 25 → 14, 13 | AI usage counts per student (never the chat) | active: the trainer dashboard's `ai_usage` and `ai_calls_7d` on each at-risk row |
-| L36 | 47 → 25 | AI-call quota and daily cap | planned (47 is S12 and S16). The cap is read from the college's active MoU (`ai_calls_per_day`, default 30) |
+| L36 | 47 → 25 | AI-call quota and daily cap | active (S12): `services/quotas.ai_calls_per_day` from the college's active MoU |
 | L18 | 34 ↔ 35 | Flagged posts reach the moderation queue | active (existing); college "flag" words add system reports |
 
 ## Study Buddy rules

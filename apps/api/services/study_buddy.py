@@ -109,8 +109,9 @@ def get_adapter() -> BuddyAdapter:
 # ---------------------------------------------------------------------------
 
 def daily_cap(db: Session, college_id: str) -> int:
-    mou = db.execute(select(MouTerm).where(MouTerm.college_id == college_id, MouTerm.status == "active")).scalars().first()
-    return mou.ai_calls_per_day if mou and mou.ai_calls_per_day else DEFAULT_DAILY_CAP
+    """L36: the AI-call cap comes from the college's MoU (services/quotas, screen 47)."""
+    from services.quotas import ai_calls_per_day
+    return ai_calls_per_day(db, college_id)
 
 
 def calls_since(db: Session, student_id: str, since: datetime.datetime) -> int:

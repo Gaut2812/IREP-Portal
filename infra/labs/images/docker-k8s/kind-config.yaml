@@ -1,0 +1,10 @@
+# kind create cluster --config /etc/irep/kind-config.yaml
+# The node's containerd pulls through the lab network's registry cache too.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+      endpoint = ["http://registry-cache:5000"]

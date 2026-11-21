@@ -126,17 +126,19 @@ def test_semester_and_track_locks():
 
 
 def test_exhausted_quota_blocks_with_clear_message():
+    from services.quotas import lab_minutes_per_student
     db = SessionLocal()
     try:
+        quota = lab_minutes_per_student(db, "col_demo_001")              # from the active MoU (L36)
         db.add(UsageLedger(id="ul_test_quota", college_id="col_demo_001", student_id="std_priya_01", kind="lab_minutes",
-                           amount=600, period=datetime.datetime.now().strftime("%Y-%m"), ref_type="test"))
+                           amount=quota, period=datetime.datetime.now().strftime("%Y-%m"), ref_type="test"))
         db.commit()
     finally:
         db.close()
     client.post("/api/v1/student/lab-sessions/ls_demo_priya_notebook/stop", headers=PRIYA)
     r = client.post("/api/v1/student/labs/lab_linux/launch", headers=PRIYA)
     assert r.status_code == 403 and r.json()["detail"]["reason"] == "quota"
-    assert "1200 lab minutes" in r.json()["detail"]["message"]
+    assert f"{quota} lab minutes" in r.json()["detail"]["message"]
     d = client.get("/api/v1/student/labs", headers=PRIYA).json()
     assert _lab(d, "lab_linux")["locked"]["reason"] == "quota"
     # cloud credits are metered separately and still allowed

@@ -37,7 +37,7 @@ from core.config import settings
 from models.schema import LabApproval, LabSession, OutboxEvent, Student, UsageLedger, VirtualLabItem
 from services.outbox import emit, handler
 
-MONTHLY_LAB_MINUTES = 1200      # 20 hours of lab time per student per month
+MONTHLY_LAB_MINUTES = 1200      # fallback only: the college's MoU sets lab hours per student (services/quotas, L36)
 MONTHLY_CLOUD_CREDITS = 100.0   # education-tier credits per student per month
 IDLE_LIMIT_MIN = 30
 START_TIMEOUT_MIN = 10          # a server that never came up is marked failed
@@ -166,9 +166,16 @@ class JupyterHubAdapter(LabAdapter):
         return f"{self.public}/user/{user}/{server}/?token={r.json()['token']}"
 
 
-def get_lab_adapter() -> LabAdapter:
+def get_lab_adapter(isolated: bool = False) -> LabAdapter:
+    """isolated=True is the Cyber Range: with JupyterHub it goes ONLY to the range's own hub on its
+    isolated node (Master Plan: the Cyber Range never runs on a shared host)."""
     kind = (settings.LAB_ADAPTER or "fake").lower()
     if kind == "jupyterhub":
+        if isolated:
+            if not (settings.CYBER_RANGE_HUB_URL and settings.CYBER_RANGE_API_TOKEN):
+                raise LabLaunchError("range_unavailable", "The Cyber Range is not open yet. Your trainer will tell you when it is.", status=503)
+            return JupyterHubAdapter(base_url=settings.CYBER_RANGE_HUB_URL, token=settings.CYBER_RANGE_API_TOKEN,
+                                     public_url=settings.CYBER_RANGE_PUBLIC_URL or settings.CYBER_RANGE_HUB_URL)
         return JupyterHubAdapter()
     if kind == "docker" and shutil.which("docker"):
         return DockerLabAdapter()
@@ -190,8 +197,14 @@ def usage(db: Session, student: Student, kind: str, period: str) -> float:
     ).scalar_one())
 
 
-def quota_for(kind: str) -> float:
-    return MONTHLY_CLOUD_CREDITS if kind == "cloud_credits" else float(MONTHLY_LAB_MINUTES)
+def quota_for(kind: str, db: Optional[Session] = None, college_id: Optional[str] = None) -> float:
+    """Monthly allowance per student. Lab minutes come from the college's active MoU (L36, screen 47)."""
+    if kind == "cloud_credits":
+        return MONTHLY_CLOUD_CREDITS
+    if db is not None and college_id:
+        from services.quotas import lab_minutes_per_student
+        return float(lab_minutes_per_student(db, college_id))
+    return float(MONTHLY_LAB_MINUTES)
 
 
 def running_minutes(s: LabSession, now: datetime.datetime) -> int:
@@ -218,11 +231,14 @@ def stop_session(db: Session, s: LabSession, reason: str, now: datetime.datetime
     _record_usage(db, s, lab, minutes)
     if s.provider in ("browser", "external"):
         return minutes                                   # nothing runs on our side
-    adapter = get_lab_adapter()
-    if adapter.synchronous or s.provider == "fake":
+    isolated = lab.network == "isolated"
+    if s.provider == "fake":
+        return minutes
+    adapter = get_lab_adapter(isolated)
+    if adapter.synchronous:
         adapter.stop(s.container_ref)
     else:
-        emit(db, "lab.stop", {"session_id": s.id, "ref": s.container_ref}, college_id=s.college_id,
+        emit(db, "lab.stop", {"session_id": s.id, "ref": s.container_ref, "isolated": isolated}, college_id=s.college_id,
              entity_type="lab_session", entity_id=s.id)
     return minutes
 
@@ -257,6 +273,13 @@ def approval_for(db: Session, student: Student, lab: VirtualLabItem) -> Optional
     ).scalars().first()
 
 
+def approval_expired(ap: LabApproval, now: Optional[datetime.datetime] = None) -> bool:
+    """Cyber Range access lasts LAB_APPROVAL_DAYS from the trainer's approval (S12)."""
+    now = now or datetime.datetime.now()
+    return ap.status == "approved" and ap.decided_at is not None and \
+        now - ap.decided_at > datetime.timedelta(days=settings.LAB_APPROVAL_DAYS)
+
+
 def lock_reason(db: Session, student: Student, lab: VirtualLabItem, now: datetime.datetime) -> Optional[Tuple[str, str]]:
     """Return (reason, message) when the student cannot launch this lab, else None."""
     if student.semester < lab.min_semester:
@@ -265,6 +288,8 @@ def lock_reason(db: Session, student: Student, lab: VirtualLabItem, now: datetim
         return "track", f"Available to the {', '.join(lab.allowed_tracks)} track."
     if lab.requires_approval:
         ap = approval_for(db, student, lab)
+        if ap and approval_expired(ap, now):
+            return "approval_expired", f"Your access ended after {settings.LAB_APPROVAL_DAYS} days. Request it again to continue."
         if not ap or ap.status != "approved":
             if ap and ap.status == "pending":
                 return "approval_pending", "Waiting for your trainer to approve access."
@@ -272,8 +297,9 @@ def lock_reason(db: Session, student: Student, lab: VirtualLabItem, now: datetim
                 return "approval_denied", f"Access was declined{': ' + ap.reason if ap.reason else ''}. Talk to your trainer."
             return "approval", "Trainer approval needed. Request access to continue."
     used = usage(db, student, lab.meter, period_of(now))
-    if used >= quota_for(lab.meter):
-        unit = "cloud credits" if lab.meter == "cloud_credits" else f"{MONTHLY_LAB_MINUTES} lab minutes"
+    quota = quota_for(lab.meter, db, student.college_id)
+    if used >= quota:
+        unit = "cloud credits" if lab.meter == "cloud_credits" else f"{int(quota)} lab minutes"
         return "quota", f"You have used all your {unit} for this month. The quota resets on the 1st."
     return None
 
@@ -289,10 +315,10 @@ def launch(db: Session, student: Student, lab: VirtualLabItem, now: Optional[dat
     if running:
         raise LabLaunchError("already_running", "Stop your running lab before launching another one.", status=409)
     runtime = lab.runtime or "server"
-    adapter = get_lab_adapter() if runtime == "server" else None
+    adapter = get_lab_adapter(lab.network == "isolated") if runtime == "server" else None
     provider = adapter.name if adapter else runtime
     # never let one session overrun the remaining monthly quota
-    remaining = quota_for(lab.meter) - usage(db, student, lab.meter, period_of(now))
+    remaining = quota_for(lab.meter, db, student.college_id) - usage(db, student, lab.meter, period_of(now))
     max_minutes = lab.session_minutes
     if lab.meter == "lab_minutes":
         max_minutes = int(min(max_minutes, remaining))
@@ -317,7 +343,7 @@ def _start_server(db: Session, ev: OutboxEvent) -> None:
     if s is None or s.status != "starting":
         return
     lab = db.get(VirtualLabItem, s.lab_id)
-    adapter = get_lab_adapter()
+    adapter = get_lab_adapter(lab.network == "isolated")
     try:
         s.container_ref = adapter.start(s, lab)
     except Exception:
@@ -331,7 +357,7 @@ def _start_server(db: Session, ev: OutboxEvent) -> None:
 
 @handler("lab.stop")
 def _stop_server(db: Session, ev: OutboxEvent) -> None:
-    get_lab_adapter().stop((ev.payload or {}).get("ref"))
+    get_lab_adapter(bool((ev.payload or {}).get("isolated"))).stop((ev.payload or {}).get("ref"))
 
 
 def connect_url(db: Session, s: LabSession, lab: VirtualLabItem) -> Optional[str]:
@@ -340,7 +366,7 @@ def connect_url(db: Session, s: LabSession, lab: VirtualLabItem) -> Optional[str
     if (lab.runtime or "server") == "external":
         return lab.external_url
     if (lab.runtime or "server") == "server":
-        return get_lab_adapter().connect_url(s, lab)
+        return get_lab_adapter(lab.network == "isolated").connect_url(s, lab)
     return None
 
 

@@ -18,6 +18,7 @@ services:
     env_file: .env
     environment:
       LAB_NETWORK: irep-labs-users
+      LAB_SYSBOX: ${LAB_SYSBOX:-0}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock      # spawner; see the warning above
       - hub-data:/srv/jupyterhub/data
@@ -26,6 +27,21 @@ services:
     networks:
       - irep-labs-hub
       - irep-labs-users
+
+  # Pull-through cache for docker.io: the ONLY way lab containers reach outside (Docker & K8s profile).
+  # It sits on the internal lab network and on an egress network; nothing else does.
+  registry-cache:
+    image: registry:2.8.3
+    restart: unless-stopped
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - registry-cache:/var/lib/registry
+    networks:
+      irep-labs-users:
+        aliases: [registry-cache]
+      irep-labs-egress: {}
 
   # profile images, built here so the spawner finds them locally (or push to your registry)
   lab-linux:
@@ -40,12 +56,18 @@ services:
     build: ./images/fullstack
     image: irep/lab-fullstack:1
     profiles: ["images"]
+  lab-docker-k8s:                  # only usable where Sysbox is installed and LAB_SYSBOX=1
+    build: ./images/docker-k8s
+    image: irep/lab-docker-k8s:1
+    profiles: ["images"]
 
 networks:
   irep-labs-hub: {}
   irep-labs-users:
     name: irep-labs-users
     internal: true          # lab containers get no route out: no internet, no cloud metadata, no portal subnet
+  irep-labs-egress: {}       # registry-cache only
 
 volumes:
   hub-data: {}
+  registry-cache: {}

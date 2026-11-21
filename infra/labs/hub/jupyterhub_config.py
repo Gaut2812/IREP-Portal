@@ -60,9 +60,12 @@ PROFILES = {
     "linux":     {"image": f"{REGISTRY}/lab-linux:1",     "mem": "1G", "cpu": 1.0},
     "ai-cpu":    {"image": f"{REGISTRY}/lab-ai-cpu:1",    "mem": "4G", "cpu": 2.0},
     "fullstack": {"image": f"{REGISTRY}/lab-fullstack:1", "mem": "2G", "cpu": 1.5},
-    # "docker-k8s" (Sysbox + kind) is S11 and "cyber-range" runs on its own isolated node (S12):
-    # neither may run on this host, so they are not listed and starting them fails.
+    # "cyber-range" never runs here: it has its own isolated node (infra/cyber-range, S12).
 }
+if os.environ.get("LAB_SYSBOX") == "1":
+    # Docker & Kubernetes (S11): only on nodes with the Sysbox runtime installed. Container root is
+    # an unprivileged host uid under Sysbox, so dockerd and kind run without --privileged.
+    PROFILES["docker-k8s"] = {"image": f"{REGISTRY}/lab-docker-k8s:1", "mem": "6G", "cpu": 2.0, "sysbox": True}
 
 
 def pre_spawn(spawner):
@@ -73,7 +76,14 @@ def pre_spawn(spawner):
     spawner.image = p["image"]
     spawner.mem_limit = p["mem"]
     spawner.cpu_limit = p["cpu"]
-    spawner.extra_host_config = {**spawner.extra_host_config, "memswap_limit": p["mem"]}
+    host = {**spawner.extra_host_config, "memswap_limit": p["mem"]}
+    if p.get("sysbox"):
+        host = {**host, "runtime": "sysbox-runc", "pids_limit": 2048}
+        host.pop("cap_drop", None)              # capabilities are namespaced by Sysbox; dockerd needs them inside
+        spawner.extra_create_kwargs = {"user": "0"}   # start.sh runs the dockerd hook as root, then drops to jovyan
+    else:
+        spawner.extra_create_kwargs = {"user": "1000"}
+    spawner.extra_host_config = host
     spawner.environment = {**spawner.environment, "IREP_LAB_PROFILE": profile,
                            "IREP_LAB_SESSION": str((spawner.user_options or {}).get("session", ""))}
 

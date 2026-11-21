@@ -179,7 +179,8 @@ def seed_cohort(db, college_id: str = "col_demo_001") -> int:
     created = 0
     students_by_batch: Dict[str, List[Student]] = {s: [] for s in batches}
     batch_of_student: Dict[str, str] = {}
-    used_emails = set()
+    db.flush()
+    used_emails = set(db.execute(select(User.email)).scalars())   # trainers, parents and staff too (emails are unique)
     name_pool = [(f, l) for f in FIRST_NAMES for l in LAST_INITIALS]
     rng.shuffle(name_pool)
     name_iter = iter(name_pool)

@@ -12,8 +12,8 @@ Master Plan: "one launcher (JupyterHub) behind one FastAPI labs service". Every 
 | Full-Stack Workspace | server | JupyterHub profile `fullstack` (code-server with Open VSX, Node.js, psql) | S10 | built; **not deployed** |
 | AI Notebook | server | JupyterHub profile `ai-cpu` (scipy stack, 2 CPU, 4 GB) | S11 | built; **not deployed**. GPU stays on Kaggle and Colab |
 | Cloud Sandbox | external | The college's AWS Academy Learner Lab link; credits metered by session time | S14 | built |
-| Docker & Kubernetes | server | Needs Sysbox + kind on a lab node | S11 | profile reserved; the hub refuses to start it until that node exists |
-| Cyber Range | server | Juice Shop + DVWA on a **separate isolated node**, no outbound network, trainer approval + signed AUP | S12 | approval and AUP flow built (43); the range itself is not built |
+| Docker & Kubernetes | server | Docker + kind inside a Sysbox container (no `--privileged`); images only via the pull-through registry cache | S11 | built in `infra/labs/images/docker-k8s`; enabled only with `LAB_SYSBOX=1` on a Sysbox node; **not deployed** |
+| Cyber Range | server | Juice Shop + DVWA on a **separate isolated node** (`infra/cyber-range`), its own hub, no outbound network, trainer approval + signed AUP, access expires after 30 days | S12 | built; portal routes only to `CYBER_RANGE_HUB_URL`; **not deployed** |
 
 ## Labs service (apps/api)
 
@@ -53,8 +53,8 @@ Master Plan: "one launcher (JupyterHub) behind one FastAPI labs service". Every 
 
 ## Still to do on the labs track
 
-- **S11:** Docker & Kubernetes profile (Sysbox and kind on a lab node), plus a launch-storm test (300 launches in 5 minutes).
-- **S12:** Cyber Range node and isolation test.
+- **Done in S11/S12:** Docker & Kubernetes profile, launch storm (`loadtest/lab_storm.py`), Cyber Range node, isolation test (`tests/test_lab_isolation.py`), MoU quotas (L36).
+- **Next on the hardware:** run the storm against the real hub; a Sysbox node for Docker & K8s; the range node.
 - **S13:** cAdvisor metering for server labs, grading checkers, and spectate links on the class page.
 - **S16:** k3s readiness.
 - Labs links L40–L43 are still a Master Plan question ("Add the labs links L40–L43 to the interconnect table?").

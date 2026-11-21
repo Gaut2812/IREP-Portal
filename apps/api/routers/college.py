@@ -96,6 +96,11 @@ def generate_report(
         lines += ["", f"MoU: {mou.starts_on.isoformat()} to {mou.ends_on.isoformat()}",
                   f"Students enrolled against the cap: {enrolled} of {mou.students_cap}",
                   f"Lab hours per student: {mou.lab_hours_per_student} · AI calls per day: {mou.ai_calls_per_day}"]
+    from services.quotas import college_usage            # L23: usage figures from 47, this month
+    u = college_usage(db, current_user.college_id)
+    lines += ["", f"Usage this month ({u['period']}):"] + [
+        f"{label}: {u['usage'][k]['used']} of {u['usage'][k]['quota']}" + (f" ({u['usage'][k]['pct']}%)" if u['usage'][k]['pct'] is not None else "")
+        for k, label in (("lab_minutes", "Lab minutes"), ("ai_calls", "AI Study Buddy calls"), ("recording_mb", "Recording storage MB"))]
     rel, size_kb = ensure_report_file(rid, f"{en} - {period}", now, now.date(), lines)
     run = ReportRun(id=rid, college_id=current_user.college_id, title_en=f"{en} · {period}", title_ta=f"{ta} · {period}",
                     report_type=req.report_type, period_label=period, generated_at=now, data_as_of=now.date(),

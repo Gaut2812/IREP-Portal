@@ -1201,7 +1201,7 @@ def get_attempt_result(
 from models.schema import LabSession, LabApproval, BatchTrainer, Trainer
 from services.lab_orchestrator import (
     launch as orchestrate_launch, stop_session, cull, lock_reason, approval_for, usage, quota_for, period_of,
-    running_minutes, LabLaunchError, MONTHLY_LAB_MINUTES, IDLE_LIMIT_MIN, beacon_token,
+    running_minutes, LabLaunchError, MONTHLY_LAB_MINUTES, IDLE_LIMIT_MIN, beacon_token, approval_expired,
 )
 
 
@@ -1246,7 +1246,7 @@ def _lab_card(db: Session, student: Student, lab: VirtualLabItem, running: Optio
     if running and running.lab_id == lab.id:
         action = "open"
     elif locked:
-        action = {"approval": "request", "approval_pending": "pending", "approval_denied": "locked"}.get(locked[0], "locked")
+        action = {"approval": "request", "approval_expired": "request", "approval_pending": "pending", "approval_denied": "locked"}.get(locked[0], "locked")
     else:
         action = "launch"
     return {
@@ -1294,7 +1294,7 @@ def get_virtual_labs(
         "active_sessions": [_session_payload(r, lab_by_id[r.lab_id], now) for r in running if r.lab_id in lab_by_id],
         "usage": {
             "period": period,
-            "lab_minutes_used": int(minutes_used), "lab_minutes_quota": MONTHLY_LAB_MINUTES,
+            "lab_minutes_used": int(minutes_used), "lab_minutes_quota": int(quota_for("lab_minutes", db, student.college_id)),
             "cloud_credits_used": round(credits_used, 1), "cloud_credits_quota": quota_for("cloud_credits"),
             "cloud_credits_left_pct": max(0, round(100 * (1 - credits_used / quota_for("cloud_credits")))),
         },
@@ -1384,7 +1384,7 @@ def request_lab_access(
     if not req.accept_aup:
         raise HTTPException(status_code=422, detail="Accept the acceptable-use agreement to request access")
     existing = approval_for(db, student, lab)
-    if existing and existing.status in ("pending", "approved"):
+    if existing and existing.status in ("pending", "approved") and not approval_expired(existing):
         return {"success": True, "status": existing.status, "approval_id": existing.id}
     ap = LabApproval(id=f"lap_{uuid.uuid4().hex[:16]}", college_id=student.college_id, lab_id=lab.id, student_id=student.id,
                      status="pending", aup_accepted_at=datetime.datetime.now(), reason=req.note)
@@ -1464,6 +1464,8 @@ def get_recording_url(
     rec = db.execute(select(Recording).filter_by(id=recording_id, college_id=student.college_id)).scalar_one_or_none()
     if not rec or (rec.batch_id and rec.batch_id != student.batch_id):
         raise HTTPException(status_code=404, detail="Recording not found")
+    if rec.status == "over_quota":
+        raise HTTPException(status_code=409, detail="This recording was not kept: your college's recording storage is full. Ask your college.")
     if rec.status != "ready":
         raise HTTPException(status_code=409, detail="Recording is still processing")
     expires = datetime.datetime.now() + datetime.timedelta(minutes=15)

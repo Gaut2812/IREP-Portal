@@ -109,6 +109,7 @@ Sign-in rules:
 | 42 | Events (college; invitations, RSVP counts, placement posts) | `/college/events` |
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
 | 46 | Content library and notification templates (IREP staff) | `/admin/content` |
+| 47 | Usage and quotas (IREP staff; use against the MoU) | `/admin/usage` |
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
 | 49 | Support desk (report a problem from any screen; IREP staff reply) | `/support`, `/admin/support` |
 

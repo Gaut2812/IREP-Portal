@@ -370,10 +370,13 @@ async def bbb_webhook(request: Request, x_bbb_signature: Optional[str] = Header(
         elif event == "rap-publish-ended":
             rid = f"rec_{s.id}"[:64]
             if not db.execute(select(Recording).filter_by(id=rid)).first():
+                from services.quotas import can_store_recording
+                size_mb = max(0, int(payload.get("size_mb") or 0))
+                fits = can_store_recording(db, s.college_id, size_mb)         # L36: the MoU's storage_gb
                 db.add(Recording(id=rid, college_id=s.college_id, session_id=s.id, batch_id=s.batch_id, title=s.title,
                                  storage_key=payload.get("storage_key") or f"recordings/{s.id}.mp4",
                                  duration_min=int(payload.get("duration_min") or s.duration_min), chapters=[],
-                                 recorded_on=at.date(), status="ready"))
+                                 recorded_on=at.date(), status="ready" if fits else "over_quota", size_mb=size_mb))
         else:
             return {"success": True, "ignored": event}
         db.commit()

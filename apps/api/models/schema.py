@@ -39,7 +39,7 @@ class User(TenantModel):
     __tablename__ = "users"
     
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), index=True, unique=True, nullable=False)   # one account per email (sign-in looks it up)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), index=True, nullable=False) # student, trainer, college_admin, parent, super_admin
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -1147,7 +1147,8 @@ class Recording(TenantModel):
     has_transcript: Mapped[bool] = mapped_column(Boolean, default=False)
     has_summary: Mapped[bool] = mapped_column(Boolean, default=False)
     recorded_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
-    status: Mapped[str] = mapped_column(String(16), default="ready")           # processing, ready
+    status: Mapped[str] = mapped_column(String(16), default="ready")           # processing, ready, over_quota
+    size_mb: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # counts against the MoU storage_gb (L36)
 
 
 class SessionReminder(TenantModel):

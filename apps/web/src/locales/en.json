@@ -1666,5 +1666,26 @@
     "by_issuer": "Top issuers",
     "by_batch": "By batch",
     "students": "students"
+  },
+  "usage": {
+    "title": "Usage and quotas",
+    "load_failed": "Could not load usage. Try again.",
+    "help": "Each college's use this month against its MoU. Labs, Study Buddy and recordings stop at these limits. Change a quota by issuing a new MoU on the college's page.",
+    "month": "Month",
+    "only_flagged": "Only colleges near or over a limit",
+    "colleges": "colleges",
+    "near": "near a limit",
+    "over": "over a limit",
+    "college": "College",
+    "students": "students",
+    "mou_until": "MoU until",
+    "no_mou": "no active MoU (defaults apply)",
+    "m_lab_minutes": "Lab minutes",
+    "m_ai_calls": "AI Study Buddy calls",
+    "m_recording_mb": "Recording storage (MB)",
+    "m_cloud_credits": "Cloud credits",
+    "level_warn": "Over 80%",
+    "level_over": "Limit reached",
+    "none": "No colleges to show."
   }
 }

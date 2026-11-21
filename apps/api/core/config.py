@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     JUPYTERHUB_URL: str = os.getenv("JUPYTERHUB_URL", "http://localhost:8001")             # as the API reaches the hub
     JUPYTERHUB_PUBLIC_URL: str = os.getenv("JUPYTERHUB_PUBLIC_URL", "")                    # as students' browsers reach it
     JUPYTERHUB_API_TOKEN: str = os.getenv("JUPYTERHUB_API_TOKEN", "")                      # the hub's "irep-labs" service token
+    # Cyber Range (S12): its own hub on its own isolated node (infra/cyber-range); never the shared lab hub
+    CYBER_RANGE_HUB_URL: str = os.getenv("CYBER_RANGE_HUB_URL", "")
+    CYBER_RANGE_PUBLIC_URL: str = os.getenv("CYBER_RANGE_PUBLIC_URL", "")
+    CYBER_RANGE_API_TOKEN: str = os.getenv("CYBER_RANGE_API_TOKEN", "")
+    LAB_APPROVAL_DAYS: int = int(os.getenv("LAB_APPROVAL_DAYS", "30"))                      # Cyber Range access lasts this long
     TRANSLATE_ADAPTER: str = os.getenv("TRANSLATE_ADAPTER", "fake")
     # Screen 25 AI Study Buddy. "fake" (dev, deterministic hints) or "anthropic" (Claude API; needs the
     # `anthropic` package and ANTHROPIC_API_KEY). Minors' data: no names or ids are sent; emails and phones are redacted.

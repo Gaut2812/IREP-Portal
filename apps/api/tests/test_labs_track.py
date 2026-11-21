@@ -56,7 +56,7 @@ def hub(monkeypatch):
     fake = FakeHub()
     adapter = lo.JupyterHubAdapter(base_url="http://hub:8000", token="svc-token", public_url="https://labs.example",
                                    client=httpx.Client(transport=httpx.MockTransport(fake)))
-    monkeypatch.setattr(lo, "get_lab_adapter", lambda: adapter)
+    monkeypatch.setattr(lo, "get_lab_adapter", lambda isolated=False: adapter)
     return fake
 
 

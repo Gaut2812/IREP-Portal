@@ -43,4 +43,5 @@ apps/web/playwright-report/
 
 # Generated report PDFs
 apps/api/static/reports/
+apps/api/static/cards/
 apps/api/var/

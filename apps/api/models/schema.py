@@ -107,6 +107,9 @@ class SessionItem(TenantModel):
     lab_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     batch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("batches.id"), nullable=True, index=True)
     week_no: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Screens 05/06: room booking and substitutes
+    room: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    substitute_trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id"), nullable=True)
 
 class SessionAttendance(TenantModel):
     __tablename__ = "session_attendance"
@@ -654,6 +657,28 @@ class AuditLog(TenantModel):
     entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class ScheduleChangeRequest(TenantModel):
+    """Screens 05 -> 06 (link L11): a trainer's proposed schedule change, approved by the college."""
+    __tablename__ = "schedule_change_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)                    # new, reschedule, cancel, substitute
+    batch_id: Mapped[str] = mapped_column(String(64), ForeignKey("batches.id"), index=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("sessions.id"), nullable=True)
+    proposed_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    proposed_start: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    proposed_end: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    proposed_room: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    substitute_trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id"), nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    requested_by_trainer_id: Mapped[str] = mapped_column(String(64), ForeignKey("trainers.id"))
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending, approved, rejected
+    clashes: Mapped[list] = mapped_column(JSON, default=list)
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class TrainerNote(TenantModel):

@@ -97,6 +97,17 @@ class GraphClient:
             "transactionId": transaction_id,
         })
 
+    def update_event_time(self, organizer: str, event_id: str, *, start_utc: datetime.datetime, end_utc: datetime.datetime,
+                          subject: Optional[str] = None) -> dict:
+        body = {"start": {"dateTime": start_utc.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "UTC"},
+                "end": {"dateTime": end_utc.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "UTC"}}
+        if subject:
+            body["subject"] = subject
+        return self._call("PATCH", f"/users/{_upn(organizer)}/events/{quote(event_id)}", json=body)
+
+    def cancel_event(self, organizer: str, event_id: str, comment: str) -> None:
+        self._call("POST", f"/users/{_upn(organizer)}/events/{quote(event_id)}/cancel", json={"comment": comment})
+
     def find_online_meeting_id(self, organizer: str, join_url: str) -> Optional[str]:
         flt = quote(f"JoinWebUrl eq '{join_url}'", safe="")
         rows = self._call("GET", f"/users/{_upn(organizer)}/onlineMeetings?$filter={flt}").get("value", [])
@@ -206,6 +217,27 @@ def _create_event(db: Session, event) -> None:
     if not join_url:
         raise GraphError("Graph created the event without a Teams join URL (is Teams enabled for the organizer?)")
     meeting.organizer_upn, meeting.graph_event_id, meeting.join_url = organizer, created.get("id"), join_url
+
+
+@outbox_handler("teams.update_event")
+def _update_event(db: Session, event) -> None:
+    """Approved reschedule (screen 06): move the Teams calendar event. Idempotent (PATCH to the same time)."""
+    session = db.get(SessionItem, event.payload["session_id"])
+    meeting = db.execute(select(LiveMeeting).where(LiveMeeting.session_id == event.payload["session_id"])).scalar_one_or_none()
+    if session is None or meeting is None or not meeting.graph_event_id:
+        return
+    get_graph().update_event_time(meeting.organizer_upn, meeting.graph_event_id, start_utc=local_to_utc(session.scheduled_start),
+                                  end_utc=local_to_utc(session.scheduled_end), subject=f"IREP · {session.title}")
+
+
+@outbox_handler("teams.cancel_event")
+def _cancel_event(db: Session, event) -> None:
+    """Approved cancellation (screen 06): cancel the Teams meeting so invitees are told."""
+    meeting = db.execute(select(LiveMeeting).where(LiveMeeting.session_id == event.payload["session_id"])).scalar_one_or_none()
+    if meeting is None or not meeting.graph_event_id or meeting.ended_at:
+        return
+    get_graph().cancel_event(meeting.organizer_upn, meeting.graph_event_id, event.payload.get("comment") or "Cancelled by the college")
+    meeting.ended_at = datetime.datetime.now()                           # never pulled for attendance
 
 
 @outbox_handler("teams.pull_attendance")
@@ -333,7 +365,7 @@ def queue_due_work(db: Session, now: Optional[datetime.datetime] = None, horizon
     created = pulled = 0
     upcoming = db.execute(select(SessionItem).where(
         SessionItem.scheduled_start >= now, SessionItem.scheduled_start <= now + datetime.timedelta(days=horizon_days),
-        SessionItem.batch_id.isnot(None),
+        SessionItem.batch_id.isnot(None), SessionItem.status != "Cancelled",
         *([SessionItem.college_id == college_id] if college_id else []))).scalars().all()
     for s in upcoming:
         m = db.execute(select(LiveMeeting).where(LiveMeeting.session_id == s.id)).scalar_one_or_none()
@@ -343,6 +375,7 @@ def queue_due_work(db: Session, now: Optional[datetime.datetime] = None, horizon
     ended = db.execute(select(LiveMeeting, SessionItem).join(SessionItem, SessionItem.id == LiveMeeting.session_id).where(
         LiveMeeting.provider == "teams", LiveMeeting.join_url.isnot(None), LiveMeeting.attendance_pulled_at.is_(None),
         SessionItem.scheduled_end <= now - datetime.timedelta(seconds=settings.TEAMS_REPORT_DELAY_SECONDS),
+        SessionItem.status != "Cancelled",
         *([SessionItem.college_id == college_id] if college_id else []))).all()
     for m, s in ended:
         queue_attendance_pull(db, s, delay_seconds=0)

@@ -82,6 +82,7 @@ Demo logins: `priya.r@demo.edu`, `arun.k@demo.edu`, `admin@demo.edu` (password `
 11. **Schema.**
     - Change `models/schema.py` and add an Alembic revision in the same PR. `alembic check` must pass on SQLite and PostgreSQL.
     - `core/db_init.ensure_schema` is a development convenience only.
+    - SQLite batch migrations run with FK enforcement off and a `foreign_key_check` before commit (`alembic/env.py`); name every new FK constraint (batch mode needs names).
 12. **Seeds** are deterministic and idempotent.
     - No `uuid4()` or `random` without a fixed seed in generated ids.
     - Dates are relative to today.
@@ -114,7 +115,7 @@ Changes to auth, messaging policy, Microsoft Graph, labs, Judge0, migrations tha
 
 ## Current state (keep this short and true)
 
-- Built: 01, 02, 03, 04, 07, 08, 12, 13, 15, 18, 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 44, 45, 48 (IREP staff: `staff@irep.demo`, role `irep_admin`, web role `admin`).
+- Built: 01, 02, 03, 04, 05, 06, 07, 08, 12, 13, 15, 18, 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 44, 45, 48 (IREP staff: `staff@irep.demo`, role `irep_admin`, web role `admin`).
 - Done in S1: outbox, workers, migrations baseline, link gate, Keycloak (realm, roles, tenancy claims, web PKCE sign-in).
 - Consent gate: parent-facing overview (15) needs a granted `parent_data_processing` consent (`services/consent.py`); seed grants it for demo pairs. Files go through `services/storage.py` (local dir in dev).
 - Roles: `placement_officer` uses the college UI (sign-in card "College"). Deactivated accounts cannot sign in; tokens already issued stay valid until expiry (known gap, see docs/screens/02).

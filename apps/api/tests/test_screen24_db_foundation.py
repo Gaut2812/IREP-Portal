@@ -392,7 +392,7 @@ def test_alembic_migration_integrity(tmp_path):
     cfg = Config(str(Path(api_dir) / "alembic.ini"))
     cfg.set_main_option("script_location", str(Path(api_dir) / "alembic"))
     eng = create_engine(f"sqlite:///{(tmp_path / 'mig.db').as_posix()}")
-    with eng.begin() as conn:
+    with eng.connect() as conn:            # env.py manages the transaction itself
         cfg.attributes["connection"] = conn
         command.upgrade(cfg, "head")
     with eng.connect() as conn:
@@ -402,7 +402,7 @@ def test_alembic_migration_integrity(tmp_path):
                 "virtual_labs", "lab_sessions", "lab_approvals", "usage_ledger", "audit_log"} <= tables
         diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)
         assert diff == [], f"migrations and models differ: {diff[:5]}"
-    with eng.begin() as conn:
+    with eng.connect() as conn:
         cfg.attributes["connection"] = conn
         command.downgrade(cfg, "base")
     with eng.connect() as conn:

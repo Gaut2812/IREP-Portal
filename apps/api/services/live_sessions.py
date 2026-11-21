@@ -39,7 +39,9 @@ def _now() -> datetime.datetime:
 
 
 def session_status(s: SessionItem, attendance: Optional[SessionAttendance], now: datetime.datetime) -> str:
-    """Attended / Missed / Live / Upcoming / Scheduled."""
+    """Attended / Missed / Live / Upcoming / Scheduled / Cancelled."""
+    if s.status == "Cancelled":                      # approved on screen 06
+        return "Cancelled"
     if s.scheduled_end <= now:
         if attendance is None:
             return "Completed"
@@ -52,6 +54,8 @@ def session_status(s: SessionItem, attendance: Optional[SessionAttendance], now:
 
 
 def join_enabled(s: SessionItem, now: datetime.datetime) -> bool:
+    if s.status == "Cancelled":
+        return False
     return s.scheduled_start - datetime.timedelta(minutes=JOIN_WINDOW_MIN) <= now < s.scheduled_end
 
 

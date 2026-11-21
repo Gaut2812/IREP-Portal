@@ -75,6 +75,8 @@ Sign-in rules:
 | 02 | College settings (users and roles, branding, data requests) | `/college/settings` |
 | 03 | Branches and batches (college admin; CSV student import) | `/college/structure` |
 | 04 | Trainer batches (roster, private notes, roster requests) | `/trainer/batches`, `/trainer/students/{id}` |
+| 05 | Schedule (trainer; propose new, reschedule, cancel, substitute) | `/trainer/schedule` |
+| 06 | Timetable (college; approve with clash warnings, rooms) | `/college/timetable` |
 | 07 | Live classroom | `/live/{sessionId}` |
 | 08 | Live sessions & recordings | `/student/live` |
 | 12 | Student dashboard | `/student` |

@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 44, 45, 48.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 44, 45, 48.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -40,7 +40,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L08 | 29 Virtual labs | 43 Approvals | Both | Cyber Range access request; approve or deny | Student requests a lab | PDF, Gap fix | planned |
 | L09 | 10 Parent attendance | 43 Approvals | Both | Leave request; decision | Parent submits | Gap fix | planned |
 | L10 | 26 Student certificates | 43 Approvals | Both | External certificate proof; decision | Student uploads proof | Gap fix | planned |
-| L11 | 05 Schedule | 06 Timetable | Both | Proposed sessions; approval or clash warning | Any schedule change | Inferred | planned |
+| L11 | 05 Schedule | 06 Timetable | Both | Proposed sessions; approval or clash warning | Any schedule change | Inferred | active |
 | L12 | 46 Content library | 11 My courses | One way | Curriculum, lessons, notes by semester and track | Content published | Gap fix | planned |
 | L13 | 22 Assessments | 24 Coding Lab, 23 Practice tests | Both | Problems, tests, trainer notes; results back to 22 | Trainer publishes | PDF | planned |
 | L14 | 30 Sprint board | 31 Code reviews | Both | Pull-request queue; review result and change requests | Pull request opened | PDF | active |

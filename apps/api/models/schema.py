@@ -659,6 +659,56 @@ class AuditLog(TenantModel):
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 
+class Course(TenantModel):
+    """Screen 46: library course (platform tenant). Students read published ones (screen 11)."""
+    __tablename__ = "courses"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    track: Mapped[str] = mapped_column(String(64), default="All", index=True)        # a track name, or "All"
+    semester: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    skill_key: Mapped[str] = mapped_column(String(32), nullable=False)              # dashboard skill bar it feeds (L33)
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)    # draft, published
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class Lesson(TenantModel):
+    __tablename__ = "lessons"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    course_id: Mapped[str] = mapped_column(String(64), ForeignKey("courses.id", name="fk_lesson_course"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=1)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    body_en: Mapped[str] = mapped_column(Text, default="")
+    body_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    duration_min: Mapped[int] = mapped_column(Integer, default=20)
+
+
+class LessonProgress(TenantModel):
+    """A student's completed lesson (student's own college)."""
+    __tablename__ = "lesson_progress"
+    __table_args__ = (UniqueConstraint("student_id", "lesson_id", name="uq_lesson_progress"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_progress_student"), index=True)
+    lesson_id: Mapped[str] = mapped_column(String(64), ForeignKey("lessons.id", name="fk_progress_lesson"), index=True)
+    completed_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+
+
+class NotificationTemplate(TenantModel):
+    """Screen 46 -> 44 (L37): Tamil and English text for a notification key, with {placeholders}."""
+    __tablename__ = "notification_templates"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    body_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    body_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 class LeaveRequest(TenantModel):
     """Screens 10 -> 43 (link L09): a parent's leave request; changes attendance only when a trainer approves it."""
     __tablename__ = "leave_requests"

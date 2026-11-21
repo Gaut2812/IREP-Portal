@@ -81,6 +81,7 @@ Sign-in rules:
 | 08 | Live sessions & recordings | `/student/live` |
 | 09 | Attendance (trainer; overrides, check-in code) and student check-in | `/trainer/attendance`, `/student/checkin` |
 | 10 | Attendance (parent; month view, leave requests) | `/parent/attendance` |
+| 11 | My courses (student; lessons feed the skill bars) | `/student/courses`, `/student/courses/[courseId]` |
 | 12 | Student dashboard | `/student` |
 | 13 | Trainer dashboard | `/trainer` |
 | 15 | Parent view (mobile first) | `/parent` |
@@ -95,6 +96,7 @@ Sign-in rules:
 | 44 | Notification centre (every role; delivery preferences) | `/notifications` |
 | 43 | Approvals (trainer; leave and Cyber Range access) | `/trainer/approvals` |
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
+| 46 | Content library and notification templates (IREP staff) | `/admin/content` |
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
 
 ## Sign-in with Keycloak (optional in development)

@@ -19,6 +19,7 @@ from services.audit import record_audit
 from services.consent import current as consent_state
 from services.leave import apply_approved_leave
 from services.notifications import notify_user
+from services.templates import render
 
 router = APIRouter(tags=["Screens 10/43 · Parent attendance and approvals"])
 PARENT = require_role(["parent"])
@@ -177,6 +178,9 @@ def decide_leave(leave_id: str, req: DecisionIn, current_user: TokenPayload = De
         title, title_ta, body = f"Leave approved for {name}", f"{name} விடுப்பு அனுமதிக்கப்பட்டது", dates
     else:
         title, title_ta, body = f"Leave not approved for {name}", f"{name} விடுப்பு அனுமதிக்கப்படவில்லை", f"{dates}: {note}"
-    notify_user(db, r.requested_by, title, body, title_ta=title_ta, kind="approval", link="/parent/attendance", college_id=r.college_id)
+    text = render(db, f"leave.{r.status}", {"title_en": title, "title_ta": title_ta, "body_en": body, "body_ta": None},
+                  student=name, dates=dates, note=note or "")              # screen 46 template when one exists (L37)
+    notify_user(db, r.requested_by, text["title_en"], text["body_en"], title_ta=text["title_ta"], body_ta=text["body_ta"],
+                kind="approval", link="/parent/attendance", college_id=r.college_id)
     db.commit()
     return {"id": r.id, "status": r.status, **effect}

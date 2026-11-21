@@ -22,14 +22,6 @@ class RSVPRequest(BaseModel):
 # --- SCREEN 15: Parent View (PDF 10) ---
 from services.parent_overview import build_parent_overview
 from services.audit import record_audit
-from models.schema import Event, Rsvp
-import uuid
-
-
-class EventRsvpRequest(BaseModel):
-    status: str = "yes"      # yes | no | maybe
-    guests: int = 1
-    child_id: Optional[str] = None
 
 
 @router.get("/me/children")
@@ -75,33 +67,6 @@ def get_child_overview(
     child = get_child_for_parent(current_user, db, child_id)
     child_name = get_user_name(db, child.user_id, "Student")
     return build_parent_overview(db, child, child_name, current_user, lang)
-
-
-@router.post("/events/{event_id}/rsvp")
-def rsvp_event(
-    event_id: str,
-    req: EventRsvpRequest,
-    current_user: TokenPayload = Depends(require_role(["parent"])),
-    db: Session = Depends(get_db),
-):
-    if req.status not in ("yes", "no", "maybe"):
-        raise HTTPException(status_code=422, detail="status must be yes, no or maybe")
-    if req.guests < 0 or req.guests > 10:
-        raise HTTPException(status_code=422, detail="guests must be between 0 and 10")
-    event = db.execute(select(Event).filter_by(id=event_id, college_id=current_user.college_id)).scalar_one_or_none()
-    if not event or not event.rsvp_enabled:
-        raise HTTPException(status_code=404, detail="Event not found or does not take RSVPs")
-    child = get_child_for_parent(current_user, db, req.child_id)
-    rsvp = db.execute(select(Rsvp).filter_by(event_id=event.id, parent_user_id=current_user.sub, college_id=current_user.college_id)).scalar_one_or_none()
-    if rsvp:
-        rsvp.status, rsvp.guests, rsvp.student_id = req.status, req.guests, child.id
-    else:
-        rsvp = Rsvp(id=f"rsvp_{uuid.uuid4().hex[:16]}", college_id=current_user.college_id, event_id=event.id,
-                    parent_user_id=current_user.sub, student_id=child.id, status=req.status, guests=req.guests)
-        db.add(rsvp)
-    record_audit(db, current_user, "rsvp.save", "event", event.id, {"status": req.status, "guests": req.guests})
-    db.commit()
-    return {"success": True, "event_id": event.id, "rsvp_status": rsvp.status, "guests": rsvp.guests}
 
 
 @router.post("/rsvp", include_in_schema=False)

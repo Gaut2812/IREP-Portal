@@ -85,7 +85,7 @@ def build_student_dashboard(db: Session, student: Student, current_user: TokenPa
     # Upcoming: personal events + batch events + college-wide, from today, next 5
     now = datetime.datetime.now()
     ev_q = select(Event).where(
-        Event.college_id == college_id,
+        Event.college_id == college_id, Event.status == "published",
         Event.starts_at >= now - datetime.timedelta(hours=12),
         (Event.student_id == student.id) | (Event.student_id.is_(None)),
         (Event.batch_id == student.batch_id) | (Event.batch_id.is_(None)),

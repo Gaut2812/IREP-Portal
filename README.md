@@ -84,7 +84,9 @@ Sign-in rules:
 | 11 | My courses (student; lessons feed the skill bars) | `/student/courses`, `/student/courses/[courseId]` |
 | 12 | Student dashboard | `/student` |
 | 13 | Trainer dashboard | `/trainer` |
+| 14 | At-risk students (trainer; parent calls) | `/trainer/at-risk` |
 | 15 | Parent view (mobile first) | `/parent` |
+| 17 | Events (parent; RSVP) | `/parent/events` |
 | 19 | College dashboard | `/college` |
 | 23 | Practice test | `/student/tests/{id}` |
 | 24 | Coding lab | `/student/coding/{problemId}` |
@@ -95,6 +97,7 @@ Sign-in rules:
 | 36 | Mock interviews | `/student/interviews` |
 | 44 | Notification centre (every role; delivery preferences) | `/notifications` |
 | 43 | Approvals (trainer; leave and Cyber Range access) | `/trainer/approvals` |
+| 42 | Events (college; invitations, RSVP counts, placement posts) | `/college/events` |
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
 | 46 | Content library and notification templates (IREP staff) | `/admin/content` |
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |

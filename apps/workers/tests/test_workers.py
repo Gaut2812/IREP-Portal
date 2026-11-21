@@ -46,3 +46,13 @@ def test_brokerless_runner_one_pass(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["run_outbox", "--limit", "100000"])
     run_outbox.main()
     assert _status(ev_id) == "done"
+
+
+def test_nightly_readiness_is_scheduled_and_its_handler_is_loaded():
+    from irep_workers.celery_app import app
+
+    nightly = app.conf.beat_schedule["readiness-nightly"]
+    assert nightly["task"] == "irep.readiness.nightly" and "irep.readiness.nightly" in app.tasks
+    assert nightly["schedule"].hour == {1} and nightly["schedule"].minute == {30}     # 01:30 Asia/Kolkata
+    outbox._load_handlers()
+    assert "at_risk.parent_call" in outbox._HANDLERS                                  # held parent calls reach a worker

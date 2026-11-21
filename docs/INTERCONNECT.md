@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum and templates; banks in S9), 48.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 17, 42, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum and templates; banks in S9), 48. Readiness v1 (S7) recomputes attendance from the register every night.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -34,7 +34,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L02 | 12 Student dashboard | 13 Trainer dashboard | Both | Up: readiness, attendance, problems solved. Down: plan, notes, flags | Nightly and on events | PDF | active |
 | L03 | 13 Trainer dashboard | 15 Parent overview | One way | Parent updates, monthly report, at-risk alert | Trainer quick actions | PDF | active |
 | L04 | 08 Live sessions | 07 Live classroom | Both | Join request; recording and attendance back | Join session | PDF | active |
-| L05 | 42 College events | 17 Parent events | Both | Invitations down; RSVPs and counts up | College publishes; parent taps RSVP | PDF, Gap fix | planned |
+| L05 | 42 College events | 17 Parent events | Both | Invitations down; RSVPs and counts up | College publishes; parent taps RSVP | PDF, Gap fix | active |
 | L06 | 07 Live classroom | 09 Trainer attendance | One way | Join and leave events; Present at 75% of the session | Meeting ends | PDF | active |
 | L07 | 09 Trainer attendance | 10 Parent attendance | Both | Attendance record down; leave request up | Marking; parent request | Inferred | active |
 | L08 | 29 Virtual labs | 43 Approvals | Both | Cyber Range access request; approve or deny | Student requests a lab | PDF, Gap fix | active |
@@ -63,9 +63,9 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 
 | ID | From | To | Direction | What moves | Trigger | Basis | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| L29 | 42 College events | 12, 34, 38 | One way | Upcoming list, placement-update posts; a mock drive is an event type | Event published | Gap fix | planned |
+| L29 | 42 College events | 12, 34, 38 | One way | Upcoming list, placement-update posts; a mock drive is an event type (12 and 34 built and tested; 38 in S15) | Event published | Gap fix | planned |
 | L30 | 41 College messages | 34, 15 | One way | Announcement-only posts to students and parents | Announcement posted | PDF, Gap fix | planned |
-| L31 | 14 At-risk | 18, 15 | One way | A flag creates a parent call and alert; the parent sees it in messages and the overview | Flag action | PDF | planned |
+| L31 | 14 At-risk | 18, 15 | One way | A flag creates a parent call and alert; the parent sees it in messages and the overview | Flag action | PDF | active |
 | L32 | 26 Student certificates | 27 Parent certificates | One way | Read-only copy of earned certificates | Certificate verified | Inferred | planned |
 | L33 | 11 My courses | 12 Dashboard | One way | Course progress feeds the skill bars | Lesson progress | Inferred | active |
 | L34 | 24, 23, 30, 36 and attendance (09) | 12, 13, 14, 15, 19, 39 | One way | One readiness score and band shown everywhere | Nightly and on events | PDF | active |
@@ -106,7 +106,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **07 Live classroom** (built): ↔ 08 · L04 · → 09 · L06 Present at 75%
 - **09 Attendance** (S4): ← 07 · L06 · ↔ 10 · L07 · → L34 readiness input. *Release rule: leave changes attendance only after approval.*
 - **13 Trainer dashboard** (built): ↔ 12 · L02 · → 15 · L03 · ← 25 · L21 · ← L34
-- **14 At-risk students** (S7): ← 25 · L21 · ← L34 · → 18, 15 · L31 parent call and alert
+- **14 At-risk students** (built): ← 25 · L21 · ← L34 · → 18, 15 · L31 parent call and alert
 - **21 Reports** (S8): → 16 · L22 approved monthly card. *Release rule: card released only after trainer approval.*
 - **22 Assessments** (S9): ↔ 24, 23 · L13 · ← 46 · L37 question and problem banks
 - **31 Code reviews** (built): ↔ 30 · L14 PR queue in, review result out
@@ -119,7 +119,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **10 Attendance** (S5): ↔ 09 · L07 · ↔ 43 · L09
 - **15 Parent overview** (built): ← 01 · L01 · ← 13 · L03 · ← 14 · L31 · ← 41 · L30 · ← L34
 - **16 Progress reports** (S8): ← 21 · L22
-- **17 Events** (S7): ↔ 42 · L05 invitations down, RSVP up
+- **17 Events** (built): ↔ 42 · L05 invitations down, RSVP up
 - **18 Message trainer** (built): ↔ 35 · L19 · ← 14 · L31
 - **27 Certificates** (S11): ← 26 · L32 read-only
 - **33 Projects and portfolio** (built): ← 32 · L15
@@ -136,7 +136,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **38 Mock drives** (S15): → 37 · L17 · ← 42 · L29
 - **39 Placement readiness** (S15): ← L34 · ← L35
 - **41 Messages** (S14): ↔ 35 · L20 · → 34, 15 · L30 announcement-only posts
-- **42 Events** (S7): ↔ 17 · L05 · → 12, 34, 38 · L29
+- **42 Events** (built): ↔ 17 · L05 · → 12, 34, 38 · L29
 
 ### Admin (IREP staff)
 

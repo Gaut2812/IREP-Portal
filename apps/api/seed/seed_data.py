@@ -646,6 +646,10 @@ def init_db_and_seed():
             seed_screen46(db, college_id="col_demo_001")
             db.commit()
 
+            from seed.seed_screen42 import seed_screen42
+            seed_screen42(db, college_id="col_demo_001")
+            db.commit()
+
             # keep at-risk flags consistent with the latest attendance history
             from services.at_risk import run_rules
             new_flags = run_rules(db, "col_demo_001")
@@ -1237,6 +1241,9 @@ def init_db_and_seed():
         db.flush()
         from seed.seed_screen46 import seed_screen46
         seed_screen46(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen42 import seed_screen42
+        seed_screen42(db, college_id="col_demo_001")
         db.flush()
 
         # same as the re-seed path: open at-risk flags for the seeded history

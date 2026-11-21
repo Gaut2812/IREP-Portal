@@ -4,11 +4,12 @@ Run (pilot / production, with OUTBOX_RUNNER=celery on the API):
     celery -A irep_workers.celery_app worker --beat --loglevel=info
 
 Teams meeting creation and attendance pull run via irep.teams.queue_due_work. Later:
-broadcast fan-out in chunks of 500 (S14), nightly readiness and backups.
+broadcast fan-out in chunks of 500 (S14) and backups. Nightly readiness (S7) runs at 01:30 IST.
 """
 import irep_workers  # noqa: F401  (puts apps/api on sys.path)
 
 from celery import Celery
+from celery.schedules import crontab
 
 from core.config import settings
 
@@ -22,6 +23,7 @@ app.conf.update(
     beat_schedule={
         "drain-outbox": {"task": "irep.outbox.dispatch", "schedule": settings.OUTBOX_POLL_SECONDS},
         "teams-due-work": {"task": "irep.teams.queue_due_work", "schedule": 900.0},
+        "readiness-nightly": {"task": "irep.readiness.nightly", "schedule": crontab(hour=1, minute=30)},
     },
 )
 
@@ -46,3 +48,23 @@ def teams_queue_due_work() -> dict:
         out = queue_due_work(db)
         db.commit()
         return out
+
+
+@app.task(name="irep.readiness.nightly", ignore_result=True)
+def readiness_nightly() -> dict:
+    """01:30 IST: readiness v1 for every college (attendance, score, delta, at-risk flags)."""
+    from sqlalchemy import select
+
+    from core.database import SessionLocal
+    from core.security import PLATFORM_TENANT
+    from models.schema import College
+    from services.readiness import run_nightly
+
+    out = {}
+    with SessionLocal() as db:
+        ids = [c for c in db.execute(select(College.id)).scalars() if c != PLATFORM_TENANT]
+    for college_id in ids:
+        with SessionLocal() as db:
+            out[college_id] = run_nightly(db, college_id)
+            db.commit()
+    return out

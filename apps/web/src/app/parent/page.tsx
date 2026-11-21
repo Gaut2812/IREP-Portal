@@ -27,6 +27,8 @@ interface Overview {
   upcoming: { id: string; title: string; kind: string; when: string; date: string; location: string | null; description: string | null; rsvp_enabled: boolean; rsvp_status: string | null; guests: number }[];
   trainers: { trainer_id: string; user_id: string; name: string; designation: string }[];
   reply_promise_hours: number;
+  /** L31: open flags the trainer raised with the parent */
+  support_alerts?: { id: string; issue: string; next_step: string; since: string }[];
 }
 interface Child { id: string; name: string; semester: number; branch: string; batch_name: string }
 
@@ -203,6 +205,13 @@ export default function ParentViewPage() {
 
           {!loading && !error && data && !data.consent_required && k && (
             <>
+              {(data.support_alerts || []).map((al) => (
+                <Link key={al.id} href="/parent/messages" className="block bg-[#FFF7ED] border border-[#FED7AA] rounded-2xl p-4" data-testid="support-alert">
+                  <div className="text-xs font-black text-[#9A3412]">{t("parent_view.support_alert")}</div>
+                  <div className="text-sm text-[#7C2D12] mt-1">{al.issue} · {t("parent_view.next_step")}: {al.next_step}</div>
+                  <div className="text-[11px] text-[#9A3412] mt-1 font-semibold">{t("parent_view.support_reply")}</div>
+                </Link>
+              ))}
               {/* Readiness card */}
               <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-4 rounded-2xl" data-testid="readiness-card">
                 <div className="flex items-center justify-between">

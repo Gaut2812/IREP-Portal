@@ -83,6 +83,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.branches_batches"), href: "/college/structure", icon: Users },
     { label: t("nav.placement_readiness"), href: "/college/readiness", icon: Award },
     { label: t("nav.certifications"), href: "/college/certifications", icon: Award },
+    { label: t("nav.events"), href: "/college/events", icon: Calendar },
     { label: t("nav.mock_drives"), href: "/college/drives", icon: Video },
     { label: t("nav.timetable"), href: "/college/timetable", icon: Calendar },
     { label: t("nav.mou_reports"), href: "/college/reports", icon: BookOpen },

@@ -80,7 +80,7 @@ def build_parent_overview(db: Session, student: Student, child_name: str, curren
     now = datetime.datetime.combine(today, datetime.time.min)
     events = db.execute(
         select(Event).where(
-            Event.college_id == college_id, Event.starts_at >= now - datetime.timedelta(hours=12),
+            Event.college_id == college_id, Event.status == "published", Event.starts_at >= now - datetime.timedelta(hours=12),
             Event.audience.in_(["parents", "all"]), Event.student_id.is_(None),
             (Event.batch_id.is_(None)) | (Event.batch_id == student.batch_id),
         ).order_by(Event.starts_at).limit(5)
@@ -103,8 +103,19 @@ def build_parent_overview(db: Session, student: Student, child_name: str, curren
             "rsvp_enabled": e.rsvp_enabled, "rsvp_status": r.status if r else None, "guests": r.guests if r else 0,
         }
 
+    # L31: open flags the trainer has raised with the parent show as support alerts
+    from models.schema import AtRiskFlag
+    from services.at_risk import ACTION_LABEL, reason_text
+    lg = "ta" if lang == "ta" else "en"
+    alerts = [{"id": f.id, "issue": reason_text(f.reason_key, f.reason_text, lg), "next_step": ACTION_LABEL[f.suggested_action][lg],
+               "since": (f.parent_notified_at or datetime.datetime.combine(f.flagged_on, datetime.time.min)).date().isoformat()}
+              for f in db.execute(select(AtRiskFlag).where(
+                  AtRiskFlag.student_id == student.id, AtRiskFlag.college_id == college_id, AtRiskFlag.status != "resolved",
+                  AtRiskFlag.parent_notified.is_(True)).order_by(AtRiskFlag.parent_notified_at.desc())).scalars()]
+
     return {
         "consent_required": False,
+        "support_alerts": alerts,
         "ward": {
             "id": student.id, "name": child_name, "semester": student.semester, "branch": student.branch, "track": student.track,
             "details": f"Sem {student.semester} · {student.branch}", "batch": student.batch_name, "college": "Demo Engineering College",

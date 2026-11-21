@@ -948,6 +948,9 @@ class Event(TenantModel):
     description_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rsvp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # Screen 42: draft -> published -> cancelled; rows from before S7 are published
+    status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
 
 
 # ---------------------------------------------------------------------------

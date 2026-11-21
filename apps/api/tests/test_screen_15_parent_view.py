@@ -93,7 +93,7 @@ def test_rsvp_persists_and_is_audited():
     try:
         rows = db.execute(select(Rsvp).filter_by(event_id="evt_demo_day", parent_user_id="usr_ramesh_01")).scalars().all()
         assert len(rows) == 1 and rows[0].status == "maybe"
-        assert db.execute(select(AuditLog).filter_by(action="rsvp.save", entity_id="evt_demo_day")).scalars().first() is not None
+        assert db.execute(select(AuditLog).filter_by(action="event.rsvp", entity_id="evt_demo_day")).scalars().first() is not None
     finally:
         db.close()
     assert client.post("/api/v1/parent/events/evt_demo_day/rsvp", json={"status": "sure"}, headers=RAMESH).status_code == 422

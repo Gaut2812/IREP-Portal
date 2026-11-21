@@ -19,7 +19,7 @@ import httpx
 from fastapi import HTTPException, status
 from jose import JWTError, jwt
 
-IREP_ROLES = ("student", "trainer", "parent", "college_admin", "irep_admin")
+IREP_ROLES = ("student", "trainer", "parent", "college_admin", "placement_officer", "irep_admin")
 
 
 def _unauthorized(detail: str = "Not authenticated") -> HTTPException:

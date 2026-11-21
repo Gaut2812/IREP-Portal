@@ -72,6 +72,7 @@ Sign-in rules:
 | # | Screen | Route |
 | --- | --- | --- |
 | 01 | Sign-in | `/login` |
+| 02 | College settings (users and roles, branding, data requests) | `/college/settings` |
 | 03 | Branches and batches (college admin; CSV student import) | `/college/structure` |
 | 07 | Live classroom | `/live/{sessionId}` |
 | 08 | Live sessions & recordings | `/student/live` |

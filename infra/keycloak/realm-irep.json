@@ -42,6 +42,10 @@
         "description": "College coordinator / admin"
       },
       {
+        "name": "placement_officer",
+        "description": "College placement cell (college UI, screens 19/38/39)"
+      },
+      {
         "name": "irep_admin",
         "description": "IREP staff (screens 45-49)"
       }

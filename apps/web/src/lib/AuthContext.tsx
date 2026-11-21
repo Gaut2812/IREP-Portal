@@ -30,7 +30,7 @@ interface AuthContextType {
 
 /** The API uses `college_admin`; the web app uses the short `college`. */
 export function toWebRole(apiRole: string): Role {
-  if (apiRole === "college_admin" || apiRole === "college") return "college";
+  if (apiRole === "college_admin" || apiRole === "placement_officer" || apiRole === "college") return "college";
   if (apiRole === "irep_admin" || apiRole === "super_admin" || apiRole === "admin") return "admin";
   if (apiRole === "trainer" || apiRole === "parent" || apiRole === "student") return apiRole;
   return "student";

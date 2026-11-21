@@ -73,6 +73,12 @@ def _as_payload(user: User) -> TokenPayload:
     return TokenPayload(sub=user.id, role=user.role, college_id=user.college_id, email=user.email, name=user.name)
 
 
+def _sign_in_group(role: Optional[str]) -> Optional[str]:
+    """Which sign-in card a role uses: both college roles use the college card."""
+    r = normalize_role(role)
+    return "college_admin" if r == "placement_officer" else r
+
+
 def _find_user(db: Session, identifier: str) -> Optional[User]:
     ident = identifier.strip()
     if "@" in ident:
@@ -92,7 +98,7 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = _find_user(db, req.identifier)
     ip = _client_ip(request)
     invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials. Check your ID and password.")
-    if not user or normalize_role(user.role) != normalize_role(req.role) or user.role == "parent":
+    if not user or _sign_in_group(user.role) != _sign_in_group(req.role) or user.role == "parent":
         record_audit(db, None, "auth.login_failed", "user", user.id if user else None, {"reason": "unknown_or_role", "role": req.role}, college_id=user.college_id if user else "unknown", ip_address=ip)
         db.commit()
         raise invalid
@@ -112,6 +118,11 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
         if left <= 0:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Account locked after too many failed attempts. Try again in {LOCKOUT_MINUTES} minutes.")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid credentials. {left} attempt{'s' if left != 1 else ''} left before the account is locked.")
+    if not user.is_active:
+        # checked only after the password, so a deactivated account cannot be probed
+        record_audit(db, None, "auth.login_inactive", "user", user.id, None, college_id=user.college_id, ip_address=ip)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="This account is deactivated. Contact your college office.")
     user.failed_logins, user.locked_until = 0, None
     record_audit(db, _as_payload(user), "auth.login", "user", user.id, {"method": "password"}, ip_address=ip)
     db.commit()
@@ -133,7 +144,8 @@ def _phone_hash(phone: str) -> str:
 
 
 def _parent_by_phone(db: Session, phone: str) -> Optional[User]:
-    return db.execute(select(User).filter_by(role="parent", phone=phone)).scalars().first()
+    # deactivated parents are treated like an unknown number
+    return db.execute(select(User).filter_by(role="parent", phone=phone, is_active=True)).scalars().first()
 
 
 @router.post("/parent/otp/request")

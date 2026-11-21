@@ -66,8 +66,8 @@ test.describe("App shell: profile menu, per-user notifications, mobile navigatio
   });
 
   test("menu items for later modules show a friendly page, not a bare 404", async ({ page }) => {
-    await loginAs(page, "student");
-    await page.goto("/student/certificates");
+    await loginAs(page, "college");
+    await page.goto("/college/drives");                // screen 38 arrives in S15
     await expect(page.getByTestId("coming-soon")).toContainText("Coming soon");
   });
 });

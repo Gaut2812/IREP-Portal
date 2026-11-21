@@ -1,16 +1,16 @@
 "use client";
 
-/** Screen 43 · Approvals (trainer): one queue for leave and Cyber Range access (links L08, L09). */
+/** Screen 43 · Approvals (trainer): one queue for leave, Cyber Range access and certificate proofs (links L08, L09, L10). */
 import React, { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
-import { ApiError, fetchApi } from "@/lib/api";
-import { CalendarDays, ShieldAlert } from "lucide-react";
+import { ApiError, fetchApi, fetchBlob } from "@/lib/api";
+import { Award, CalendarDays, ShieldAlert } from "lucide-react";
 
 interface Item {
-  type: "leave" | "lab_access"; id: string; student_id: string; student_name: string; batch: string; status: string;
-  detail: { start_date?: string; end_date?: string; reason?: string; requested_by?: string; lab_name?: string; aup_accepted?: boolean };
+  type: "leave" | "lab_access" | "certificate"; id: string; student_id: string; student_name: string; batch: string; status: string;
+  detail: { start_date?: string; end_date?: string; reason?: string; requested_by?: string; lab_name?: string; aup_accepted?: boolean; title?: string; issuer?: string; issued_on?: string | null; credential_id?: string | null };
   decision_note: string | null; requested_at: string | null;
 }
 
@@ -39,8 +39,8 @@ export default function ApprovalsPage() {
     setBusy(true);
     setError("");
     try {
-      const url = it.type === "leave" ? `/trainer/approvals/leave/${it.id}` : `/trainer/approvals/labs/${it.id}`;
-      const body = it.type === "leave" ? { decision, note: note.trim() || null } : { decision, reason: note.trim() || null };
+      const url = it.type === "leave" ? `/trainer/approvals/leave/${it.id}` : it.type === "certificate" ? `/trainer/approvals/certificates/${it.id}` : `/trainer/approvals/labs/${it.id}`;
+      const body = it.type === "lab_access" ? { decision, reason: note.trim() || null } : { decision, note: note.trim() || null };
       await fetchApi(url, { method: "POST", body: JSON.stringify(body) });
       setDenying(null);
       setNote("");
@@ -50,6 +50,11 @@ export default function ApprovalsPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const viewProof = async (it: Item) => {
+    try { window.open(URL.createObjectURL(await fetchBlob(`/trainer/certificates/${it.id}/proof`)), "_blank", "noopener"); }
+    catch { setError(t("approvals.load_failed")); }
   };
 
   return (
@@ -71,11 +76,16 @@ export default function ApprovalsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="font-bold text-[#0F1F3A] flex items-center gap-1.5">
-                      {it.type === "leave" ? <CalendarDays className="w-3.5 h-3.5 text-[#2B5CD0]" /> : <ShieldAlert className="w-3.5 h-3.5 text-[#B45309]" />}
+                      {it.type === "leave" ? <CalendarDays className="w-3.5 h-3.5 text-[#2B5CD0]" /> : it.type === "certificate" ? <Award className="w-3.5 h-3.5 text-[#166534]" /> : <ShieldAlert className="w-3.5 h-3.5 text-[#B45309]" />}
                       {t(`approvals.type_${it.type}`)} · {it.student_name} <span className="font-normal text-[#64748B]">({it.batch})</span>
                     </div>
                     {it.type === "leave" ? (
                       <div className="text-[#475569]">{it.detail.start_date} → {it.detail.end_date} · {it.detail.reason} · {t("approvals.by")} {it.detail.requested_by}</div>
+                    ) : it.type === "certificate" ? (
+                      <div className="text-[#475569]">
+                        {it.detail.title} · {it.detail.issuer}{it.detail.issued_on ? ` · ${it.detail.issued_on}` : ""}{it.detail.credential_id ? ` · ${it.detail.credential_id}` : ""}
+                        <button type="button" onClick={() => viewProof(it)} data-testid="view-proof" className="ml-2 text-[#2B5CD0] font-bold underline">{t("approvals.view_proof")}</button>
+                      </div>
                     ) : (
                       <div className="text-[#475569]">{it.detail.lab_name} · {it.detail.aup_accepted ? t("approvals.aup_yes") : t("approvals.aup_no")}</div>
                     )}

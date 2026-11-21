@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 22, 25 (cap from the MoU until 47), 42, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum, templates and the problem and question bank), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 22, 25 (cap from the MoU until 47), 26, 27, 28, 42, 43 (leave, Cyber Range and certificate proofs), 44, 45, 46 (curriculum, templates and the problem and question bank), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -39,7 +39,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L07 | 09 Trainer attendance | 10 Parent attendance | Both | Attendance record down; leave request up | Marking; parent request | Inferred | active |
 | L08 | 29 Virtual labs | 43 Approvals | Both | Cyber Range access request; approve or deny | Student requests a lab | PDF, Gap fix | active |
 | L09 | 10 Parent attendance | 43 Approvals | Both | Leave request; decision | Parent submits | Gap fix | active |
-| L10 | 26 Student certificates | 43 Approvals | Both | External certificate proof; decision | Student uploads proof | Gap fix | planned |
+| L10 | 26 Student certificates | 43 Approvals | Both | External certificate proof; decision | Student uploads proof | Gap fix | active |
 | L11 | 05 Schedule | 06 Timetable | Both | Proposed sessions; approval or clash warning | Any schedule change | Inferred | active |
 | L12 | 46 Content library | 11 My courses | One way | Curriculum, lessons, notes by semester and track | Content published | Gap fix | active |
 | L13 | 22 Assessments | 24 Coding Lab, 23 Practice tests | Both | Problems, tests, trainer notes; results back to 22 | Trainer publishes | PDF | active |
@@ -66,7 +66,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L29 | 42 College events | 12, 34, 38 | One way | Upcoming list, placement-update posts; a mock drive is an event type (12 and 34 built and tested; 38 in S15) | Event published | Gap fix | planned |
 | L30 | 41 College messages | 34, 15 | One way | Announcement-only posts to students and parents | Announcement posted | PDF, Gap fix | planned |
 | L31 | 14 At-risk | 18, 15 | One way | A flag creates a parent call and alert; the parent sees it in messages and the overview | Flag action | PDF | active |
-| L32 | 26 Student certificates | 27 Parent certificates | One way | Read-only copy of earned certificates | Certificate verified | Inferred | planned |
+| L32 | 26 Student certificates | 27 Parent certificates | One way | Read-only copy of earned certificates | Certificate verified | Inferred | active |
 | L33 | 11 My courses | 12 Dashboard | One way | Course progress feeds the skill bars | Lesson progress | Inferred | active |
 | L34 | 24, 23, 30, 36 and attendance (09) | 12, 13, 14, 15, 19, 39 | One way | One readiness score and band shown everywhere | Nightly and on events | PDF | active |
 | L35 | All data | 19, 39, 28, 20 | One way | Aggregates only; no private trainer notes or chats | On read | PDF | active |
@@ -92,7 +92,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **23 Practice tests** (built): ← 22 · L13 tests down, results back · → L34 readiness input
 - **24 Coding Lab** (built): ← 22 · L13 problems and trainer notes · ← 46 · L37 problem bank · → L34 readiness input
 - **25 AI Study Buddy** (built, S10): → 14, 13 · L21 AI usage counts · ← 47 · L36 AI-call quota and daily cap
-- **26 Certificates** (S11): ↔ 43 · L10 proof up, decision down · → 27 · L32 · → 28 · L35 counts and proof status only. *Release rule: verified only after trainer approval.*
+- **26 Certificates** (built): ↔ 43 · L10 proof up, decision down · → 27 · L32 · → 28 · L35 counts and proof status only. *Release rule: verified only after trainer approval.*
 - **29 Virtual labs** (built): ↔ 43 · L08 Cyber Range access · ← 47 · L36 lab-hour quota
 - **30 Sprint board** (built): ↔ 31 · L14 · → L34 readiness input
 - **32 Portfolio** (built): → 33 · L15 public projects · → 48 · L38 consent for a public portfolio
@@ -112,7 +112,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **31 Code reviews** (built): ↔ 30 · L14 PR queue in, review result out
 - **35 Message Hub** (built): ↔ 18 · L19 · ↔ 34 · L18 · ↔ 41 · L20
 - **37 Mock interviews** (S15): ↔ 36 · L16 · ← 38 · L17
-- **43 Approvals** (S5 leave, S11 proofs, S12 labs): ↔ 29 · L08 · ↔ 10 · L09 · ↔ 26 · L10. Every decision → 44 and 48.
+- **43 Approvals** (built: leave, Cyber Range access and certificate proofs): ↔ 29 · L08 · ↔ 10 · L09 · ↔ 26 · L10. Every decision → 44 and 48.
 
 ### Parent
 
@@ -121,7 +121,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **16 Progress reports** (built): ← 21 · L22
 - **17 Events** (built): ↔ 42 · L05 invitations down, RSVP up
 - **18 Message trainer** (built): ↔ 35 · L19 · ← 14 · L31
-- **27 Certificates** (S11): ← 26 · L32 read-only
+- **27 Certificates** (built): ← 26 · L32 read-only
 - **33 Projects and portfolio** (built): ← 32 · L15
 - **40 Feedback survey** (S14): ↔ 02 · L26
 
@@ -132,7 +132,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **06 Timetable** (S4): ↔ 05 · L11
 - **19 College overview** (built): ← 01 · L01 · ← L34 · ← L35 aggregates only
 - **20 MoU reports** (built; L23 usage figures with 47): ← 47 · L23 · ← L35 aggregates only
-- **28 Certifications** (S11): ← L35 counts, proofs and vouchers as aggregates
+- **28 Certifications** (built): ← L35 counts, proofs and vouchers as aggregates
 - **38 Mock drives** (S15): → 37 · L17 · ← 42 · L29
 - **39 Placement readiness** (S15): ← L34 · ← L35
 - **41 Messages** (S14): ↔ 35 · L20 · → 34, 15 · L30 announcement-only posts

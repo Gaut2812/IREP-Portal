@@ -40,8 +40,9 @@ export function authHeaders(): Record<string, string> {
 }
 
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;   // multipart: the browser sets the boundary
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isForm ? {} : { "Content-Type": "application/json" }),
     ...authHeaders(),
     ...((options.headers as Record<string, string>) || {}),
   };

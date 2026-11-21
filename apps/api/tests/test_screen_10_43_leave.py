@@ -176,7 +176,7 @@ def test_request_rules(week):
 
 def test_cyber_range_requests_share_the_queue_and_roles_are_guarded():
     q = client.get("/api/v1/trainer/approvals?status=all", headers=ARUN).json()
-    assert set(q["counts"]) == {"leave", "lab_access"}
+    assert set(q["counts"]) == {"leave", "lab_access", "certificate"}   # certificate proofs joined in S11
     for h in (PRIYA, RAMESH, KAVITHA):
         assert client.get("/api/v1/trainer/approvals", headers=h).status_code == 403
     assert client.get("/api/v1/parent/attendance", headers=PRIYA).status_code == 403

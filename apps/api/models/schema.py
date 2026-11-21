@@ -643,11 +643,20 @@ class Certificate(TenantModel):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     issuer: Mapped[str] = mapped_column(String(128), default="IREP")
     cert_type: Mapped[str] = mapped_column(String(32), default="course")   # course, external, exam
-    status: Mapped[str] = mapped_column(String(32), default="earned", index=True)  # earned, scheduled, pending_proof, revoked
+    status: Mapped[str] = mapped_column(String(32), default="earned", index=True)  # earned, scheduled, pending_proof, rejected, revoked
     issued_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, index=True)
     exam_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
     verify_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     proof_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    # S11 (26 ↔ 43, L10): external proof, verified only after trainer approval (release rule 5.1.4)
+    credential_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)     # the issuer's id or verify link
+    proof_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)         # services/storage key, never a public URL
+    proof_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    proof_submitted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    voucher_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)      # an IREP-funded exam voucher (28 counts them)
 
 
 class Internship(TenantModel):

@@ -95,6 +95,9 @@ Sign-in rules:
 | 23 | Practice tests (published to my batch) | `/student/tests`, `/student/tests/{id}` |
 | 24 | Coding lab | `/student/coding/{problemId}` |
 | 25 | AI Study Buddy (student; hints, daily cap, Tamil) | `/student/buddy` |
+| 26 | Certificates (student; external proofs to the trainer) | `/student/certificates` |
+| 27 | Certificates (parent; verified only) | `/parent/certificates` |
+| 28 | Certifications (college; counts only) | `/college/certifications` |
 | 29 | Virtual labs | `/student/labs` |
 | 30 | Sprint board | `/student/projects/{teamId}/board` |
 | 34 | Discussion groups | `/student/discussions` |

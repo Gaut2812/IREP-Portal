@@ -149,9 +149,25 @@ def approvals_queue(status_filter: str = Query("pending", alias="status"), curre
                       "status": ap.status, "detail": {"lab_name": lab, "aup_accepted": ap.aup_accepted_at is not None},
                       "decision_note": ap.reason if ap.status != "pending" else None,
                       "requested_at": ap.created_at.isoformat() if ap.created_at else None})
+    # S11 (L10): certificate proofs; pending = waiting, decided = verified (earned with a decision) or rejected
+    from models.schema import Certificate
+    cert_states = {"pending": ["pending_proof"], "decided": ["earned", "rejected"]}.get(status_filter, ["pending_proof", "earned", "rejected"])
+    q = (select(Certificate, Student, User.name).join(Student, Student.id == Certificate.student_id)
+         .join(User, User.id == Student.user_id)
+         .where(Certificate.college_id == current_user.college_id, Student.batch_id.in_(batch_ids),
+                Certificate.status.in_(cert_states), Certificate.proof_key.is_not(None)))
+    if status_filter in ("approved", "denied"):
+        q = q.where(Certificate.status == ("earned" if status_filter == "approved" else "rejected"))
+    for c, st, name in db.execute(q).all():
+        items.append({"type": "certificate", "id": c.id, "student_id": st.id, "student_name": name, "batch": st.batch_name,
+                      "status": {"pending_proof": "pending", "earned": "approved", "rejected": "denied"}[c.status],
+                      "detail": {"title": c.title, "issuer": c.issuer, "issued_on": c.issued_on.isoformat() if c.issued_on else None,
+                                 "credential_id": c.credential_id, "proof_url": f"/api/v1/trainer/certificates/{c.id}/proof"},
+                      "decision_note": c.decision_note, "requested_at": c.proof_submitted_at.isoformat() if c.proof_submitted_at else None})
     items.sort(key=lambda i: i["requested_at"] or "", reverse=True)
     return {"items": items, "counts": {"leave": sum(1 for i in items if i["type"] == "leave"),
-                                       "lab_access": sum(1 for i in items if i["type"] == "lab_access")}}
+                                       "lab_access": sum(1 for i in items if i["type"] == "lab_access"),
+                                       "certificate": sum(1 for i in items if i["type"] == "certificate")}}
 
 
 @router.post("/trainer/approvals/leave/{leave_id}")

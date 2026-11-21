@@ -5,7 +5,7 @@ import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,7 +18,8 @@ from services.audit import record_audit
 from services.consent import is_granted
 from services.notifications import notify_user
 from services.parent_overview import month_label
-from services.reports import STATIC_DIR, render_simple_pdf
+from services.reports import render_pdf
+from services.storage import get_storage
 
 router = APIRouter(tags=["Monthly cards"])
 TRAINER = require_role(["trainer"])
@@ -162,12 +163,12 @@ def edit_card(card_id: str, req: CardEdit, current_user: TokenPayload = Depends(
 
 def card_pdf(c: MonthlyCard, child_name: str) -> str:
     """Render the released card (English PDF; Tamil glyphs need WeasyPrint, see services/reports.py)."""
-    rel = f"cards/{c.id}.pdf"
+    key = f"cards/{c.id}.pdf"
     lines = [f"Student: {child_name}", f"Month: {month_label(c.month, 'en')} {c.year}", ""]
     lines += [f"{r.get('area_en')}: {r.get('prev')} -> {r.get('curr')} ({r.get('status_en')})" for r in (c.rows or [])]
     lines += ["", f"Trainer: {c.trainer_name or ''}", f"Remark: {c.trainer_remark_en or ''}"[:110], f"How to help: {c.how_to_help_en or ''}"[:110]]
-    render_simple_pdf(STATIC_DIR / rel, "IREP monthly progress card", lines)
-    return rel
+    get_storage().put(key, render_pdf("IREP monthly progress card", lines), "application/pdf")
+    return key
 
 
 def _approve(db: Session, c: MonthlyCard, user: TokenPayload) -> Optional[str]:
@@ -258,7 +259,9 @@ def parent_card(card_id: str, lang: str = "en", current_user: TokenPayload = Dep
 @router.get("/parent/reports/{card_id}/pdf")
 def parent_card_pdf(card_id: str, current_user: TokenPayload = Depends(PARENT), db: Session = Depends(get_db)):
     c, child = _parent_card(db, current_user, card_id)
-    if not c.pdf_path or not (STATIC_DIR / c.pdf_path).exists():
+    storage = get_storage()
+    if not c.pdf_path or not storage.exists(c.pdf_path):
         c.pdf_path = card_pdf(c, get_user_name(db, child.user_id, "Student"))       # seeded cards: render on first download
     db.commit()
-    return FileResponse(str(STATIC_DIR / c.pdf_path), media_type="application/pdf", filename=f"progress-{c.year}-{c.month:02d}.pdf")
+    return Response(content=storage.get(c.pdf_path), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="progress-{c.year}-{c.month:02d}.pdf"'})

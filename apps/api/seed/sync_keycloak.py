@@ -7,7 +7,7 @@
 Each Keycloak user gets: username/email, first/last name, the realm role, and
 the admin-only attributes irep_user_id (users.id) and college_id that the API
 reads from the token. Parents are skipped: they sign in with the API's OTP
-until Keycloak has SMS OTP (MSG91, pilot).
+(email by default, MSG91 SMS as a switch; docs/deploy/DEPLOY.md).
 
 DEMO ONLY: --password sets the same password on every synced account
 (default: DEMO_PASSWORD or password123). Never run with --password against

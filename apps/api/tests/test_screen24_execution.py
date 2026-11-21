@@ -79,7 +79,7 @@ async def test_production_mode_refuses_fake_adapter():
         with pytest.raises(RuntimeError) as exc_info:
             async with lifespan(app):
                 pass
-        assert "Production environment requires a live Judge0 execution cluster" in str(exc_info.value)
+        assert "JUDGE0_ADAPTER must be judge0" in str(exc_info.value)          # core/production.py lists every problem
     finally:
         settings.ENVIRONMENT = orig_env
         settings.JUDGE0_ADAPTER = orig_adapter

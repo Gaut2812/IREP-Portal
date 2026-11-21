@@ -163,12 +163,27 @@ def request_parent_otp(req: ParentOTPRequest, request: Request, db: Session = De
     otp = f"{secrets.randbelow(1_000_000):06d}"
     db.add(OtpAttempt(id=f"otp_{uuid.uuid4().hex[:20]}", college_id=college_id, phone_hash=ph, otp_hash=get_password_hash(otp),
                       expires_at=now + datetime.timedelta(minutes=OTP_TTL_MINUTES), created_at=now, updated_at=now))
+    channel = None
     if parent:
-        # SMS goes straight to the adapter: the OTP is never stored in plain text
-        get_notification_adapter().deliver(parent, "sms", "IREP sign-in OTP", f"Your IREP OTP is {otp}. Valid for {OTP_TTL_MINUTES} minutes.")
-    record_audit(db, None, "auth.otp_requested", "phone", ph[:16], {"known": bool(parent)}, college_id=college_id, ip_address=_client_ip(request))
+        # Sent directly (never through the outbox): an outbox row would hold the code in plain text.
+        # Email by default; SMS only when PARENT_OTP_CHANNEL=sms and SMS_PROVIDER=msg91.
+        if (settings.NOTIFY_ADAPTER or "fake").lower() == "live":
+            from services.gateways import GatewayError, send_parent_otp
+            try:
+                channel = send_parent_otp(parent, otp, OTP_TTL_MINUTES)
+            except GatewayError:
+                db.rollback()
+                raise HTTPException(status_code=503, detail="We could not send the code just now. Try again in a minute or contact the college office.")
+        else:
+            get_notification_adapter().deliver(parent, "sms", "IREP sign-in OTP", f"Your IREP OTP is {otp}. Valid for {OTP_TTL_MINUTES} minutes.")
+            channel = "demo"
+    record_audit(db, None, "auth.otp_requested", "phone", ph[:16], {"known": bool(parent), "channel": channel}, college_id=college_id, ip_address=_client_ip(request))
     db.commit()
-    out = {"success": True, "message": f"If this number is registered, an OTP has been sent. It is valid for {OTP_TTL_MINUTES} minutes.", "expires_in": OTP_TTL_MINUTES * 60}
+    where = "to the email address registered with the college" if settings.PARENT_OTP_CHANNEL.lower() == "email" else "by SMS"
+    where_ta = "கல்லூரியில் பதிவு செய்த மின்னஞ்சலுக்கு" if settings.PARENT_OTP_CHANNEL.lower() == "email" else "SMS மூலம்"
+    out = {"success": True, "message": f"If this number is registered, a code has been sent {where}. It is valid for {OTP_TTL_MINUTES} minutes.",
+           "message_ta": f"இந்த எண் பதிவு செய்யப்பட்டிருந்தால், குறியீடு {where_ta} அனுப்பப்பட்டது. இது {OTP_TTL_MINUTES} நிமிடங்கள் செல்லுபடியாகும்.",
+           "expires_in": OTP_TTL_MINUTES * 60, "channel": settings.PARENT_OTP_CHANNEL.lower()}
     if settings.ENVIRONMENT == "development":
         out["demo_otp"] = otp
     return out

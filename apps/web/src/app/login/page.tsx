@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("9876543210");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [otpChannel, setOtpChannel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -84,8 +85,9 @@ export default function LoginPage() {
       }
       if (selectedRole === "parent") {
         if (!otpSent) {
-          const data = await fetchApi<{ demo_otp?: string; message: string }>("/auth/parent/otp/request", { method: "POST", body: JSON.stringify({ phone }) });
+          const data = await fetchApi<{ demo_otp?: string; message: string; channel?: string }>("/auth/parent/otp/request", { method: "POST", body: JSON.stringify({ phone }) });
           setOtpSent(true);
+          setOtpChannel(data.channel || null);
           setDemoOtp(data.demo_otp || null);
           return;
         }
@@ -250,7 +252,7 @@ export default function LoginPage() {
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="block text-xs font-bold text-[#0F1F3A]">{t("login.otp_label")}</label>
-                      {demoOtp ? <span className="text-[10px] text-[#2BB3A0] font-bold" data-testid="demo-otp">{t("login.demo_otp").replace("{otp}", demoOtp)}</span> : <span className="text-[10px] text-[#64748B]">{t("login.otp_sent")}</span>}
+                      {demoOtp ? <span className="text-[10px] text-[#2BB3A0] font-bold" data-testid="demo-otp">{t("login.demo_otp").replace("{otp}", demoOtp)}</span> : <span className="text-[10px] text-[#64748B]" data-testid="otp-sent">{t(otpChannel === "email" ? "login.otp_sent_email" : "login.otp_sent")}</span>}
                     </div>
                     <input
                       type="text"

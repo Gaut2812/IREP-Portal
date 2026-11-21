@@ -3,8 +3,8 @@
 Every notification is stored in the `notifications` table (in-app channel)
 and optionally fanned out through an SMS / email adapter. The default
 adapter is a fake that only records the delivery status, so the portal is
-fully usable without a DLT sender or SMTP server. Select the real adapter
-with NOTIFY_ADAPTER=smtp|sms once credentials exist.
+fully usable without a DLT sender or SMTP server. NOTIFY_ADAPTER=live sends
+real email, and SMS when SMS_PROVIDER=msg91 (services/gateways.py).
 """
 import datetime
 import uuid
@@ -36,8 +36,18 @@ class FakeNotificationAdapter(NotificationAdapter):
         return "delivered"
 
 
+class LiveNotificationAdapter(NotificationAdapter):
+    """Real email (SMTP) and, when switched on, SMS (MSG91): services/gateways.py."""
+
+    def deliver(self, user: User, channel: str, title: str, body: Optional[str]) -> str:
+        from services.gateways import deliver
+        return deliver(user, channel, title, body)
+
+
 def get_notification_adapter() -> NotificationAdapter:
-    # Real SMS/email adapters plug in here (NOTIFY_ADAPTER=smtp|sms).
+    from core.config import settings
+    if (settings.NOTIFY_ADAPTER or "fake").lower() == "live":
+        return LiveNotificationAdapter()
     return FakeNotificationAdapter()
 
 

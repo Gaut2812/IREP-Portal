@@ -291,6 +291,7 @@ export default function LiveClassroomPage() {
                   {t("live_class.join_in_teams")}
                 </a>
                 <p className="text-[11px] text-[#94A3B8] max-w-sm">{t("live_class.teams_attendance_note")}</p>
+                {!isTrainer && <p className="text-[11px] text-[#94A3B8] max-w-sm" data-testid="teams-name-rule">{t("live_class.teams_name_rule")}</p>}
               </div>
             ) : joinUrl ? (
               <iframe src={joinUrl} title={st.title} className="flex-1 w-full rounded-xl bg-black" allow="camera; microphone; display-capture; fullscreen" />

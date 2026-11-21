@@ -92,7 +92,8 @@ def get_verifier() -> KeycloakVerifier:
     global _verifier
     if _verifier is None:
         from core.config import settings
-        _verifier = KeycloakVerifier(settings.KEYCLOAK_ISSUER, settings.KEYCLOAK_AUDIENCE)
+        _verifier = KeycloakVerifier(settings.KEYCLOAK_ISSUER, settings.KEYCLOAK_AUDIENCE,
+                                     jwks_url=settings.KEYCLOAK_JWKS_URL or None)
     return _verifier
 
 

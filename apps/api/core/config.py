@@ -62,6 +62,27 @@ class Settings(BaseSettings):
     LAB_METER_URL: str = os.getenv("LAB_METER_URL", "")                                    # cAdvisor on the lab node (S13); empty = off
     SPECTATE_ALLOWED_HOSTS: str = os.getenv("SPECTATE_ALLOWED_HOSTS", "")                   # extra hosts for class spectate links (comma-separated)
     TRANSLATE_ADAPTER: str = os.getenv("TRANSLATE_ADAPTER", "fake")
+
+    # ---- Pilot deployment (docs/deploy/DEPLOY.md) ----
+    # Demo adapters production may keep for features outside the pilot: any of judge0, labs, study_buddy
+    ALLOW_DEMO_ADAPTERS: str = os.getenv("ALLOW_DEMO_ADAPTERS", "")
+    # Outbound email and SMS. NOTIFY_ADAPTER=fake records deliveries only (dev); live sends them.
+    NOTIFY_ADAPTER: str = os.getenv("NOTIFY_ADAPTER", "fake")
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "")                       # e.g. "IREP Portal <no-reply@your-domain>"
+    SMTP_STARTTLS: bool = os.getenv("SMTP_STARTTLS", "true").lower() == "true"
+    # SMS is a switch, off by default: notices meant for SMS go to email instead
+    SMS_PROVIDER: str = os.getenv("SMS_PROVIDER", "off")              # off | msg91
+    MSG91_AUTH_KEY: str = os.getenv("MSG91_AUTH_KEY", "")
+    MSG91_TEMPLATE_ID: str = os.getenv("MSG91_TEMPLATE_ID", "")       # DLT-approved flow for notices (var: message)
+    MSG91_OTP_TEMPLATE_ID: str = os.getenv("MSG91_OTP_TEMPLATE_ID", "")   # DLT-approved flow for the OTP (var: otp)
+    MSG91_URL: str = os.getenv("MSG91_URL", "https://control.msg91.com/api/v5/flow")
+    PARENT_OTP_CHANNEL: str = os.getenv("PARENT_OTP_CHANNEL", "email")    # email | sms (needs SMS_PROVIDER=msg91)
+    # Files: local disk now, S3-compatible later (services/storage.py)
+    STORAGE_ADAPTER: str = os.getenv("STORAGE_ADAPTER", "local")
     # Screen 25 AI Study Buddy. "fake" (dev, deterministic hints) or "anthropic" (Claude API; needs the
     # `anthropic` package and ANTHROPIC_API_KEY). Minors' data: no names or ids are sent; emails and phones are redacted.
     STUDY_BUDDY_ADAPTER: str = os.getenv("STUDY_BUDDY_ADAPTER", "fake")
@@ -76,6 +97,9 @@ class Settings(BaseSettings):
     KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "http://localhost:8081")      # as the browser sees it (token issuer)
     KEYCLOAK_REALM: str = os.getenv("KEYCLOAK_REALM", "irep")
     KEYCLOAK_AUDIENCE: str = os.getenv("KEYCLOAK_AUDIENCE", "irep-api")
+    # Optional in-network signing-keys URL (Docker: http://keycloak:8080/realms/irep/protocol/openid-connect/certs);
+    # tokens are still checked against KEYCLOAK_ISSUER, the public URL.
+    KEYCLOAK_JWKS_URL: str = os.getenv("KEYCLOAK_JWKS_URL", "")
 
     @property
     def KEYCLOAK_ISSUER(self) -> str:

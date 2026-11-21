@@ -47,6 +47,12 @@ venv/Scripts/python seed/sync_keycloak.py
 KEYCLOAK_IT=1 venv/Scripts/python -m pytest tests/test_keycloak_live.py -q
 AUTH_PROVIDER=keycloak venv/Scripts/python -m uvicorn main:app --port 8000
 
+# Production (pilot, one VM): docs/deploy/DEPLOY.md; run from infra/prod with a filled-in .env
+docker compose build && docker compose up -d
+docker compose run --rm api python ops/configure_keycloak.py      # realm -> real domain + SMTP
+docker compose run --rm api python ops/bootstrap_admin.py --email you@x.in   # first IREP staff
+docker compose run --rm api python ops/teams_check.py              # Graph token, calendar, meetings
+
 # Web
 cd apps/web
 pnpm install --frozen-lockfile   # apps/web/pnpm-lock.yaml is the lockfile CI uses
@@ -96,7 +102,7 @@ Demo logins: `priya.r@demo.edu`, `arun.k@demo.edu`, `admin@demo.edu` (password `
 13. **Identity.** `AUTH_PROVIDER=local` (dev default) or `keycloak` (required in production).
     - In Keycloak mode the API verifies RS256 tokens (`core/keycloak.py`). It maps realm role, `irep_user_id` and `college_id` claims to `TokenPayload`.
     - Only admins can edit `irep_user_id` and `college_id` (realm user profile), so users cannot change tenant.
-    - Parents keep the API's mobile OTP until Keycloak has SMS OTP (MSG91, pilot). In Keycloak mode a local token is accepted only for the parent role, and `/auth/login` returns 410.
+    - Parents keep the API's mobile-number OTP, delivered by email (default) or MSG91 SMS (`PARENT_OTP_CHANNEL`). In Keycloak mode a local token is accepted only for the parent role, and `/auth/login` returns 410.
     - Never commit a realm export with users or secrets. `infra/keycloak/realm-irep.json` is a dev realm template.
 
 ## Definition of done (per screen or PR)
@@ -126,7 +132,9 @@ Changes to auth, messaging policy, Microsoft Graph, labs, Judge0, migrations tha
 - Roles: `placement_officer` uses the college UI (sign-in card "College"). Deactivated accounts cannot sign in; tokens already issued stay valid until expiry (known gap, see docs/screens/02).
 - `packages/api-client`: generated types; after any route or model change run `cd packages/api-client && npm run generate` (CI fails if stale). Web imports them type-only: `import type { RequestBody } from "@irep/api-client"`.
 - Readiness v1 (L34): `services/readiness.run_nightly` (Celery beat 01:30 IST, or `POST /admin/jobs/readiness`) recomputes attendance from `session_attendance` (Excused left out), snapshots once a day with a monthly delta, then runs the at-risk rules. Parent calls (L31) in quiet hours wait in the outbox (`at_risk.parent_call`).
-- Not built yet (S1 plan): Keycloak SMS OTP for parents (pilot). Specs: `docs/screens/NN-*.md` before building a screen.
+- Pilot deployment (`infra/prod`, `docs/deploy/`): Caddy + Compose on one VM, nightly `backup.sh` (pg_dump of both DBs + uploads, 7 days, `BACKUP_REMOTE`). `ENVIRONMENT=production` runs `core/production.problems()` at start-up; `ALLOW_DEMO_ADAPTERS` (judge0, labs, study_buddy, live_classes) keeps named features on demo adapters. `NOTIFY_ADAPTER=live` sends via `services/gateways.py` (SMTP; MSG91 only when `SMS_PROVIDER=msg91`, else SMS falls back to email).
+- Parent OTP stays in the API in Keycloak mode (Keycloak 26 has no email/SMS OTP): `PARENT_OTP_CHANNEL=email` (default) or `sms`. Files: always `services/storage.get_storage()` (keys, not paths); `S3Storage` is a stub.
+- Specs: `docs/screens/NN-*.md` before building a screen.
 - Study Buddy (25): `STUDY_BUDDY_ADAPTER=fake` (dev) or `anthropic` (Claude; production requires it; install `anthropic` on that server, it is not in requirements.txt yet). Redacts emails and phones; trainers see counts only (L21).
 - Labs track (docs/labs/README.md): browser labs (PGlite, Pyodide) with signed beacons; server labs via `LAB_ADAPTER=jupyterhub` (outbox `lab.start`/`lab.stop`, production refuses others); trainer lab board `/trainer/labs`. `infra/labs` (JupyterHub + DockerSpawner, profiles incl. Sysbox-only docker-k8s) and `infra/cyber-range` (own node; portal uses `CYBER_RANGE_HUB_URL` only) are written but not deployed: need review and dedicated nodes. Metering: cAdvisor via `LAB_METER_URL` (`services/lab_metering.py`); exercise checkers keep answers server-side; class spectate links (`/trainer/sessions/{id}/spectate`). Quotas (L36) come from the active MoU via `services/quotas.py`; `tests/test_lab_isolation.py` guards the infra hardening.
-- Live classes: `LIVE_CLASS_ADAPTER=teams` (`services/teams.py`, Graph mocked in tests) creates calendar events, opens "Join in Teams" and imports attendance (email, then "IREP-<register no> Name", else trainer confirms). Not yet exercised against a real tenant: needs the M365 licence and Graph consent decisions.
+- Live classes: `LIVE_CLASS_ADAPTER=teams` (`services/teams.py`, Graph mocked in tests) creates calendar events, opens "Join in Teams" and imports attendance (email, then "IREP-<register no> Name", else trainer confirms). Not yet exercised against a real tenant: the M365 admin steps are in `docs/deploy/TEAMS_SETUP.md`; `ops/teams_check.py` proves them. Teams recordings are not imported (links stay in Teams).

@@ -1,0 +1,50 @@
+# Caddy gets and renews Let's Encrypt certificates for both names on its own.
+# Needs DNS A records for APP_DOMAIN and ID_DOMAIN pointing at this VM, with ports 80 and 443 open.
+{
+	email {$ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+{$APP_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+	request_body {
+		max_size 25MB
+	}
+	# API (REST + WebSockets under /api/v1/ws/...) and signed media links
+	@api path /api/* /media/* /health
+	handle @api {
+		reverse_proxy api:8000
+	}
+	# The interactive API docs stay off the public internet
+	@docs path /docs* /redoc* /openapi.json
+	handle @docs {
+		respond 404
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+{$ID_DOMAIN} {
+	import security_headers
+	# Admin console and the master realm only from KC_ADMIN_ALLOW_IPS (your office/home IP).
+	# The API reaches Keycloak's admin API inside Docker (http://keycloak:8080), not through here.
+	@kcadmin {
+		path /admin* /realms/master*
+		not remote_ip {$KC_ADMIN_ALLOW_IPS}
+	}
+	respond @kcadmin 404
+	# Keycloak's health and metrics stay internal
+	@kcinternal path /health* /metrics*
+	respond @kcinternal 404
+	reverse_proxy keycloak:8080
+}

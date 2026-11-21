@@ -1,0 +1,161 @@
+# IREP pilot: everything on one VM behind Caddy (automatic HTTPS).
+# Step by step: docs/deploy/DEPLOY.md.   Run from this folder with a filled-in .env:
+#   docker compose build && docker compose up -d
+# Only Caddy publishes ports (80, 443). Postgres, Valkey, Keycloak and the app stay on the
+# private Docker network.
+name: irep
+
+x-app: &app
+  image: irep-api:${IREP_VERSION:-local}
+  env_file: .env
+  environment: &app-env
+    ENVIRONMENT: production
+    AUTH_PROVIDER: keycloak
+    OUTBOX_RUNNER: celery
+    DATABASE_URL: postgresql+psycopg2://irep:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/irep
+    CELERY_BROKER_URL: redis://:${VALKEY_PASSWORD:?set VALKEY_PASSWORD}@valkey:6379/0
+    PUBLIC_BASE_URL: https://${APP_DOMAIN:?set APP_DOMAIN}
+    KEYCLOAK_URL: https://${ID_DOMAIN:?set ID_DOMAIN}
+    KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/irep/protocol/openid-connect/certs
+    KEYCLOAK_ADMIN_URL: http://keycloak:8080
+    STORAGE_ADAPTER: local
+    STORAGE_DIR: /data/uploads
+  volumes:
+    - uploads:/data/uploads
+  restart: unless-stopped
+  logging: &logging
+    driver: json-file
+    options: {max-size: "20m", max-file: "5"}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: irep
+      POSTGRES_DB: irep
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?set KC_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-keycloak-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U irep -d irep"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--appendonly", "yes", "--requirepass", "${VALKEY_PASSWORD}"]
+    volumes:
+      - valkeydata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$$VALKEY_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD}
+    restart: unless-stopped
+    logging: *logging
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: ["start", "--import-realm"]          # imports the realm only if it does not exist yet
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_HOSTNAME: https://${ID_DOMAIN}             # token issuer = what browsers see
+      KC_HTTP_ENABLED: "true"                       # TLS ends at Caddy
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?set KEYCLOAK_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD}
+    volumes:
+      - ../keycloak/realm-irep.json:/opt/keycloak/data/import/realm-irep.json:ro   # dev template; ops/configure_keycloak.py sets domains + SMTP
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q UP <&3"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:                                          # one-off: alembic upgrade head, then exits
+    <<: *app
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  api:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: infra/prod/api.Dockerfile
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      valkey: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
+
+  worker:                                           # drains the outbox: email, SMS, Teams, audit fan-out
+    <<: *app
+    working_dir: /app/apps/workers
+    command: ["celery", "-A", "irep_workers.celery_app", "worker", "--loglevel=warning", "--concurrency=2"]
+    healthcheck: {disable: true}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      valkey: {condition: service_healthy}
+
+  beat:                                             # schedules: outbox poll, Teams work, nightly readiness
+    <<: *app
+    working_dir: /app/apps/workers
+    command: ["celery", "-A", "irep_workers.celery_app", "beat", "--loglevel=warning", "--schedule=/tmp/celerybeat-schedule"]
+    healthcheck: {disable: true}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      valkey: {condition: service_healthy}
+
+  web:
+    image: irep-web:${IREP_VERSION:-local}
+    build:
+      context: ../..
+      dockerfile: infra/prod/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://${APP_DOMAIN}/api/v1
+    restart: unless-stopped
+    depends_on: [api]
+    logging: *logging
+
+  caddy:
+    image: caddy:2.10-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      ID_DOMAIN: ${ID_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+      KC_ADMIN_ALLOW_IPS: ${KC_ADMIN_ALLOW_IPS:-192.0.2.1/32}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web, api, keycloak]
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  pgdata:
+  valkeydata:
+  uploads:
+  caddy_data:
+  caddy_config:

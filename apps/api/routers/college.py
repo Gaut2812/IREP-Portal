@@ -4,7 +4,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,7 +13,8 @@ from core.database import get_db
 from core.security import get_current_user, require_role, TokenPayload
 from models.schema import ReportRun
 from services.college_overview import build_college_overview
-from services.reports import ensure_report_file, STATIC_DIR
+from services.reports import ensure_report_file
+from services.storage import get_storage
 from services.audit import record_audit
 
 router = APIRouter(prefix="/college", tags=["College Screens"])
@@ -120,9 +121,10 @@ def download_report(
     run = db.execute(select(ReportRun).filter_by(id=report_id, college_id=current_user.college_id)).scalar_one_or_none()
     if not run or not run.file_path:
         raise HTTPException(status_code=404, detail="Report not found")
-    path = STATIC_DIR / run.file_path
-    if not path.exists():
+    storage = get_storage()
+    if not storage.exists(run.file_path):
         raise HTTPException(status_code=404, detail="Report file missing")
     record_audit(db, current_user, "report.download", "report_run", run.id)
     db.commit()
-    return FileResponse(str(path), media_type="application/pdf", filename=f"{run.id}.pdf")
+    return Response(content=storage.get(run.file_path), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{run.id}.pdf"'})

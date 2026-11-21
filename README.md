@@ -138,9 +138,16 @@ Each external service sits behind an adapter. The default is a local fake, so th
 | `LAB_ADAPTER` | simulated lab sessions | `docker` |
 | `TRANSLATE_ADAPTER` | seeded Tamil pairs + glossary, cached | `libretranslate` (`TRANSLATE_URL`) |
 | `REALTIME_ADAPTER` | in-process WebSocket hub | `valkey` |
-| `NOTIFY_ADAPTER` | records SMS/email in memory | `smtp` / `sms` |
+| `NOTIFY_ADAPTER` | records SMS/email in memory | `live`: SMTP email (`SMTP_*`); SMS via MSG91 only when `SMS_PROVIDER=msg91` (off by default: SMS notices go by email) |
+| `STORAGE_ADAPTER` | `local` (files under `STORAGE_DIR`) | `s3` is an interface slot in `services/storage.py`, not implemented yet |
 
 `.env.example` lists every variable. With `ENVIRONMENT=production`, the development fallbacks are disabled: the `X-Demo-Role` header, the returned demo OTP and permissive CORS.
+
+## Production (pilot)
+
+One Ubuntu VM with Docker Compose: Caddy (automatic HTTPS), the web app, the API, a Celery worker and beat, Keycloak, PostgreSQL and Valkey. Follow [docs/deploy/DEPLOY.md](docs/deploy/DEPLOY.md); the files are in [infra/prod/](infra/prod/) (`.env.example` lists every secret, `backup.sh` takes the nightly backup). Your Microsoft 365 admin follows [docs/deploy/TEAMS_SETUP.md](docs/deploy/TEAMS_SETUP.md).
+
+With `ENVIRONMENT=production` the API refuses to start on unsafe settings and lists them all (`core/production.py`). The pilot keeps the Coding Lab, Virtual Labs and Study Buddy on their demo adapters through `ALLOW_DEMO_ADAPTERS=judge0,labs,study_buddy`. Parents sign in with a code sent to their email (`PARENT_OTP_CHANNEL=email`); MSG91 SMS is a paid switch that is off by default.
 
 ## Tests
 

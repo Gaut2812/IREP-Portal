@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 17, 42, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum and templates; banks in S9), 48. Readiness v1 (S7) recomputes attendance from the register every night.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 10, 11, 14, 16, 17, 20 (MoU terms; usage figures with 47), 21, 42, 43 (leave and Cyber Range; certificate proofs in S11), 44, 45, 46 (curriculum and templates; banks in S9), 48, 49. Readiness v1 (S7) recomputes attendance from the register every night.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -51,13 +51,13 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L19 | 35 Messages | 18 Message trainer | Both | One-to-one chat, translation, 24-hour reply promise | Message sent | PDF | active |
 | L20 | 35 Messages | 41 College messages | Both | Trainer and coordinator chat | Message sent | PDF, Gap fix | planned |
 | L21 | 25 Study Buddy | 14 At-risk, 13 Trainer dashboard | One way | AI usage counts for each student | Every AI call | PDF | planned |
-| L22 | 21 Reports | 16 Parent progress reports | One way | Approved monthly card and PDF | Trainer approves | PDF, plan | planned |
+| L22 | 21 Reports | 16 Parent progress reports | One way | Approved monthly card and PDF | Trainer approves | PDF, plan | active |
 | L23 | 47 Usage and billing | 20 MoU reports | One way | Usage figures included in reports | Monthly | Gap fix | planned |
 | L24 | 04 Batches | 03 Branches and batches | Both | Structure and student lists down; roster changes up | Import, semester promotion | Inferred | active |
 | L25 | 45 Colleges | 03 Branches and batches | One way | New college, first admin, structure import | Admin creates a college | Gap fix | active |
 | L26 | 40 Survey | 02 Settings | Both | Survey sent; responses returned | College publishes a survey | Inferred | planned |
 | L27 | 48 Audit | 02 Settings | Both | Data export and deletion requests; audit trail | College admin requests | Gap fix | active |
-| L28 | 49 Support | 44 Notification centre | One way | Ticket replies as notifications | Support replies | Gap fix | planned |
+| L28 | 49 Support | 44 Notification centre | One way | Ticket replies as notifications | Support replies | Gap fix | active |
 
 ### 3.2 Core links (through the portal core, no arrow)
 
@@ -73,7 +73,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L36 | 47 Usage and billing | 29, 25, 08 | One way | Quotas for lab hours, AI calls and recording storage | Every metered use | Gap fix | planned |
 | L37 | 46 Content library | 22, 24, 44 | One way | Question bank, problem bank, notification templates | Content published | Gap fix | planned |
 | L38 | Every sensitive action | 48 Audit; consent records for 15 and 32 | One way | Audit trail and consent | Every sensitive action | Gap fix | active |
-| L39 | Every screen | 44 Notification centre, 49 Support | One way | Alerts in; report-a-problem out | Any alert or report | Gap fix | planned |
+| L39 | Every screen | 44 Notification centre, 49 Support | One way | Alerts in; report-a-problem out | Any alert or report | Gap fix | active |
 
 L38 is `active` for the audit writer that already records sensitive actions. Screen 48 and the consent records stay to be built in S2.
 
@@ -107,7 +107,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **09 Attendance** (S4): ← 07 · L06 · ↔ 10 · L07 · → L34 readiness input. *Release rule: leave changes attendance only after approval.*
 - **13 Trainer dashboard** (built): ↔ 12 · L02 · → 15 · L03 · ← 25 · L21 · ← L34
 - **14 At-risk students** (built): ← 25 · L21 · ← L34 · → 18, 15 · L31 parent call and alert
-- **21 Reports** (S8): → 16 · L22 approved monthly card. *Release rule: card released only after trainer approval.*
+- **21 Reports** (built): → 16 · L22 approved monthly card. *Release rule: card released only after trainer approval.*
 - **22 Assessments** (S9): ↔ 24, 23 · L13 · ← 46 · L37 question and problem banks
 - **31 Code reviews** (built): ↔ 30 · L14 PR queue in, review result out
 - **35 Message Hub** (built): ↔ 18 · L19 · ↔ 34 · L18 · ↔ 41 · L20
@@ -118,7 +118,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 
 - **10 Attendance** (S5): ↔ 09 · L07 · ↔ 43 · L09
 - **15 Parent overview** (built): ← 01 · L01 · ← 13 · L03 · ← 14 · L31 · ← 41 · L30 · ← L34
-- **16 Progress reports** (S8): ← 21 · L22
+- **16 Progress reports** (built): ← 21 · L22
 - **17 Events** (built): ↔ 42 · L05 invitations down, RSVP up
 - **18 Message trainer** (built): ↔ 35 · L19 · ← 14 · L31
 - **27 Certificates** (S11): ← 26 · L32 read-only
@@ -131,7 +131,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **03 Branches and batches** (S2): ← 45 · L25 · ↔ 04 · L24
 - **06 Timetable** (S4): ↔ 05 · L11
 - **19 College overview** (built): ← 01 · L01 · ← L34 · ← L35 aggregates only
-- **20 MoU reports** (S8): ← 47 · L23 · ← L35 aggregates only
+- **20 MoU reports** (built; L23 usage figures with 47): ← 47 · L23 · ← L35 aggregates only
 - **28 Certifications** (S11): ← L35 counts, proofs and vouchers as aggregates
 - **38 Mock drives** (S15): → 37 · L17 · ← 42 · L29
 - **39 Placement readiness** (S15): ← L34 · ← L35
@@ -144,7 +144,7 @@ Arrows: → sends to, ← receives from, ↔ both ways. Every screen also has L3
 - **46 Content library** (S6): → 11 · L12 · → 22, 24, 44 · L37
 - **47 Usage and billing** (quotas S12, full S16): → 20 · L23 · → 29, 25, 08 · L36
 - **48 Audit and consent** (S2): ↔ 02 · L27 · ← every sensitive action · L38
-- **49 Support desk** (S8): ← every screen · L39 · → 44 · L28
+- **49 Support desk** (built): ← every screen · L39 · → 44 · L28
 
 ### Shared
 

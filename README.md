@@ -86,8 +86,11 @@ Sign-in rules:
 | 13 | Trainer dashboard | `/trainer` |
 | 14 | At-risk students (trainer; parent calls) | `/trainer/at-risk` |
 | 15 | Parent view (mobile first) | `/parent` |
+| 16 | Progress reports (parent; released monthly cards) | `/parent/reports` |
 | 17 | Events (parent; RSVP) | `/parent/events` |
 | 19 | College dashboard | `/college` |
+| 20 | MoU reports (college; aggregates and MoU terms) | `/college/reports` |
+| 21 | Monthly reports (trainer; approve and release cards) | `/trainer/reports` |
 | 23 | Practice test | `/student/tests/{id}` |
 | 24 | Coding lab | `/student/coding/{problemId}` |
 | 29 | Virtual labs | `/student/labs` |
@@ -101,6 +104,7 @@ Sign-in rules:
 | 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
 | 46 | Content library and notification templates (IREP staff) | `/admin/content` |
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
+| 49 | Support desk (report a problem from any screen; IREP staff reply) | `/support`, `/admin/support` |
 
 ## Sign-in with Keycloak (optional in development)
 

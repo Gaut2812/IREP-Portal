@@ -89,6 +89,13 @@ def generate_report(
         f"Certifications earned: {overview['kpis']['certifications']['value']}",
         f"Internships secured: {overview['kpis']['internships']['value']}",
     ] + [f"{b['band']}: {b['percentage']}%" for b in overview["readiness_distribution"]]
+    from models.schema import MouTerm   # Screen 20: MoU terms in the report (usage figures follow with 47, L23)
+    mou = db.execute(select(MouTerm).where(MouTerm.college_id == current_user.college_id, MouTerm.status == "active")).scalars().first()
+    if mou:
+        enrolled = overview["kpis"]["students_enrolled"]["value"]
+        lines += ["", f"MoU: {mou.starts_on.isoformat()} to {mou.ends_on.isoformat()}",
+                  f"Students enrolled against the cap: {enrolled} of {mou.students_cap}",
+                  f"Lab hours per student: {mou.lab_hours_per_student} · AI calls per day: {mou.ai_calls_per_day}"]
     rel, size_kb = ensure_report_file(rid, f"{en} - {period}", now, now.date(), lines)
     run = ReportRun(id=rid, college_id=current_user.college_id, title_en=f"{en} · {period}", title_ta=f"{ta} · {period}",
                     report_type=req.report_type, period_label=period, generated_at=now, data_as_of=now.date(),

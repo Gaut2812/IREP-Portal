@@ -1059,6 +1059,36 @@ class Rsvp(TenantModel):
 
 
 # ---------------------------------------------------------------------------
+# Screen 49: support desk (links L39 report-a-problem, L28 replies)
+# ---------------------------------------------------------------------------
+
+class SupportTicket(TenantModel):
+    """A report-a-problem ticket. college_id is the requester's college; IREP staff see all."""
+    __tablename__ = "support_tickets"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    requester_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_ticket_requester"), index=True)
+    requester_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    requester_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str] = mapped_column(String(16), default="question")         # bug, question, access, data
+    page_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)    # the screen it was reported from
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)     # open, answered, closed
+    last_activity_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+
+class SupportMessage(TenantModel):
+    __tablename__ = "support_messages"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ticket_id: Mapped[str] = mapped_column(String(64), ForeignKey("support_tickets.id", name="fk_support_msg_ticket"), index=True)
+    author_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    author_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    is_staff: Mapped[bool] = mapped_column(Boolean, default=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+# ---------------------------------------------------------------------------
 # Screen 08: recordings, reminders, recording views
 # ---------------------------------------------------------------------------
 

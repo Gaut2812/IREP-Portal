@@ -7,6 +7,7 @@ import { useAuth, Role } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
+  LifeBuoy,
   LayoutDashboard, BookOpen, Code2, FileCheck2, Cpu,
   KanbanSquare, Video, Bot, Award, Briefcase, Radio,
   MessageSquare, Calendar, Users, ClipboardCheck,
@@ -209,6 +210,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
                     <div className="flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5 text-[#94A3B8]" /><span>{t("shell.language")}: {language === "ta" ? "தமிழ்" : "English"}</span></div>
                   </div>
                   <div className="border-t border-[#E2E8F0] p-1">
+                    {/* L39: report a problem from any screen (screen 49) */}
+                    <Link role="menuitem" href={`/support?from=${encodeURIComponent(pathname || "/")}`} data-testid="report-problem"
+                      className="w-full text-left px-3 py-2.5 text-[#334155] hover:bg-[#F1F5F9] rounded-lg flex items-center gap-2 font-semibold">
+                      <LifeBuoy className="w-4 h-4" /><span>{t("shell.report_problem")}</span>
+                    </Link>
                     <button role="menuitem" onClick={logout} data-testid="sign-out"
                       className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 font-semibold">
                       <LogOut className="w-4 h-4" /><span>{t("shell.sign_out")}</span>

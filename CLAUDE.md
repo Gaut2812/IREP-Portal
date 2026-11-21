@@ -28,6 +28,7 @@ venv/Scripts/python -m alembic upgrade head        # schema (production: migrati
 venv/Scripts/python seed/run_seed.py               # idempotent; re-anchors demo dates to today
 venv/Scripts/python -m uvicorn main:app --port 8000
 venv/Scripts/python -m pytest tests -q             # full suite
+venv/Scripts/python loadtest/load_api.py --users 50 --seconds 60   # API load test (local or staging only)
 LINK_REPORT=links.json venv/Scripts/python -m pytest tests -q && python ../../scripts/link_gate.py --pytest links.json
 
 # Migrations
@@ -115,7 +116,7 @@ Changes to auth, messaging policy, Microsoft Graph, labs, Judge0, migrations tha
 
 ## Current state (keep this short and true)
 
-- Built: 01, 02, 03, 04, 05, 06, 07, 09, 10, 43, 08, 11, 12, 13, 14, 15, 17, 18, 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 42, 44, 45, 46, 48 (IREP staff: `staff@irep.demo`, role `irep_admin`, web role `admin`).
+- Built: 01, 02, 03, 04, 05, 06, 07, 09, 10, 43, 08, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 42, 44, 45, 46, 48, 49 (IREP staff: `staff@irep.demo`, role `irep_admin`, web role `admin`).
 - Done in S1: outbox, workers, migrations baseline, link gate, Keycloak (realm, roles, tenancy claims, web PKCE sign-in).
 - Consent gate: parent-facing overview (15) needs a granted `parent_data_processing` consent (`services/consent.py`); seed grants it for demo pairs. Files go through `services/storage.py` (local dir in dev).
 - Roles: `placement_officer` uses the college UI (sign-in card "College"). Deactivated accounts cannot sign in; tokens already issued stay valid until expiry (known gap, see docs/screens/02).

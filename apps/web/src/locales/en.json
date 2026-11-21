@@ -84,7 +84,8 @@
     "content_library": "Content library",
     "usage_billing": "Usage & billing",
     "audit_consent": "Audit & consent",
-    "support_desk": "Support desk"
+    "support_desk": "Support desk",
+    "checkin": "Class check-in"
   },
   "student": {
     "readiness_score": "Readiness score",
@@ -1177,5 +1178,44 @@
     "reject": "Reject",
     "reject_reason": "Reason for rejecting (at least 5 characters)",
     "rooms": "Rooms in use"
+  },
+  "attendance": {
+    "title": "Attendance",
+    "load_failed": "Could not load attendance. Try again.",
+    "save_failed": "Could not save. Try again.",
+    "no_sessions": "No sessions in the last two weeks.",
+    "checkin_open": "check-in open",
+    "present": "present",
+    "absent": "absent",
+    "unmarked": "not marked",
+    "rule_note": "Marked automatically: present for at least 75% of the class. Your overrides always win.",
+    "code_label": "Check-in code",
+    "code_help": "Changes every minute. Students enter it under Class check-in.",
+    "show_code": "Show check-in code",
+    "student": "Student",
+    "status": "Status",
+    "minutes": "Minutes",
+    "source": "How",
+    "override": "Change",
+    "status_Present": "Present",
+    "status_Absent": "Absent",
+    "status_Partial": "Partial",
+    "source_auto": "75% rule",
+    "source_teams": "Teams report",
+    "source_qr": "Check-in code",
+    "source_manual": "Trainer",
+    "reason": "Reason (at least 5 characters)",
+    "err_reason": "Give a reason of at least 5 characters.",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "checkin": {
+    "title": "Class check-in",
+    "help": "Enter the code your trainer shows in class. It changes every minute.",
+    "code": "Check-in code",
+    "err_code": "Enter the code.",
+    "failed": "Check-in failed. Try again.",
+    "done": "You are checked in:",
+    "submit": "Check in"
   }
 }

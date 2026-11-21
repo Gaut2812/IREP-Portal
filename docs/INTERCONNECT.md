@@ -20,7 +20,7 @@ Source: *IREP Portal — 26 + 9 Screen Map, Links and Visual Flows* (19 Nov 2026
 | `active` | Both ends are built | Needs at least one passing tagged test and no failing one |
 | `planned` | At least one end is not built yet | Reported only |
 
-Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 44, 45, 48.
+Screens built so far: 01, 07, 08, 12, 13, 15, 18 (parent messages at `/parent/messages`), 19, 23, 24, 29, 30, 31, 32, 33, 34, 35, 36, 02, 03, 04, 05, 06, 09, 44, 45, 48.
 
 Screen specs live in `docs/screens/` (one file per screen, written before the screen is built).
 
@@ -35,7 +35,7 @@ Screen specs live in `docs/screens/` (one file per screen, written before the sc
 | L03 | 13 Trainer dashboard | 15 Parent overview | One way | Parent updates, monthly report, at-risk alert | Trainer quick actions | PDF | active |
 | L04 | 08 Live sessions | 07 Live classroom | Both | Join request; recording and attendance back | Join session | PDF | active |
 | L05 | 42 College events | 17 Parent events | Both | Invitations down; RSVPs and counts up | College publishes; parent taps RSVP | PDF, Gap fix | planned |
-| L06 | 07 Live classroom | 09 Trainer attendance | One way | Join and leave events; Present at 75% of the session | Meeting ends | PDF | planned |
+| L06 | 07 Live classroom | 09 Trainer attendance | One way | Join and leave events; Present at 75% of the session | Meeting ends | PDF | active |
 | L07 | 09 Trainer attendance | 10 Parent attendance | Both | Attendance record down; leave request up | Marking; parent request | Inferred | planned |
 | L08 | 29 Virtual labs | 43 Approvals | Both | Cyber Range access request; approve or deny | Student requests a lab | PDF, Gap fix | planned |
 | L09 | 10 Parent attendance | 43 Approvals | Both | Leave request; decision | Parent submits | Gap fix | planned |

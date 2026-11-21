@@ -79,6 +79,7 @@ Sign-in rules:
 | 06 | Timetable (college; approve with clash warnings, rooms) | `/college/timetable` |
 | 07 | Live classroom | `/live/{sessionId}` |
 | 08 | Live sessions & recordings | `/student/live` |
+| 09 | Attendance (trainer; overrides, check-in code) and student check-in | `/trainer/attendance`, `/student/checkin` |
 | 12 | Student dashboard | `/student` |
 | 13 | Trainer dashboard | `/trainer` |
 | 15 | Parent view (mobile first) | `/parent` |

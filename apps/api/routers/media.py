@@ -12,6 +12,8 @@ router = APIRouter(tags=["Media"])
 def get_media(storage_key: str, exp: int, sig: str):
     if not verify_signed(storage_key, exp, sig):
         raise HTTPException(status_code=403, detail="Link expired or invalid")
+    if storage_key.startswith("quarantine/"):
+        raise HTTPException(status_code=404, detail="Not found")      # infected uploads are never served
     storage = get_storage()
     try:
         found = storage.exists(storage_key)

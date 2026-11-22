@@ -74,6 +74,9 @@ def problems(settings) -> List[str]:
     if settings.PARENT_OTP_CHANNEL.lower() == "sms" and sms not in ("fast2sms", "msg91"):
         out.append("PARENT_OTP_CHANNEL=sms needs SMS_PROVIDER=fast2sms or msg91.")
 
+    if settings.AV_ADAPTER.lower() != "clamd":
+        out.append("AV_ADAPTER must be clamd: every upload is virus-scanned by ClamAV before it is saved.")
+
     # files and background work
     if settings.STORAGE_ADAPTER.lower() != "local":
         out.append("STORAGE_ADAPTER must be local for now (the S3 adapter is an interface only, see services/storage.py).")

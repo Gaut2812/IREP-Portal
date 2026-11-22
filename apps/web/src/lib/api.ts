@@ -7,12 +7,22 @@ export const WS_BASE = API_BASE.replace(/^http/, "ws");
 export class ApiError extends Error {
   status: number;
   detail: string;
-  constructor(status: number, detail: string) {
+  /** Set when the API answers with a structured error, e.g. "virus_found" or "scanner_unavailable". */
+  code?: string;
+  constructor(status: number, detail: string, code?: string) {
     super(`API Error ${status}: ${detail}`);
     this.name = "ApiError";
     this.status = status;
     this.detail = detail;
+    this.code = code;
   }
+}
+
+/** Structured API errors carry {code, message, message_ta}: show the user's language. */
+function structuredDetail(d: { code?: string; message?: string; message_ta?: string }): { text: string; code?: string } {
+  let lang = "en";
+  try { lang = localStorage.getItem("irep_lang") || "en"; } catch { /* storage blocked */ }
+  return { text: (lang === "ta" && d.message_ta) || d.message || "", code: d.code };
 }
 
 const MOCK_TOKENS = new Set(["mock_jwt_token_demo", "mock_token"]);
@@ -67,14 +77,16 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
 
   if (!res.ok) {
     let detail = res.statusText;
+    let code: string | undefined;
     try {
       const body = await res.json();
       if (body && typeof body.detail === "string") detail = body.detail;
+      else if (body && body.detail && typeof body.detail.message === "string") ({ text: detail, code } = structuredDetail(body.detail));
       else if (body && body.detail) detail = JSON.stringify(body.detail);
     } catch {
       /* body was not JSON */
     }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, detail, code);
   }
 
   if (res.status === 204) return undefined as T;

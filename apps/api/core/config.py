@@ -125,6 +125,10 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")  # Valkey speaks the Redis protocol
     # Cache for "is this account still active?" (core/active_users.py). Empty: ask the database.
     USER_STATE_CACHE_URL: str = os.getenv("USER_STATE_CACHE_URL", "")
+    # Virus scan of every upload (services/antivirus.py): clamd in production, fake (EICAR only) in development
+    AV_ADAPTER: str = os.getenv("AV_ADAPTER", "fake")
+    AV_CLAMD_HOST: str = os.getenv("AV_CLAMD_HOST", "clamav")
+    AV_CLAMD_PORT: int = int(os.getenv("AV_CLAMD_PORT", "3310"))
 
     # AI Reviewer
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)

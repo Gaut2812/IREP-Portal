@@ -15,6 +15,8 @@ x-app: &app
     DATABASE_URL: postgresql+psycopg2://irep:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/irep
     CELERY_BROKER_URL: redis://:${VALKEY_PASSWORD:?set VALKEY_PASSWORD}@valkey:6379/0
     USER_STATE_CACHE_URL: redis://:${VALKEY_PASSWORD}@valkey:6379/1      # "still active?" cache (core/active_users.py)
+    AV_ADAPTER: clamd                       # every upload is virus-scanned before it is saved (services/antivirus.py)
+    AV_CLAMD_HOST: clamav
     PUBLIC_BASE_URL: https://${APP_DOMAIN:?set APP_DOMAIN}
     KEYCLOAK_URL: https://${ID_DOMAIN:?set ID_DOMAIN}
     KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/irep/protocol/openid-connect/certs
@@ -62,6 +64,23 @@ services:
     restart: unless-stopped
     logging: *logging
 
+  clamav:                                           # ClamAV (open source): scans every upload; signatures update by themselves
+    image: clamav/clamav:1.4
+    environment:
+      CLAMD_CONF_StreamMaxLength: 600M              # interview recordings can be 500 MB
+      CLAMD_CONF_MaxFileSize: 600M
+      CLAMD_CONF_MaxScanSize: 600M
+    volumes:
+      - clamav_db:/var/lib/clamav                   # signature database survives restarts
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 300s                            # the first start downloads the signatures
+    restart: unless-stopped
+    logging: *logging
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
     command: ["start", "--import-realm"]          # imports the realm only if it does not exist yet
@@ -105,6 +124,7 @@ services:
       migrate: {condition: service_completed_successfully}
       valkey: {condition: service_healthy}
       keycloak: {condition: service_healthy}
+      clamav: {condition: service_started}          # uploads answer 503 until ClamAV is ready (fail closed)
 
   worker:                                           # drains the outbox: email, SMS, Teams, audit fan-out
     <<: *app
@@ -155,6 +175,7 @@ services:
     logging: *logging
 
 volumes:
+  clamav_db:
   pgdata:
   valkeydata:
   uploads:

@@ -20,6 +20,7 @@ from core.security import TokenPayload, get_password_hash, keycloak_mode, requir
 from models.schema import Batch, BatchTrainer, Branch, ParentStudent, Student, Trainer, User
 from services.audit import record_audit
 from services import consent as consent_svc
+from services.antivirus import check_upload
 from services.outbox import emit
 
 router = APIRouter(prefix="/college", tags=["Screen 03 · Branches and batches"])
@@ -254,7 +255,9 @@ def _parent_row(db: Session, cid: str, r: dict, file_parents: Dict[str, str]):
 async def import_students(file: UploadFile = File(...), dry_run: bool = Query(True),
                           current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
     cid = current_user.college_id
-    rows = _parse_csv(await file.read())
+    raw = await file.read()
+    check_upload(current_user, raw, file.filename, college_id=cid, purpose="student_import")     # even though it is not stored
+    rows = _parse_csv(raw)
     branches = {b.code.upper(): b for b in db.execute(select(Branch).where(Branch.college_id == cid)).scalars()}
     batches = {(x.branch_id, x.short_name.upper()): x for x in db.execute(select(Batch).where(Batch.college_id == cid)).scalars()}
     existing = {s.register_no: s for s in db.execute(select(Student).where(Student.college_id == cid)).scalars()}

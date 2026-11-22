@@ -16,6 +16,7 @@ from core.database import get_db
 from core.security import TokenPayload, require_role
 from core.tenant import get_child_for_parent, get_student_for_user, get_trainer_batch_ids, get_trainer_for_user, get_user_name
 from models.schema import Batch, BatchTrainer, Certificate, ParentStudent, Student, Trainer
+from services.antivirus import check_upload
 from services.audit import record_audit
 from services.consent import is_granted
 from services.notifications import notify_user
@@ -91,6 +92,7 @@ async def add_external(title: str = Form(..., min_length=3, max_length=255), iss
     if len(data) > MAX_BYTES:
         raise HTTPException(status_code=413, detail="The file is larger than 5 MB")
     st = get_student_for_user(current_user, db)
+    check_upload(current_user, data, file.filename, college_id=st.college_id, purpose="certificate_proof")
     c = Certificate(id=f"cert_{uuid.uuid4().hex[:14]}", college_id=st.college_id, student_id=st.id, title=title.strip(),
                     issuer=issuer.strip(), cert_type="external", issued_on=issued_on, credential_id=(credential_id or "").strip() or None)
     db.add(c)
@@ -112,6 +114,7 @@ async def add_proof(cert_id: str, file: UploadFile = File(...), credential_id: O
     data = await file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise HTTPException(status_code=413, detail="The file is larger than 5 MB")
+    check_upload(current_user, data, file.filename, college_id=st.college_id, purpose="certificate_proof")
     if credential_id:
         c.credential_id = credential_id.strip()
     if c.status == "scheduled":

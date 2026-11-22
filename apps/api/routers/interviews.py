@@ -220,6 +220,7 @@ def cancel_slot(slot_id: str, current_user: TokenPayload = Depends(TRAINER), db:
 async def add_recording(interview_id: str, file: UploadFile = File(...), current_user: TokenPayload = Depends(TRAINER),
                         db: Session = Depends(get_db)):
     """Store the interview recording (storage interface) for the student's signed link on 36 (L16)."""
+    from services.antivirus import check_upload
     from services.quotas import can_store_recording
     from services.storage import get_storage
     trainer = get_trainer_for_user(current_user, db)
@@ -232,6 +233,7 @@ async def add_recording(interview_id: str, file: UploadFile = File(...), current
     data = await file.read(MAX_RECORDING_MB * 1024 * 1024 + 1)
     if len(data) > MAX_RECORDING_MB * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"Recordings can be at most {MAX_RECORDING_MB} MB")
+    check_upload(current_user, data, file.filename, college_id=iv.college_id, purpose="interview_recording")
     size_mb = max(1, len(data) // (1024 * 1024))
     if not can_store_recording(db, iv.college_id, size_mb):          # L36: the MoU's storage quota
         raise HTTPException(status_code=409, detail="The college's recording storage is full (MoU quota)")

@@ -344,6 +344,18 @@ Parents sign in with their mobile number. The portal then sends a 6-digit code, 
 
 While `SMS_PROVIDER=off`, every notice meant for SMS (leave decisions, events, at-risk alerts) goes to the person's email instead. It is recorded as `delivered:email`.
 
+## Virus scanning of uploads (ClamAV)
+
+Every upload is scanned by ClamAV (open source, the `clamav` service) **before** it is saved. This covers certificate proofs, interview recordings and student import files.
+- **Infected files** are refused with a message in English and Tamil. They are kept in quarantine (`quarantine/` on the uploads volume), which is never served, and audited as `upload.infected` with the virus name and the file's SHA-256.
+- **If ClamAV is not running,** uploads are refused (503) rather than saved unscanned.
+- **First start:** ClamAV downloads its signature database, which takes about 5 minutes; uploads answer 503 until it is ready. It then updates the signatures by itself.
+- **Memory:** it needs about 1.3 GB of RAM. On a 4 GB server, keep the 2 GB swap from step 2.
+- **Check:** `docker compose exec clamav clamdcheck.sh` prints `Clamd is up`.
+- **Review quarantine** now and then:
+  - list it with `docker compose exec api ls -R /data/uploads/quarantine`
+  - see who uploaded what in the audit trail (screen 48, action `upload.infected`)
+
 ## Files: local disk now, S3 later
 
 All files go through `services/storage.py`, an interface with `put`, `get`, `exists`, `delete` and `size`. In the pilot, `STORAGE_ADAPTER=local` keeps them on the `uploads` Docker volume, and the nightly backup copies them.

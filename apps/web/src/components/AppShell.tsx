@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuth, Role } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
 import { NotificationBell } from "@/components/NotificationBell";
-import {
+import { KeyRound,
   LifeBuoy,
   LayoutDashboard, BookOpen, Code2, FileCheck2, Cpu,
   KanbanSquare, Video, Bot, Award, Briefcase, Radio,
@@ -113,6 +113,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.usage_billing"), href: "/admin/usage", icon: Cpu },
     { label: t("nav.audit_consent"), href: "/admin/audit", icon: ShieldCheck },
     { label: t("nav.support_desk"), href: "/admin/support", icon: MessageSquare },
+    ...(user?.super_admin ? [{ label: t("nav.super_admin"), href: "/admin/super", icon: KeyRound }] : []),
   ];
 
   const currentNav = role === "admin" ? adminNav : role === "trainer" ? trainerNav : role === "college" ? collegeNav : role === "parent" ? parentNav : studentNav;

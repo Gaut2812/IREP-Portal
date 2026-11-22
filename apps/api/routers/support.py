@@ -31,7 +31,7 @@ class MessageIn(BaseModel):
 
 
 def _is_staff(user: TokenPayload) -> bool:
-    return normalize_role(user.role) == "irep_admin"
+    return normalize_role(user.role) in ("irep_admin", "super_admin")
 
 
 def _ticket(db: Session, ticket_id: str, user: TokenPayload) -> SupportTicket:

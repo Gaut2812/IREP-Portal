@@ -64,7 +64,7 @@ pnpm exec playwright test        # starts API and web unless already running; re
 pnpm exec playwright test -c playwright.keycloak.config.ts   # Keycloak sign-in; stop other APIs on :8000 first
 ```
 
-Demo logins: `priya.r@demo.edu`, `arun.k@demo.edu`, `admin@demo.edu` (password `password123`). Parents sign in with mobile 9876543210 or 9876543214 plus the OTP that development returns.
+Demo logins: `priya.r@demo.edu`, `arun.k@demo.edu`, `admin@demo.edu`, `staff@irep.demo` (IREP staff), `super@irep.demo` (super admin) (password `password123`). Parents sign in with mobile 9876543210 or 9876543214 plus the OTP that development returns.
 
 ## Architecture rules (do not break)
 
@@ -129,7 +129,7 @@ Changes to auth, messaging policy, Microsoft Graph, labs, Judge0, migrations tha
 - Built: 01, 02, 03, 04, 05, 06, 07, 09, 10, 43, 08, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 40, 41, 42, 44, 45, 46, 47, 48, 49 (IREP staff: `staff@irep.demo`, role `irep_admin`, web role `admin`).
 - Done in S1: outbox, workers, migrations baseline, link gate, Keycloak (realm, roles, tenancy claims, web PKCE sign-in).
 - Consent gate: parent-facing overview (15) needs a granted `parent_data_processing` consent (`services/consent.py`); seed grants it for demo pairs. Files go through `services/storage.py` (local dir in dev).
-- Roles: `placement_officer` uses the college UI (sign-in card "College"). Deactivated accounts cannot sign in; tokens already issued stay valid until expiry (known gap, see docs/screens/02).
+- Roles and permissions: `docs/PERMISSIONS.md` is the matrix. `super_admin` is above `irep_admin` (passes every staff check; `SUPER` guards staff accounts, MoU terms, feature switches, deletion approvals, support sessions; every super-admin request is audited as `super_admin.request`). No self-registration; staff roles must use Keycloak two-factor (`ops/configure_keycloak.py`). Student import creates/links parents only with `parent_consent=yes` + `parent_consent_ref`. `placement_officer` uses the college UI (sign-in card "College"). Deactivated accounts cannot sign in; tokens already issued stay valid until expiry (known gap, see docs/screens/02).
 - `packages/api-client`: generated types; after any route or model change run `cd packages/api-client && npm run generate` (CI fails if stale). Web imports them type-only: `import type { RequestBody } from "@irep/api-client"`.
 - Readiness v1 (L34): `services/readiness.run_nightly` (Celery beat 01:30 IST, or `POST /admin/jobs/readiness`) recomputes attendance from `session_attendance` (Excused left out), snapshots once a day with a monthly delta, then runs the at-risk rules. Parent calls (L31) in quiet hours wait in the outbox (`at_risk.parent_call`).
 - Pilot deployment (`infra/prod`, `docs/deploy/`): Caddy + Compose on one VM, nightly `backup.sh` (pg_dump of both DBs + uploads, 7 days, `BACKUP_REMOTE`). `ENVIRONMENT=production` runs `core/production.problems()` at start-up; `ALLOW_DEMO_ADAPTERS` (judge0, labs, study_buddy, live_classes) keeps named features on demo adapters. `NOTIFY_ADAPTER=live` sends via `services/gateways.py` (SMTP; SMS only when `SMS_PROVIDER=fast2sms` (default choice) or `msg91`, else SMS falls back to email).

@@ -15,13 +15,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import TokenPayload, get_password_hash, keycloak_mode, require_role
+from core.security import SUPER, TokenPayload, get_password_hash, is_super_admin, keycloak_mode, require_role
 from models.schema import College, MouTerm, Student, User
 from services.audit import record_audit
 from services.outbox import emit, handler as outbox_handler
 
 router = APIRouter(prefix="/admin/colleges", tags=["Screen 45 · Colleges and MoU"])
-STAFF = require_role(["irep_admin"])
+STAFF = require_role(["irep_admin"])      # IREP staff and the super admin
+# MoU terms (incl. fees) and feature switches: super admin only (docs/PERMISSIONS.md)
 
 FEATURE_DEFAULTS: Dict[str, bool] = {
     "virtual_labs": True,
@@ -141,11 +142,12 @@ def college_detail(college_id: str, current_user: TokenPayload = Depends(STAFF),
         "features": _features(c),
         "mou_terms": [_mou_out(m) for m in mous],
         "admins": [{"id": u.id, "name": u.name, "email": u.email, "phone": u.phone} for u in _admins(db, c.id)],
+        "can_manage": is_super_admin(current_user),       # MoU terms and feature switches
     }
 
 
 @router.put("/{college_id}/features")
-def set_features(college_id: str, req: FeaturesIn, current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
+def set_features(college_id: str, req: FeaturesIn, current_user: TokenPayload = Depends(SUPER), db: Session = Depends(get_db)):
     c = _college(db, college_id)
     unknown = sorted(set(req.features) - set(FEATURE_DEFAULTS))
     if unknown:
@@ -160,7 +162,7 @@ def set_features(college_id: str, req: FeaturesIn, current_user: TokenPayload = 
 
 
 @router.post("/{college_id}/mou", status_code=status.HTTP_201_CREATED)
-def create_mou(college_id: str, req: MouIn, current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
+def create_mou(college_id: str, req: MouIn, current_user: TokenPayload = Depends(SUPER), db: Session = Depends(get_db)):
     c = _college(db, college_id)
     if req.ends_on <= req.starts_on:
         raise HTTPException(status_code=422, detail="The MoU must end after it starts")
@@ -178,7 +180,7 @@ def create_mou(college_id: str, req: MouIn, current_user: TokenPayload = Depends
 
 
 @router.post("/{college_id}/mou/{mou_id}/activate")
-def activate_mou(college_id: str, mou_id: str, current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
+def activate_mou(college_id: str, mou_id: str, current_user: TokenPayload = Depends(SUPER), db: Session = Depends(get_db)):
     c = _college(db, college_id)
     m = db.execute(select(MouTerm).where(MouTerm.id == mou_id, MouTerm.college_id == c.id)).scalar_one_or_none()
     if m is None:

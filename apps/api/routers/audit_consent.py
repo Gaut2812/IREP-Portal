@@ -19,7 +19,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import TokenPayload, normalize_role, require_role
+from core.security import TokenPayload, is_super_admin, normalize_role, require_role
 from core.tenant import get_child_for_parent, get_student_for_user
 from models.schema import (AuditLog, CodingSubmission, ConsentRecord, DataRequest, ParentStudent,
                            SessionAttendance, Student, TestAttempt, User, Certificate)
@@ -199,13 +199,19 @@ class DecisionIn(BaseModel):
     reason: str = Field(min_length=5, max_length=2000)
 
 
-def _request_out(r: DataRequest, names: dict, today: datetime.date) -> dict:
+def _may_decide(user: Optional[TokenPayload], r: DataRequest) -> bool:
+    """Deletions are approved or rejected by the super admin only; exports by any IREP staff."""
+    return user is not None and (r.kind != "deletion" or is_super_admin(user))
+
+
+def _request_out(r: DataRequest, names: dict, today: datetime.date, user: Optional[TokenPayload] = None) -> dict:
     open_ = r.status in ("received", "in_progress")
     return {"id": r.id, "kind": r.kind, "college_id": r.college_id, "student_id": r.subject_student_id,
             "student_name": names.get(r.subject_student_id), "requested_by": r.requested_by, "reason": r.reason,
             "status": r.status, "due_on": r.due_on.isoformat(), "days_left": (r.due_on - today).days if open_ else None,
             "overdue": open_ and r.due_on < today, "has_export": bool(r.result_ref), "result_summary": r.result_summary,
-            "decision_note": r.decision_note, "created_at": r.created_at.isoformat()}
+            "decision_note": r.decision_note, "created_at": r.created_at.isoformat(),
+            "can_decide": open_ and _may_decide(user, r) and normalize_role(user.role) in ("irep_admin", "super_admin")}
 
 
 def _student_names(db: Session, ids) -> dict:
@@ -228,7 +234,9 @@ def create_data_request(req: DataRequestIn, current_user: TokenPayload = Depends
     db.add(r)
     db.flush()
     record_audit(db, current_user, "data_request.created", "data_request", r.id, {"kind": r.kind, "student_id": s.id})
-    for staff_id in db.execute(select(User.id).where(User.role == "irep_admin", User.is_active.is_(True))).scalars():
+    # deletions are decided by the super admin; exports by any IREP staff
+    roles = ("super_admin",) if r.kind == "deletion" else ("irep_admin", "super_admin")
+    for staff_id in db.execute(select(User.id).where(User.role.in_(roles), User.is_active.is_(True))).scalars():
         notify_user(db, staff_id, f"New {r.kind} request", f"Due by {r.due_on.isoformat()}",
                     title_ta="புதிய தரவுக் கோரிக்கை", kind="approval", link="/admin/audit/requests")
     db.commit()
@@ -254,13 +262,15 @@ def staff_queue(status_filter: Optional[str] = Query(None, alias="status"), curr
     rows = db.execute(q.order_by(open_first, DataRequest.due_on, DataRequest.created_at)).scalars().all()
     names = _student_names(db, [r.subject_student_id for r in rows])
     today = datetime.date.today()
-    return {"items": [_request_out(r, names, today) for r in rows]}
+    return {"items": [_request_out(r, names, today, current_user) for r in rows]}
 
 
-def _open_request(db: Session, request_id: str) -> DataRequest:
+def _open_request(db: Session, request_id: str, user: TokenPayload) -> DataRequest:
     r = db.get(DataRequest, request_id)
     if r is None:
         raise HTTPException(status_code=404, detail="Request not found")
+    if not _may_decide(user, r):
+        raise HTTPException(status_code=403, detail="Only the super admin can approve or reject a deletion request")
     if r.status not in ("received", "in_progress"):
         raise HTTPException(status_code=409, detail=f"This request is already {r.status}")
     return r
@@ -284,7 +294,7 @@ def _anonymise(db: Session, s: Student) -> dict:
 
 @router.post("/admin/data-requests/{request_id}/complete")
 def complete_request(request_id: str, current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
-    r = _open_request(db, request_id)
+    r = _open_request(db, request_id, current_user)
     s = db.get(Student, r.subject_student_id)
     now = datetime.datetime.utcnow()
     r.decided_by, r.decided_at = current_user.sub, now
@@ -305,7 +315,7 @@ def complete_request(request_id: str, current_user: TokenPayload = Depends(STAFF
 
 @router.post("/admin/data-requests/{request_id}/reject")
 def reject_request(request_id: str, req: DecisionIn, current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
-    r = _open_request(db, request_id)
+    r = _open_request(db, request_id, current_user)
     r.status, r.decision_note, r.decided_by, r.decided_at = "rejected", req.reason.strip(), current_user.sub, datetime.datetime.utcnow()
     record_audit(db, current_user, "data_request.rejected", "data_request", r.id, {"reason": r.decision_note}, college_id=r.college_id)
     notify_user(db, r.requested_by, f"{r.kind.capitalize()} request rejected", r.decision_note,

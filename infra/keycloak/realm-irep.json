@@ -47,7 +47,27 @@
       },
       {
         "name": "irep_admin",
-        "description": "IREP staff (screens 45-49)"
+        "description": "IREP staff (screens 45-49)",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "irep_2fa"
+          ]
+        }
+      },
+      {
+        "name": "irep_2fa",
+        "description": "Marker: two-factor sign-in required"
+      },
+      {
+        "name": "super_admin",
+        "description": "IREP super admin (above IREP staff)",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "irep_2fa"
+          ]
+        }
       }
     ]
   },

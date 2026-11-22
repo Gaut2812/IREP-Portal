@@ -26,6 +26,7 @@ def _h(sub, role, college_id="col_demo_001"):
 
 
 STAFF = _h("usr_irep_staff_01", "irep_admin", PLATFORM_TENANT)
+SUPER = _h("usr_irep_super_01", "super_admin", PLATFORM_TENANT)          # MoU terms and feature switches
 PRIYA, KAVITHA, ARUN = _h("usr_priya_01", "student"), _h("usr_kavitha_01", "college_admin"), _h("usr_arun_01", "trainer")
 
 
@@ -34,10 +35,10 @@ def tight_mou():
     """A new MoU with tiny quotas, activated through 45; the demo MoU is re-activated afterwards."""
     r = client.post("/api/v1/admin/colleges/col_demo_001/mou", json={
         "starts_on": "2026-06-01", "ends_on": "2027-05-31", "students_cap": 650, "lab_hours_per_student": 1,
-        "ai_calls_per_day": 1, "storage_gb": 0, "activate": True}, headers=STAFF)
+        "ai_calls_per_day": 1, "storage_gb": 0, "activate": True}, headers=SUPER)
     assert r.status_code == 201, r.text
     yield r.json()["id"]
-    client.post("/api/v1/admin/colleges/col_demo_001/mou/mou_demo_2026/activate", headers=STAFF)
+    client.post("/api/v1/admin/colleges/col_demo_001/mou/mou_demo_2026/activate", headers=SUPER)
     db = SessionLocal()
     try:
         db.execute(delete(MouTerm).where(MouTerm.id == r.json()["id"]))

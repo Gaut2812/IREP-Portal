@@ -3,9 +3,9 @@ import { loginAs } from "./helpers/auth";
 
 /** Screen 45 · Colleges and MoU terms. Spec: docs/screens/45-colleges-and-mou.md */
 test.describe("Screen 45: Colleges and MoU terms (/admin/colleges)", () => {
-  test("staff onboard a college: create, MoU, feature switch, first admin who then signs in", { tag: "@L01" }, async ({ page, browser }) => {
+  test("super admin onboards a college: create, MoU, feature switch, first admin who then signs in", { tag: "@L01" }, async ({ page, browser }) => {
     const code = `E${Date.now().toString(36).slice(-6).toUpperCase()}`;
-    await loginAs(page, "admin");
+    await loginAs(page, "super");                                            // MoU terms and switches: super admin only
     await page.goto("/admin/colleges");
     await expect(page.getByTestId("college-row-DEC")).toBeVisible();
 
@@ -47,6 +47,15 @@ test.describe("Screen 45: Colleges and MoU terms (/admin/colleges)", () => {
     await p2.getByTestId("login-submit").click();
     await p2.waitForURL("**/college");
     await ctx.close();
+  });
+
+  test("IREP staff see MoU terms and switches but cannot change them", async ({ page }) => {
+    await loginAs(page, "admin");
+    await page.goto("/admin/colleges/col_demo_001");
+    await expect(page.getByTestId("mou-section")).toBeVisible();
+    await expect(page.getByTestId("mou-form")).toHaveCount(0);
+    await expect(page.getByTestId("mou-super-only")).toBeVisible();
+    await expect(page.getByTestId("feature-cyber_range")).toBeDisabled();
   });
 
   test("IREP staff sign in from the login page", async ({ page }) => {

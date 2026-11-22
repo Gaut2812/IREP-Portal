@@ -147,13 +147,17 @@ On the first start, the services come up in this order:
 
 ## 7. Point Keycloak at your domain and email
 
-The realm is imported from a development template that has `localhost` addresses and no mail server. This one command fixes both. Run it again whenever you change the domain or the SMTP settings.
+The realm is imported from a development template that has `localhost` addresses and no mail server. This one command fixes both. It also:
+- turns self-registration off (accounts are invited or imported only)
+- requires two-factor sign-in (an authenticator app such as Google Authenticator or Microsoft Authenticator) for IREP staff and super admins
+
+Run it again whenever you change the domain or the SMTP settings; a re-run changes nothing that is already right.
 
 ```bash
 docker compose run --rm api python ops/configure_keycloak.py
 ```
 
-**Check:** it prints `realm irep: redirects -> https://portal.example.in; SMTP set`.
+**Check:** it prints `realm irep: redirects -> https://portal.example.in; SMTP set; self-registration off; two-factor required for irep_admin, super_admin`.
 
 Then, from the IP you put in `KC_ADMIN_ALLOW_IPS`:
 1. Open `https://id.example.in/admin` and sign in with `KEYCLOAK_ADMIN_USER` and `KEYCLOAK_ADMIN_PASSWORD`.
@@ -161,20 +165,38 @@ Then, from the IP you put in `KC_ADMIN_ALLOW_IPS`:
 
 From any other address, `/admin` returns 404. That is intended.
 
-## 8. Create the first IREP staff account
+## 8. Create the first super admin
 
 ```bash
 docker compose run --rm api python ops/bootstrap_admin.py --email you@example.in --name "Your Name"
 ```
 
-Keycloak emails you a link to set your password. Then sign in at `https://portal.example.in` and choose **IREP staff**.
+This creates a **super admin**: IREP staff plus the powers only it has (see [docs/PERMISSIONS.md](../PERMISSIONS.md)):
+- staff accounts
+- MoU terms and fees
+- feature switches
+- billing
+- deletion approvals
+- logged support sessions
 
-From there, everyone else is invited, not created by hand:
+Everything a super admin does is written to the audit log.
+
+Keycloak emails you a link to set your password. On your first sign-in, Keycloak shows a QR code: scan it with an authenticator app and type the 6-digit code. After that, every sign-in asks for a code. Then sign in at `https://portal.example.in` and choose **IREP staff**.
+
+Running the command again is safe: it never resets an existing password or authenticator. Use `--resend-invite` to email the link again.
+
+From there, everyone else is invited, not created by hand. Nobody can sign up on their own:
+- **Super admin page** (`/admin/super`): invite IREP staff (they also must use two-factor), and open a logged support session before working on a college's account.
 - **Screen 45 (Colleges):** onboard the pilot college. The college representative gets an invite email (`KEYCLOAK_INVITE_EMAIL=true`).
 - **The college admin** adds trainers and students on the college screens. Each person gets a Keycloak invite to set their password.
-- **Parents** do not get a Keycloak account. They sign in with their mobile number plus a one-time code (see "Parent sign-in" below). The college office must record a parent email address for every parent.
+- **Parents** come from the student import file:
+  - `parent_phone`, `parent_email`
+  - `parent_consent=yes`
+  - `parent_consent_ref`: the signed consent form's number
 
-**Check:** you can sign in as IREP staff and see the Colleges screen.
+  One mobile number becomes one parent account, linked to all of that parent's children. A row with parent details but no recorded consent is refused, and nothing is saved for it. Parents do not get a Keycloak account: they sign in with their mobile number plus a one-time code (see "Parent sign-in" below), so record a parent email for every parent.
+
+**Check:** you can sign in (password, then authenticator code) and see the Colleges screen and the **Super admin** menu item.
 
 Do **not** run `seed/run_seed.py` or `seed/sync_keycloak.py --password` on this server. They create demo accounts with a shared password.
 

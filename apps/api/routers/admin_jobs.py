@@ -13,7 +13,7 @@ router = APIRouter(prefix="/admin/jobs", tags=["Admin Jobs"])
 
 @router.post("/readiness")
 def trigger_readiness_job(
-    current_user: TokenPayload = Depends(require_role(["college_admin", "trainer", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["college_admin", "trainer", "irep_admin"])),
     db: Session = Depends(get_db),
 ):
     out = run_nightly(db, current_user.college_id)
@@ -24,7 +24,7 @@ def trigger_readiness_job(
 
 @router.post("/at-risk")
 def trigger_at_risk_rules(
-    current_user: TokenPayload = Depends(require_role(["college_admin", "trainer", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["college_admin", "trainer", "irep_admin"])),
     db: Session = Depends(get_db),
 ):
     created = run_rules(db, current_user.college_id)
@@ -35,7 +35,7 @@ def trigger_at_risk_rules(
 
 @router.post("/labs/cull")
 def trigger_lab_cull(
-    current_user: TokenPayload = Depends(require_role(["college_admin", "trainer", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["college_admin", "trainer", "irep_admin"])),
     db: Session = Depends(get_db),
 ):
     from services.lab_orchestrator import cull
@@ -46,7 +46,7 @@ def trigger_lab_cull(
 
 @router.post("/teams")
 def trigger_teams_sync(
-    current_user: TokenPayload = Depends(require_role(["college_admin", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["college_admin", "irep_admin"])),
     db: Session = Depends(get_db),
 ):
     """Queue Teams meeting creation for upcoming sessions and attendance pulls

@@ -9,6 +9,7 @@ from core.security import PLATFORM_TENANT, get_password_hash
 from models.schema import College, MouTerm, User
 
 STAFF_ID = "usr_irep_staff_01"
+SUPER_ID = "usr_irep_super_01"
 FEATURES = {"virtual_labs": True, "cyber_range": True, "ai_study_buddy": True, "parent_sms": True,
             "whatsapp": False, "teams_live_classes": True}
 
@@ -17,6 +18,15 @@ def seed_screen45(db, college_id: str = "col_demo_001") -> None:
     if db.get(User, STAFF_ID) is None:
         db.add(User(id=STAFF_ID, college_id=PLATFORM_TENANT, email="staff@irep.demo", hashed_password=get_password_hash("password123"),
                     role="irep_admin", name="IREP Operations", phone="9876500001", avatar_initials="IO", language_pref="en"))
+    if db.get(User, SUPER_ID) is None:
+        db.add(User(id=SUPER_ID, college_id=PLATFORM_TENANT, email="super@irep.demo", hashed_password=get_password_hash("password123"),
+                    role="super_admin", name="IREP Director", phone="9876500002", avatar_initials="ID", language_pref="en"))
+    else:                                               # a re-run restores demo state
+        s = db.get(User, SUPER_ID)
+        s.role, s.is_active = "super_admin", True
+    staff = db.get(User, STAFF_ID)
+    if staff is not None:
+        staff.role, staff.is_active = "irep_admin", True
     c = db.get(College, college_id)
     if c is None:
         return

@@ -230,7 +230,8 @@ export default function CollegeStructurePage() {
 
           <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3" data-testid="import-section">
             <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><FileUp className="w-4 h-4 text-[#2B5CD0]" />{t("structure.import_title")}</h2>
-            <p className="text-[11px] text-[#64748B]">{t("structure.import_help")} <code className="font-mono">register_no,name,email,phone,branch_code,batch,semester,parent_name,parent_phone</code></p>
+            <p className="text-[11px] text-[#64748B]">{t("structure.import_help")} <code className="font-mono">register_no,name,email,phone,branch_code,batch,semester,parent_name,parent_phone,parent_email,parent_consent,parent_consent_ref</code></p>
+            <p className="text-[11px] text-[#64748B]" data-testid="import-consent-help">{t("structure.import_consent_help")}</p>
             <div className="flex flex-wrap items-center gap-2">
               <input type="file" accept=".csv,text/csv" data-testid="import-file" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); }} className="text-xs" />
               <button type="button" disabled={!file || busy} onClick={() => upload(true)} data-testid="import-check" className="px-3 py-1.5 border border-[#CBD5E1] text-xs font-bold rounded-lg disabled:opacity-40">{t("structure.check_file")}</button>

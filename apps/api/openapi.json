@@ -16483,6 +16483,484 @@
         }
       }
     },
+    "/api/v1/admin/staff": {
+      "get": {
+        "tags": [
+          "Super admin"
+        ],
+        "summary": "List Staff",
+        "operationId": "list_staff_api_v1_admin_staff_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Super admin"
+        ],
+        "summary": "Invite Staff",
+        "operationId": "invite_staff_api_v1_admin_staff_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/staff/{user_id}/role": {
+      "put": {
+        "tags": [
+          "Super admin"
+        ],
+        "summary": "Change Staff Role",
+        "operationId": "change_staff_role_api_v1_admin_staff__user_id__role_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/staff/{user_id}/deactivate": {
+      "post": {
+        "tags": [
+          "Super admin"
+        ],
+        "summary": "Deactivate Staff",
+        "operationId": "deactivate_staff_api_v1_admin_staff__user_id__deactivate_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/staff/{user_id}/reactivate": {
+      "post": {
+        "tags": [
+          "Super admin"
+        ],
+        "summary": "Reactivate Staff",
+        "operationId": "reactivate_staff_api_v1_admin_staff__user_id__reactivate_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/support-sessions": {
+      "get": {
+        "tags": [
+          "Super admin"
+        ],
+        "summary": "List Support Sessions",
+        "operationId": "list_support_sessions_api_v1_admin_support_sessions_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Super admin"
+        ],
+        "summary": "Open Support Session",
+        "operationId": "open_support_session_api_v1_admin_support_sessions_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportSessionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/support-sessions/{session_id}/end": {
+      "post": {
+        "tags": [
+          "Super admin"
+        ],
+        "summary": "End Support Session",
+        "operationId": "end_support_session_api_v1_admin_support_sessions__session_id__end_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -18759,6 +19237,20 @@
         ],
         "title": "ReviewActionRequest"
       },
+      "RoleIn": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "pattern": "^(irep_admin|super_admin)$",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "RoleIn"
+      },
       "RosterRequestIn": {
         "properties": {
           "student_id": {
@@ -18922,6 +19414,35 @@
         ],
         "title": "SpectateIn"
       },
+      "StaffIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 2,
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 5,
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Email"
+          },
+          "role": {
+            "type": "string",
+            "pattern": "^(irep_admin|super_admin)$",
+            "title": "Role",
+            "default": "irep_admin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "StaffIn"
+      },
       "StandupRequest": {
         "properties": {
           "yesterday": {
@@ -19054,6 +19575,59 @@
         },
         "type": "object",
         "title": "SubmitTestRequest"
+      },
+      "SupportSessionIn": {
+        "properties": {
+          "college_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "College Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Reason"
+          },
+          "minutes": {
+            "type": "integer",
+            "maximum": 240.0,
+            "minimum": 15.0,
+            "title": "Minutes",
+            "default": 60
+          },
+          "staff_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Staff User Id"
+          },
+          "ticket_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "college_id",
+          "reason"
+        ],
+        "title": "SupportSessionIn"
       },
       "SurveyIn": {
         "properties": {

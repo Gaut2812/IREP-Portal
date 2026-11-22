@@ -1,9 +1,11 @@
-"""Create the first IREP staff account on an empty production database and invite it through
-Keycloak (an email with a link to set the password). Idempotent.
+"""Create the first SUPER ADMIN on an empty production database and invite it through Keycloak (an
+email with a link to set the password; the first sign-in also sets up an authenticator app, 2FA).
+Idempotent: a re-run never touches an existing password or authenticator.
 
     docker compose run --rm api python ops/bootstrap_admin.py --email ops@yourdomain.in --name "IREP Operations"
 
-The staff member then onboards colleges from the portal (Screen 45), and college admins invite
+The super admin then invites IREP staff (Super admin page), signs MoUs and onboards colleges
+(Screen 45), and college admins invite
 their trainers and students (invites are emailed by Keycloak, see ops/configure_keycloak.py).
 --no-email prints the next step instead, for when Keycloak SMTP is not set up yet.
 """
@@ -22,14 +24,17 @@ from models.schema import User
 from services.keycloak_admin import admin_from_env
 
 
-def ensure_staff(db, email: str, name: str) -> User:
+def ensure_staff(db, email: str, name: str, role: str = "super_admin") -> User:
     email = email.strip().lower()
     u = db.execute(select(User).filter_by(email=email)).scalar_one_or_none()
     if u is not None:
-        if u.role != "irep_admin":
+        if u.college_id != PLATFORM_TENANT or u.role not in ("irep_admin", "super_admin"):
             raise SystemExit(f"{email} already exists with role {u.role!r}; use another email")
+        if u.role != role:                                  # promote existing IREP staff (operator action)
+            u.role = role
+            db.commit()
         return u
-    u = User(id=f"usr_irep_{secrets.token_hex(6)}", college_id=PLATFORM_TENANT, email=email, role="irep_admin", name=name,
+    u = User(id=f"usr_irep_{secrets.token_hex(6)}", college_id=PLATFORM_TENANT, email=email, role=role, name=name,
              # Keycloak owns the password in production; this local hash is random and never used
              hashed_password=get_password_hash(secrets.token_urlsafe(32)),
              avatar_initials="".join(p[0] for p in name.split()[:2]).upper() or "IR", language_pref="en")
@@ -58,7 +63,7 @@ def main() -> int:
         db.close()
     kc = admin_from_env()
     existed = kc.find_user(rep["username"]) is not None
-    kc.invite(rep, "irep_admin", send_email=not args.no_email, resend=args.resend_invite)
+    kc.invite(rep, u.role, send_email=not args.no_email, resend=args.resend_invite)
     if existed and not args.resend_invite:
         print(f"{u.email}: already set up; nothing changed (use --resend-invite to email the link again).")
     elif args.no_email:

@@ -24,6 +24,7 @@ def _h(sub, role, college_id):
 
 
 STAFF = _h("usr_irep_staff_01", "irep_admin", PLATFORM_TENANT)
+SUPER = _h("usr_irep_super_01", "super_admin", PLATFORM_TENANT)          # MoU terms and feature switches
 KAVITHA = _h("usr_kavitha_01", "college_admin", "col_demo_001")
 ARUN = _h("usr_arun_01", "trainer", "col_demo_001")
 
@@ -92,14 +93,14 @@ def test_only_irep_staff(headers):
 def test_mou_versions_and_activation(code):
     cid = _create(code).json()["id"]
     base = {"starts_on": "2026-12-01", "ends_on": "2027-11-30", "students_cap": 500}
-    bad = client.post(f"/api/v1/admin/colleges/{cid}/mou", json={**base, "ends_on": "2026-11-01"}, headers=STAFF)
+    bad = client.post(f"/api/v1/admin/colleges/{cid}/mou", json={**base, "ends_on": "2026-11-01"}, headers=SUPER)
     assert bad.status_code == 422
-    assert client.post(f"/api/v1/admin/colleges/{cid}/mou", json={**base, "students_cap": 0}, headers=STAFF).status_code == 422
-    first = client.post(f"/api/v1/admin/colleges/{cid}/mou", json=base, headers=STAFF).json()
+    assert client.post(f"/api/v1/admin/colleges/{cid}/mou", json={**base, "students_cap": 0}, headers=SUPER).status_code == 422
+    first = client.post(f"/api/v1/admin/colleges/{cid}/mou", json=base, headers=SUPER).json()
     assert first["status"] == "active"
-    draft = client.post(f"/api/v1/admin/colleges/{cid}/mou", json={**base, "students_cap": 650, "activate": False}, headers=STAFF).json()
+    draft = client.post(f"/api/v1/admin/colleges/{cid}/mou", json={**base, "students_cap": 650, "activate": False}, headers=SUPER).json()
     assert draft["status"] == "draft"
-    client.post(f"/api/v1/admin/colleges/{cid}/mou/{draft['id']}/activate", headers=STAFF)
+    client.post(f"/api/v1/admin/colleges/{cid}/mou/{draft['id']}/activate", headers=SUPER)
     terms = {m["id"]: m["status"] for m in client.get(f"/api/v1/admin/colleges/{cid}", headers=STAFF).json()["mou_terms"]}
     assert terms == {first["id"]: "superseded", draft["id"]: "active"}
     assert len(_audit(cid, "mou.activated")) == 2
@@ -109,15 +110,15 @@ def test_mou_versions_and_activation(code):
 
 def test_feature_switches(code):
     cid = _create(code).json()["id"]
-    r = client.put(f"/api/v1/admin/colleges/{cid}/features", json={"features": {"cyber_range": True}}, headers=STAFF)
+    r = client.put(f"/api/v1/admin/colleges/{cid}/features", json={"features": {"cyber_range": True}}, headers=SUPER)
     assert r.json()["features"]["cyber_range"] is True and r.json()["features"]["virtual_labs"] is True
-    assert client.put(f"/api/v1/admin/colleges/{cid}/features", json={"features": {"teleport": True}}, headers=STAFF).status_code == 422
+    assert client.put(f"/api/v1/admin/colleges/{cid}/features", json={"features": {"teleport": True}}, headers=SUPER).status_code == 422
     assert _audit(cid, "college.features_changed")[0].detail == {"changed": {"cyber_range": True}}
 
 
 def test_first_admin_signs_in_to_their_own_college_only(code):
     cid = _create(code).json()["id"]
-    client.post(f"/api/v1/admin/colleges/{cid}/mou", json={"starts_on": "2026-12-01", "ends_on": "2027-11-30", "students_cap": 300}, headers=STAFF)
+    client.post(f"/api/v1/admin/colleges/{cid}/mou", json={"starts_on": "2026-12-01", "ends_on": "2027-11-30", "students_cap": 300}, headers=SUPER)
     email = f"coordinator.{code.lower()}@college.example"
     r = client.post(f"/api/v1/admin/colleges/{cid}/admins", json={"name": "Dr. Meera Iyer", "email": email}, headers=STAFF)
     assert r.status_code == 201 and r.json()["college_status"] == "active"

@@ -26,6 +26,7 @@ def _h(sub, role, college_id="col_demo_001"):
 
 
 STAFF = _h("usr_irep_staff_01", "irep_admin", PLATFORM_TENANT)
+SUPER = _h("usr_irep_super_01", "super_admin", PLATFORM_TENANT)          # MoU terms and feature switches
 KAVITHA = _h("usr_kavitha_01", "college_admin")
 OTHER_COLLEGE_ADMIN = _h("usr_kavitha_01", "college_admin", "col_other_999")
 RAMESH = _h("usr_ramesh_01", "parent")
@@ -195,7 +196,13 @@ def test_deletion_anonymises_and_rejection_needs_a_reason(throwaway_student):
 
     rid = client.post("/api/v1/college/data-requests", json={"student_id": throwaway_student, "kind": "deletion",
                                                              "reason": "Student left the programme and asked for deletion"}, headers=KAVITHA).json()["id"]
-    done = client.post(f"/api/v1/admin/data-requests/{rid}/complete", headers=STAFF).json()
+    # deletions are decided by the super admin only (docs/PERMISSIONS.md)
+    assert client.post(f"/api/v1/admin/data-requests/{rid}/complete", headers=STAFF).status_code == 403
+    assert client.post(f"/api/v1/admin/data-requests/{rid}/reject", json={"reason": "Not ours to decide"}, headers=STAFF).status_code == 403
+    queued = next(i for i in client.get("/api/v1/admin/data-requests", headers=STAFF).json()["items"] if i["id"] == rid)
+    assert queued["can_decide"] is False
+    assert next(i for i in client.get("/api/v1/admin/data-requests", headers=SUPER).json()["items"] if i["id"] == rid)["can_decide"] is True
+    done = client.post(f"/api/v1/admin/data-requests/{rid}/complete", headers=SUPER).json()
     assert done["status"] == "completed"
     db = SessionLocal()
     try:

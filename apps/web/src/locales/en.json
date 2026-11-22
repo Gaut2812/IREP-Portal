@@ -91,7 +91,8 @@
     "lab_board": "Lab board",
     "moderation": "Moderation",
     "college_messages": "Messages",
-    "surveys": "Parent surveys"
+    "surveys": "Parent surveys",
+    "super_admin": "Super admin"
   },
   "student": {
     "readiness_score": "Readiness score",
@@ -1000,7 +1001,8 @@
     "admin_phone": "Mobile (optional)",
     "add_admin": "Add college admin",
     "err_admin_name": "Enter the admin's name.",
-    "err_admin_email": "Enter a valid email."
+    "err_admin_email": "Enter a valid email.",
+    "super_only": "Only the super admin can change MoU terms and feature switches."
   },
   "admin_audit": {
     "title": "Audit and consent",
@@ -1055,7 +1057,8 @@
     "reject": "Reject",
     "reject_reason": "Reason for rejecting",
     "err_reason": "Give a reason (at least 5 characters).",
-    "download": "Download export"
+    "download": "Download export",
+    "super_only_deletion": "Deletion requests are approved or rejected by the super admin."
   },
   "structure": {
     "title": "Branches and batches",
@@ -1100,7 +1103,8 @@
     "remove_from": "remove from",
     "approve": "Approve",
     "reject": "Reject",
-    "reject_reason": "Reason for rejecting (at least 5 characters)"
+    "reject_reason": "Reason for rejecting (at least 5 characters)",
+    "import_consent_help": "Parent columns are optional. A row with parent details needs parent_consent=yes and parent_consent_ref (the signed form's number or file name): consent is recorded before any parent data is saved. One mobile number = one parent account, linked to each of their children."
   },
   "college_settings": {
     "title": "College settings",
@@ -1779,5 +1783,44 @@
     "closed": "This survey has closed.",
     "submit": "Send my answers",
     "privacy": "The college sees totals and comments without your name."
+  },
+  "super_admin": {
+    "title": "Super admin",
+    "help": "IREP staff accounts and logged support sessions. Everything you do here is written to the audit log; staff sign in with two-factor.",
+    "only_title": "Super admin only",
+    "only_body": "Ask the super admin to manage staff accounts and support sessions.",
+    "load_failed": "Could not load this page. Try again.",
+    "action_failed": "Something went wrong. Try again.",
+    "staff": "IREP staff accounts",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "role_irep_admin": "IREP staff",
+    "role_super_admin": "Super admin",
+    "two_factor": "Two-factor",
+    "required": "Required",
+    "status": "Status",
+    "active": "Active",
+    "deactivated": "Deactivated",
+    "you": "you",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "invite": "Send invite",
+    "invite_invalid": "Enter a name and a valid email.",
+    "invited": "Invite sent to",
+    "invited_dev": "Development: one-time password for",
+    "sessions": "Support sessions",
+    "sessions_help": "Open a time-boxed, logged session before working on a college's account. It ends by itself.",
+    "college": "College",
+    "choose_college": "Choose a college",
+    "minutes": "Duration",
+    "min": "min",
+    "reason": "Reason (at least 10 characters)",
+    "session_invalid": "Choose a college and give a reason of at least 10 characters.",
+    "open_session": "Open session",
+    "no_sessions": "No support sessions yet.",
+    "session_active": "Active",
+    "session_closed": "Closed",
+    "end_session": "End now"
   }
 }

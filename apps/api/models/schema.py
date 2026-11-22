@@ -1590,3 +1590,19 @@ class ModerationAction(TenantModel):
     action: Mapped[str] = mapped_column(String(16), nullable=False)               # remove, keep, mute
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     actor_user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class SupportSession(TenantModel):
+    """A logged support session: the super admin opens a time-boxed window, with a reason, during which
+    IREP support works on one college's account. Opening and ending are audited (docs/PERMISSIONS.md)."""
+    __tablename__ = "support_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    staff_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_support_sessions_staff"), nullable=False)
+    opened_by: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_support_sessions_opened_by"), nullable=False)
+    ticket_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    opened_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    ended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    ended_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

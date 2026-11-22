@@ -284,7 +284,7 @@ def purge_expired_messages(db: Session, college_id: str, now: Optional[datetime.
 
 
 @router.post("/admin/jobs/chat-retention")
-def run_retention(current_user: TokenPayload = Depends(require_role(["college_admin", "super_admin"])), db: Session = Depends(get_db)):
+def run_retention(current_user: TokenPayload = Depends(require_role(["college_admin", "irep_admin"])), db: Session = Depends(get_db)):
     n = purge_expired_messages(db, current_user.college_id)
     record_audit(db, current_user, "job.chat_retention", "college", current_user.college_id, {"deleted": n})
     db.commit()

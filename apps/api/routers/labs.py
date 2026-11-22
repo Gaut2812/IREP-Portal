@@ -204,7 +204,7 @@ def exercise_progress(current_user: TokenPayload = Depends(require_role(["traine
 # ------------------------------------------------------------------ S13: metering job
 
 @router.post("/admin/jobs/labs/meter")
-def run_meter(current_user: TokenPayload = Depends(require_role(["college_admin", "super_admin"])), db: Session = Depends(get_db)):
+def run_meter(current_user: TokenPayload = Depends(require_role(["college_admin", "irep_admin"])), db: Session = Depends(get_db)):
     from services.lab_metering import meter
     out = meter(db)
     db.commit()

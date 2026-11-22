@@ -19,7 +19,7 @@ from services.audit import record_audit
 
 router = APIRouter(prefix="/college", tags=["College Screens"])
 
-COLLEGE_ROLES = ["college_admin", "placement_officer", "super_admin"]
+COLLEGE_ROLES = ["college_admin", "placement_officer", "irep_admin"]
 
 
 class GenerateReportRequest(BaseModel):

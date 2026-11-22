@@ -19,6 +19,7 @@ interface Detail {
   features: Record<string, boolean>;
   mou_terms: Mou[];
   admins: { id: string; name: string; email: string; phone: string | null }[];
+  can_manage?: boolean;          // super admin: MoU terms and feature switches
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -152,7 +153,8 @@ export default function AdminCollegeDetailPage() {
                       </li>
                     ))}
                   </ul>
-                  <form onSubmit={addMou} noValidate className="grid grid-cols-2 gap-2 pt-2 border-t border-[#F1F5F9]" data-testid="mou-form">
+                  {!d.can_manage && <p className="text-[11px] text-[#64748B] pt-2 border-t border-[#F1F5F9]" data-testid="mou-super-only">{t("admin_colleges.super_only")}</p>}
+                  {d.can_manage && <form onSubmit={addMou} noValidate className="grid grid-cols-2 gap-2 pt-2 border-t border-[#F1F5F9]" data-testid="mou-form">
                     {input(mou.starts_on, (v) => setMou({ ...mou, starts_on: v }), "mou-starts", t("admin_colleges.starts_on"), "date")}
                     {input(mou.ends_on, (v) => setMou({ ...mou, ends_on: v }), "mou-ends", t("admin_colleges.ends_on"), "date")}
                     {input(mou.students_cap, (v) => setMou({ ...mou, students_cap: v }), "mou-cap", t("admin_colleges.students_cap"), "number")}
@@ -163,7 +165,7 @@ export default function AdminCollegeDetailPage() {
                     <div className="col-span-2 flex justify-end">
                       <button type="submit" disabled={busy} data-testid="mou-save" className="px-3.5 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("admin_colleges.save_activate_mou")}</button>
                     </div>
-                  </form>
+                  </form>}
                 </section>
 
                 {/* Feature switches */}
@@ -173,7 +175,8 @@ export default function AdminCollegeDetailPage() {
                     {FEATURE_KEYS.map((k) => (
                       <li key={k} className="flex items-center justify-between text-xs">
                         <span>{t(`admin_colleges.feature_${k}`)}</span>
-                        <button type="button" role="switch" aria-checked={!!d.features[k]} disabled={busy} data-testid={`feature-${k}`}
+                        <button type="button" role="switch" aria-checked={!!d.features[k]} disabled={busy || !d.can_manage} data-testid={`feature-${k}`}
+                          title={d.can_manage ? undefined : t("admin_colleges.super_only")}
                           onClick={() => toggle(k, !d.features[k])}
                           className={`w-10 h-5 rounded-full relative transition-colors ${d.features[k] ? "bg-[#2BB3A0]" : "bg-[#CBD5E1]"}`}>
                           <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${d.features[k] ? "left-5" : "left-0.5"}`} />

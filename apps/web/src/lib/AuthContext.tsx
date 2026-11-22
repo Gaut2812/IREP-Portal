@@ -16,6 +16,8 @@ export interface UserProfile {
   avatar: string;
   college_id: string;
   language_pref?: string;
+  /** API role super_admin: IREP staff plus staff accounts, MoU terms, feature switches, deletions, support sessions */
+  super_admin?: boolean;
 }
 
 interface AuthContextType {
@@ -82,7 +84,7 @@ export async function demoLogin(role: Role): Promise<{ token: string; user: User
     if (!res.ok) throw new Error("Demo login failed");
     data = await res.json();
   }
-  const user: UserProfile = { ...data.user, role: toWebRole(data.user.role) };
+  const user: UserProfile = { ...data.user, role: toWebRole(data.user.role), super_admin: data.user.role === "super_admin" };
   return { token: data.access_token, user };
 }
 
@@ -117,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        savedUser = { ...parsed, role: toWebRole(parsed.role) };
+        savedUser = { ...parsed, role: toWebRole(parsed.role), super_admin: parsed.super_admin === true || parsed.role === "super_admin" };
         setUser(savedUser);
         setToken(savedToken);
       } catch {
@@ -137,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [persist]);
 
   const login = (newToken: string, newUser: UserProfile) => {
-    const normalised = { ...newUser, role: toWebRole(newUser.role) };
+    const normalised = { ...newUser, role: toWebRole(newUser.role), super_admin: newUser.super_admin === true || (newUser.role as string) === "super_admin" };
     persist(newToken, normalised);
 
     if (normalised.role === "student") router.push("/student");

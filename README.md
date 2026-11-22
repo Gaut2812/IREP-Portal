@@ -59,6 +59,7 @@ The web app runs at `http://localhost:3000`. Set `NEXT_PUBLIC_API_URL` if the AP
 | Trainer | `arun.k@demo.edu` / `password123` | `/trainer` |
 | College admin | `admin@demo.edu` / `password123` | `/college` |
 | IREP staff | `staff@irep.demo` / `password123` (link "IREP staff sign-in") | `/admin/colleges` |
+| Super admin | `super@irep.demo` / `password123` (same "IREP staff sign-in") | `/admin/super` |
 | Parent | Mobile `9876543210` (Ramesh K) or `9876543214` (Lakshmi S), then the OTP | `/parent` |
 
 In development the API returns the OTP in its response and the sign-in card shows it as "Demo OTP". In production it is sent only by SMS. The **View as** switcher in the top bar signs in as each demo role.
@@ -114,6 +115,7 @@ Sign-in rules:
 | 47 | Usage and quotas (IREP staff; use against the MoU) | `/admin/usage` |
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
 | 49 | Support desk (report a problem from any screen; IREP staff reply) | `/support`, `/admin/support` |
+| SA | Super admin: IREP staff accounts, logged support sessions ([permission matrix](docs/PERMISSIONS.md)) | `/admin/super` |
 
 ## Sign-in with Keycloak (optional in development)
 

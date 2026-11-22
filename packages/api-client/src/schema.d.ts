@@ -4101,6 +4101,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Staff */
+        get: operations["list_staff_api_v1_admin_staff_get"];
+        put?: never;
+        /** Invite Staff */
+        post: operations["invite_staff_api_v1_admin_staff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/staff/{user_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change Staff Role */
+        put: operations["change_staff_role_api_v1_admin_staff__user_id__role_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/staff/{user_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate Staff */
+        post: operations["deactivate_staff_api_v1_admin_staff__user_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/staff/{user_id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reactivate Staff */
+        post: operations["reactivate_staff_api_v1_admin_staff__user_id__reactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/support-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Support Sessions */
+        get: operations["list_support_sessions_api_v1_admin_support_sessions_get"];
+        put?: never;
+        /** Open Support Session */
+        post: operations["open_support_session_api_v1_admin_support_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/support-sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End Support Session */
+        post: operations["end_support_session_api_v1_admin_support_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -4919,6 +5023,11 @@ export interface components {
              */
             score_percent: number | null;
         };
+        /** RoleIn */
+        RoleIn: {
+            /** Role */
+            role: string;
+        };
         /** RosterRequestIn */
         RosterRequestIn: {
             /** Student Id */
@@ -4987,6 +5096,18 @@ export interface components {
             /** Label */
             label?: string | null;
         };
+        /** StaffIn */
+        StaffIn: {
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /**
+             * Role
+             * @default irep_admin
+             */
+            role: string;
+        };
         /** StandupRequest */
         StandupRequest: {
             /** Yesterday */
@@ -5027,6 +5148,22 @@ export interface components {
             } | null;
             /** Marked For Review */
             marked_for_review?: number[] | null;
+        };
+        /** SupportSessionIn */
+        SupportSessionIn: {
+            /** College Id */
+            college_id: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Minutes
+             * @default 60
+             */
+            minutes: number;
+            /** Staff User Id */
+            staff_user_id?: string | null;
+            /** Ticket Id */
+            ticket_id?: string | null;
         };
         /** SurveyIn */
         SurveyIn: {
@@ -13914,6 +14051,274 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_staff_api_v1_admin_staff_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invite_staff_api_v1_admin_staff_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_staff_role_api_v1_admin_staff__user_id__role_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_staff_api_v1_admin_staff__user_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reactivate_staff_api_v1_admin_staff__user_id__reactivate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_support_sessions_api_v1_admin_support_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_support_session_api_v1_admin_support_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_support_session_api_v1_admin_support_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

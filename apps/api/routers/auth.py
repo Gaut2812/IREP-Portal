@@ -78,6 +78,8 @@ def _as_payload(user: User) -> TokenPayload:
 def _sign_in_group(role: Optional[str]) -> Optional[str]:
     """Which sign-in card a role uses: both college roles use the college card."""
     r = normalize_role(role)
+    if r == "super_admin":
+        return "irep_admin"                       # same "IREP staff" sign-in card
     return "college_admin" if r == "placement_officer" else r
 
 

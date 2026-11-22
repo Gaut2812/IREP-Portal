@@ -1,6 +1,7 @@
 import { Page } from "@playwright/test";
 
-export type DemoRole = "student" | "trainer" | "college" | "parent" | "admin";
+/** "super" is the super admin (API role super_admin, web role admin); "admin" is plain IREP staff. */
+export type DemoRole = "student" | "trainer" | "college" | "parent" | "admin" | "super";
 
 const API_BASE = process.env.PLAYWRIGHT_API_URL || "http://localhost:8000/api/v1";
 
@@ -10,6 +11,7 @@ const CREDENTIALS: Record<DemoRole, { identifier: string; password: string; phon
   college: { identifier: "admin@demo.edu", password: "password123" },
   parent: { identifier: "ramesh.k@example.com", password: "password123", phone: "9876543210" },
   admin: { identifier: "staff@irep.demo", password: "password123" },
+  super: { identifier: "super@irep.demo", password: "password123" },
 };
 
 // OTP requests are rate limited (5 per 10 min per phone), so each worker logs a
@@ -18,7 +20,7 @@ const parentLogins = new Map<string, any>();
 
 function toWebRole(apiRole: string): DemoRole {
   if (apiRole === "college_admin") return "college";
-  if (apiRole === "irep_admin") return "admin";
+  if (apiRole === "irep_admin" || apiRole === "super_admin") return "admin";
   return apiRole as DemoRole;
 }
 
@@ -51,12 +53,12 @@ export async function loginAs(
     }
   } else {
     const res = await page.request.post(`${API_BASE}/auth/login`, {
-      data: { role, identifier: creds.identifier, password: creds.password },
+      data: { role: role === "super" ? "admin" : role, identifier: creds.identifier, password: creds.password },
     });
     if (!res.ok()) throw new Error(`Login failed for ${role}: ${res.status()}`);
     data = await res.json();
   }
-  const user = { ...data.user, role: toWebRole(data.user.role) };
+  const user = { ...data.user, role: toWebRole(data.user.role), super_admin: data.user.role === "super_admin" };
   const token: string = data.access_token;
   const lang = options.lang || "en";
 

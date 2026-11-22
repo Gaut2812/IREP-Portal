@@ -78,9 +78,11 @@ DEMO_PROFILES = {
     "college_admin": dict(sub="usr_kavitha_01", email="admin@demo.edu", role="college_admin", name="Dr. Kavitha", avatar="DC"),
     "parent": dict(sub="usr_ramesh_01", email="ramesh.k@example.com", role="parent", name="Mr. Ramesh K", avatar="RK"),
 }
-# The web app uses short role names ("college", "admin"). IREP staff are
-# "irep_admin" (Keycloak realm role); "super_admin" is the older spelling.
-ROLE_ALIASES = {"college": "college_admin", "admin": "irep_admin", "super_admin": "irep_admin"}
+# The web app uses short role names ("college", "admin"). IREP staff are "irep_admin";
+# "super_admin" sits above them (docs/PERMISSIONS.md): it passes every irep_admin check and alone
+# manages staff accounts, MoU terms, feature switches, billing, deletion approvals and support sessions.
+ROLE_ALIASES = {"college": "college_admin", "admin": "irep_admin"}
+STAFF_ROLES = ("irep_admin", "super_admin")
 # IREP staff are not in any college: their token carries the platform tenant.
 PLATFORM_TENANT = "irep_platform"
 
@@ -125,6 +127,8 @@ async def get_current_user(
 def require_role(allowed_roles: List[str]):
     def role_checker(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
         allowed = {normalize_role(r) for r in allowed_roles}
+        if "irep_admin" in allowed:
+            allowed.add("super_admin")                 # super_admin is above IREP staff
         if normalize_role(current_user.role) not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -132,3 +136,16 @@ def require_role(allowed_roles: List[str]):
             )
         return current_user
     return role_checker
+
+
+def is_staff(role: Optional[str]) -> bool:
+    return normalize_role(role) in STAFF_ROLES
+
+
+def is_super_admin(user: TokenPayload) -> bool:
+    return normalize_role(user.role) == "super_admin"
+
+
+# Only the super admin: staff accounts, MoU terms, feature switches, billing, deletion approvals,
+# support sessions. Every request a super admin makes is also audited (main.py).
+SUPER = require_role(["super_admin"])

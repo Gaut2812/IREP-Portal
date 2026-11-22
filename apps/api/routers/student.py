@@ -792,7 +792,7 @@ def get_practice_test(
 @router.post("/tests/{test_id}/attempts")
 def start_or_resume_attempt(
     test_id: str,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
@@ -854,7 +854,7 @@ def start_or_resume_attempt(
 def batch_save_answers(
     attempt_id: str,
     req: BatchAnswersRequest,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
@@ -924,7 +924,7 @@ def batch_save_answers(
 def log_proctor_event(
     attempt_id: str,
     req: ProctorEventRequest,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
@@ -953,7 +953,7 @@ def log_proctor_event(
 def submit_practice_test(
     attempt_id: str,
     req: Optional[SubmitTestRequest] = None,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
@@ -1124,7 +1124,7 @@ def submit_practice_test(
 @router.get("/tests/attempts/{attempt_id}/result")
 def get_attempt_result(
     attempt_id: str,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)

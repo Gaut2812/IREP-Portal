@@ -278,7 +278,7 @@ def test_bootstrap_admin_is_idempotent_and_platform_scoped():
     try:
         a = ensure_staff(db, "Pilot.Ops@Example.in", "Pilot Ops")
         b = ensure_staff(db, "pilot.ops@example.in", "Pilot Ops")
-        assert a.id == b.id and a.role == "irep_admin" and a.college_id == PLATFORM_TENANT and a.email == "pilot.ops@example.in"
+        assert a.id == b.id and a.role == "super_admin" and a.college_id == PLATFORM_TENANT and a.email == "pilot.ops@example.in"
         with pytest.raises(SystemExit):
             ensure_staff(db, "priya.r@demo.edu", "Not staff")
         db.delete(a)

@@ -77,7 +77,7 @@ def _setup(c):
     return br, bt
 
 
-CSV_HEADER = "register_no,name,email,phone,branch_code,batch,semester,parent_name,parent_phone\n"
+CSV_HEADER = "register_no,name,email,phone,branch_code,batch,semester,parent_name,parent_phone,parent_email,parent_consent,parent_consent_ref\n"
 
 
 def _import(c, body, dry_run):
@@ -91,10 +91,11 @@ def test_first_admin_sets_up_a_new_college(college):
     assert empty == {"students_total": 0, "unassigned_students": 0, "branches": []}
     br, bt = _setup(college)
     tag = college["code"].lower()
-    rows = (f"R{tag}01,Anu K,anu.{tag}@stu.example,9876501001,CSE,CSE-A,5,Kumar K,9876502001\n"
-            f"R{tag}02,Bala S,bala.{tag}@stu.example,,cse,cse-a,5,,\n")
+    rows = (f"R{tag}01,Anu K,anu.{tag}@stu.example,9876501001,CSE,CSE-A,5,Kumar K,9876502001,,yes,FORM-{tag}-01\n"
+            f"R{tag}02,Bala S,bala.{tag}@stu.example,,cse,cse-a,5,,,,,\n")
     dry = _import(college, rows, True).json()
-    assert dry["can_import"] is True and dry["summary"] == {"rows": 2, "errors": 0, "new": 2, "updated": 0, "parents_linked": 1}
+    assert dry["can_import"] is True and dry["summary"] == {"rows": 2, "errors": 0, "new": 2, "updated": 0, "parents_linked": 1,
+                                                            "parents_without_email": 1}
     assert client.get("/api/v1/college/structure", headers=college["h"]).json()["students_total"] == 0      # dry run wrote nothing
     done = _import(college, rows, False).json()
     assert done["imported"] is True
@@ -102,10 +103,10 @@ def test_first_admin_sets_up_a_new_college(college):
     assert st["students_total"] == 2 and st["branches"][0]["batches"][0]["students"] == 2
     # staff see the onboarded college with its students (45 <- 03)
     assert client.get(f"/api/v1/admin/colleges/{college['id']}", headers=STAFF).json()["college"]["students"] == 2
-    # the imported parent signs in with OTP and must consent before seeing data (screen 48)
+    # the imported parent signs in with OTP; the consent form recorded at import already covers screen 15 (48)
     otp = client.post("/api/v1/auth/parent/otp/request", json={"phone": "9876502001"}).json()["demo_otp"]
     ptok = client.post("/api/v1/auth/parent/otp/verify", json={"phone": "9876502001", "otp": otp}).json()["access_token"]
-    assert client.get("/api/v1/parent/overview", headers={"Authorization": f"Bearer {ptok}"}).json()["consent_required"] is True
+    assert client.get("/api/v1/parent/overview", headers={"Authorization": f"Bearer {ptok}"}).json().get("consent_required") is not True
     db = SessionLocal()
     try:
         audit = db.execute(select(AuditLog).where(AuditLog.college_id == college["id"], AuditLog.action == "students.imported")).scalar_one()
@@ -117,8 +118,8 @@ def test_first_admin_sets_up_a_new_college(college):
 def test_reimport_updates_and_reports_row_errors(college):
     _setup(college)
     tag = college["code"].lower()
-    _import(college, f"R{tag}01,Anu K,anu.{tag}@stu.example,,CSE,CSE-A,5,,\n", False)
-    again = _import(college, f"R{tag}01,Anu Kumari,anu.{tag}@stu.example,9876501002,CSE,CSE-A,5,,\n", False).json()
+    _import(college, f"R{tag}01,Anu K,anu.{tag}@stu.example,,CSE,CSE-A,5,,,,,\n", False)
+    again = _import(college, f"R{tag}01,Anu Kumari,anu.{tag}@stu.example,9876501002,CSE,CSE-A,5,,,,,\n", False).json()
     assert again["summary"]["new"] == 0 and again["summary"]["updated"] == 1
     db = SessionLocal()
     try:
@@ -126,12 +127,12 @@ def test_reimport_updates_and_reports_row_errors(college):
         assert len(s) == 1 and db.get(User, s[0].user_id).name == "Anu Kumari"
     finally:
         db.close()
-    bad = (f"R{tag}02,Bala,bala.{tag}@stu.example,,ECE,ECE-A,5,,\n"          # unknown branch
-           f"R{tag}03,Chitra,not-an-email,,CSE,CSE-A,5,,\n"
-           f"R{tag}04,Devi,devi.{tag}@stu.example,,CSE,CSE-A,6,,\n"           # semester mismatch
-           f"R{tag}05,Ezhil,priya.r@demo.edu,,CSE,CSE-A,5,,\n"                # another account's email
-           f"R{tag}06,Fathima,f.{tag}@stu.example,12345,CSE,CSE-A,5,,\n"
-           f"R{tag}06,Fathima,f2.{tag}@stu.example,,CSE,CSE-A,5,,\n")
+    bad = (f"R{tag}02,Bala,bala.{tag}@stu.example,,ECE,ECE-A,5,,,,,\n"          # unknown branch
+           f"R{tag}03,Chitra,not-an-email,,CSE,CSE-A,5,,,,,\n"
+           f"R{tag}04,Devi,devi.{tag}@stu.example,,CSE,CSE-A,6,,,,,\n"           # semester mismatch
+           f"R{tag}05,Ezhil,priya.r@demo.edu,,CSE,CSE-A,5,,,,,\n"                # another account's email
+           f"R{tag}06,Fathima,f.{tag}@stu.example,12345,CSE,CSE-A,5,,,,,\n"
+           f"R{tag}06,Fathima,f2.{tag}@stu.example,,CSE,CSE-A,5,,,,,\n")
     r = _import(college, bad, False).json()
     assert r["dry_run"] is True and r["can_import"] is False                   # errors block the real import
     assert [e["row"] for e in r["errors"]] == [2, 3, 4, 5, 6, 7]
@@ -167,7 +168,7 @@ def test_branches_batches_and_trainers(college):
 def test_promote_moves_batch_and_students(college):
     br, bt = _setup(college)
     tag = college["code"].lower()
-    _import(college, f"R{tag}01,Anu K,anu.{tag}@stu.example,,CSE,CSE-A,5,,\n", False)
+    _import(college, f"R{tag}01,Anu K,anu.{tag}@stu.example,,CSE,CSE-A,5,,,,,\n", False)
     r = client.post(f"/api/v1/college/batches/{bt}/promote", headers=college["h"]).json()
     assert r == {"batch_id": bt, "semester": 6, "students": 1}
     db = SessionLocal()

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
-from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent, college_structure, college_settings, trainer_batches, schedule, attendance, leave_approvals, content_library, events, monthly_cards, support, assessments, labs, study_buddy, certificates, usage, college_messages, surveys
+from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent, college_structure, college_settings, trainer_batches, schedule, attendance, leave_approvals, content_library, events, monthly_cards, support, assessments, labs, study_buddy, certificates, usage, college_messages, surveys, super_admin
 
 class _RedactSecrets(logging.Filter):
     """Access logs never show bearer tokens or link signatures (WebSockets pass ?token=, media links ?sig=)."""
@@ -95,6 +95,50 @@ app.include_router(certificates.router, prefix=settings.API_V1_PREFIX)
 app.include_router(usage.router, prefix=settings.API_V1_PREFIX)
 app.include_router(college_messages.router, prefix=settings.API_V1_PREFIX)
 app.include_router(surveys.router, prefix=settings.API_V1_PREFIX)
+app.include_router(super_admin.router, prefix=settings.API_V1_PREFIX)
+
+
+def _super_admin_claimed(token: str) -> bool:
+    """Cheap pre-check on the unverified claims; the token is verified before anything is written."""
+    from jose import jwt
+    try:
+        claims = jwt.get_unverified_claims(token)
+    except Exception:
+        return False
+    return claims.get("role") == "super_admin" or "super_admin" in ((claims.get("realm_access") or {}).get("roles") or [])
+
+
+def _audit_super_request(token: str, method: str, path: str, status_code: int, ip) -> None:
+    from fastapi import HTTPException
+    from core.database import SessionLocal
+    from core.security import _payload_from_token, normalize_role
+    from services.audit import record_audit
+    try:
+        payload = _payload_from_token(token)
+    except HTTPException:
+        return
+    if payload is None or normalize_role(payload.role) != "super_admin":
+        return
+    db = SessionLocal()
+    try:
+        record_audit(db, payload, "super_admin.request", "http", path[:64],
+                     {"method": method, "path": path, "status": status_code}, ip_address=ip)
+        db.commit()
+    finally:
+        db.close()
+
+
+@app.middleware("http")
+async def audit_every_super_admin_request(request, call_next):
+    """docs/PERMISSIONS.md: everything the super admin does goes to the audit log, reads included,
+    with the outcome (status code). Specific events (staff.invited, mou.created, ...) are written too."""
+    response = await call_next(request)
+    auth = request.headers.get("authorization") or ""
+    if auth[:7].lower() == "bearer " and _super_admin_claimed(auth[7:]):
+        from starlette.concurrency import run_in_threadpool
+        await run_in_threadpool(_audit_super_request, auth[7:], request.method, request.url.path, response.status_code,
+                                request.client.host if request.client else None)
+    return response
 
 @app.get("/")
 def root():

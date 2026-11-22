@@ -30,7 +30,7 @@ from core.keycloak import IREP_ROLES
 from services.keycloak_admin import KeycloakAdmin, admin_from_env
 from models.schema import User
 
-DEMO_EMAILS = ["priya.r@demo.edu", "arun.k@demo.edu", "admin@demo.edu", "staff@irep.demo"]
+DEMO_EMAILS = ["priya.r@demo.edu", "arun.k@demo.edu", "admin@demo.edu", "staff@irep.demo", "super@irep.demo"]
 
 
 def representation(u: User) -> dict:

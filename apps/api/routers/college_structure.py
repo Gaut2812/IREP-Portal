@@ -19,12 +19,15 @@ from core.database import get_db
 from core.security import TokenPayload, get_password_hash, keycloak_mode, require_role
 from models.schema import Batch, BatchTrainer, Branch, ParentStudent, Student, Trainer, User
 from services.audit import record_audit
+from services import consent as consent_svc
 from services.outbox import emit
 
 router = APIRouter(prefix="/college", tags=["Screen 03 · Branches and batches"])
 COLLEGE = require_role(["college_admin"])
 MAX_ROWS = 5000
-CSV_COLUMNS = ["register_no", "name", "email", "phone", "branch_code", "batch", "semester", "parent_name", "parent_phone"]
+CSV_COLUMNS = ["register_no", "name", "email", "phone", "branch_code", "batch", "semester", "parent_name", "parent_phone",
+               "parent_email", "parent_consent", "parent_consent_ref"]
+CONSENT_YES = ("yes", "y", "true", "1", "granted")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -211,6 +214,42 @@ def _parse_csv(raw: bytes) -> List[dict]:
     return rows
 
 
+def _find_parent(db: Session, cid: str, phone: str, email: Optional[str]) -> Optional[User]:
+    """Tenant-scoped: a parent in another college is a different account."""
+    found = db.execute(select(User).where(User.college_id == cid, User.role == "parent", User.phone == phone)).scalars().first()
+    if found is None and email:
+        found = db.execute(select(User).where(User.college_id == cid, User.role == "parent",
+                                              func.lower(User.email) == email)).scalars().first()
+    return found
+
+
+def _parent_row(db: Session, cid: str, r: dict, file_parents: Dict[str, str]):
+    """The row's parent as a dict, None when the row has no parent, or an error message."""
+    raw_phone, pemail, pname = r.get("parent_phone", ""), r.get("parent_email", "").lower(), r.get("parent_name", "")
+    if not (raw_phone or pemail or pname):
+        return None
+    if not raw_phone:
+        return "parent_phone is required when a parent is given (parents sign in with their mobile number)"
+    pphone = _norm_phone(raw_phone)
+    if pphone is None:
+        return "parent_phone must be a 10-digit mobile number"
+    if pemail and not EMAIL_RE.match(pemail):
+        return "parent_email is invalid"
+    if r.get("parent_consent", "").lower() not in CONSENT_YES:
+        return "parent details need parent_consent=yes: record the parent's consent before their data is saved"
+    ref = r.get("parent_consent_ref", "")
+    if len(ref) < 2 or len(ref) > 200:
+        return "parent_consent_ref is required: the consent form number or scanned file name"
+    if pemail:
+        owner = db.execute(select(User).where(func.lower(User.email) == pemail)).scalars().first()
+        if owner is not None and (owner.role != "parent" or owner.college_id != cid or (owner.phone and owner.phone != pphone)):
+            return "parent_email already belongs to another account"
+    if pphone in file_parents and pemail and file_parents[pphone] and file_parents[pphone] != pemail:
+        return "the same parent_phone has two different parent_email values in this file"
+    file_parents[pphone] = file_parents.get(pphone) or pemail
+    return {"phone": pphone, "email": pemail or None, "name": pname, "consent_ref": ref}
+
+
 @router.post("/students/import")
 async def import_students(file: UploadFile = File(...), dry_run: bool = Query(True),
                           current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
@@ -221,6 +260,7 @@ async def import_students(file: UploadFile = File(...), dry_run: bool = Query(Tr
     existing = {s.register_no: s for s in db.execute(select(Student).where(Student.college_id == cid)).scalars()}
     errors: List[dict] = []
     seen_reg, seen_email = set(), set()
+    file_parents: Dict[str, str] = {}                           # parent phone -> email seen earlier in this file
     plan = []
     for i, r in enumerate(rows, start=2):                      # row 1 is the header
         def err(msg):
@@ -253,18 +293,20 @@ async def import_students(file: UploadFile = File(...), dry_run: bool = Query(Tr
         phone = _norm_phone(r.get("phone", "")) if r.get("phone") else None
         if r.get("phone") and phone is None:
             err("phone must be a 10-digit mobile number"); continue
-        pphone = _norm_phone(r.get("parent_phone", "")) if r.get("parent_phone") else None
-        if r.get("parent_phone") and pphone is None:
-            err("parent_phone must be a 10-digit mobile number"); continue
-        plan.append((r, br, bt, cur, email, phone, pphone))
+        parent = _parent_row(db, cid, r, file_parents)
+        if isinstance(parent, str):
+            err(parent); continue
+        plan.append((r, br, bt, cur, email, phone, parent))
 
     summary = {"rows": len(rows), "errors": len(errors), "new": sum(1 for p in plan if p[3] is None),
-               "updated": sum(1 for p in plan if p[3] is not None), "parents_linked": sum(1 for p in plan if p[6])}
+               "updated": sum(1 for p in plan if p[3] is not None), "parents_linked": sum(1 for p in plan if p[6]),
+               "parents_without_email": sum(1 for p in plan if p[6] and not p[6]["email"])}
     if dry_run or errors:
         return {"dry_run": True, "can_import": not errors and bool(plan), "summary": summary, "errors": errors[:50]}
 
     new_users = []
-    for r, br, bt, cur, email, phone, pphone in plan:
+    consents = parents_new = 0
+    for r, br, bt, cur, email, phone, p in plan:
         name = r["name"]
         if cur is None:
             uid = f"usr_{uuid.uuid4().hex[:16]}"
@@ -280,15 +322,29 @@ async def import_students(file: UploadFile = File(...), dry_run: bool = Query(Tr
         cur.branch, cur.branch_id, cur.batch_id = br.name, br.id, bt.id
         cur.semester, cur.batch_name, cur.track, cur.academic_year = bt.semester, bt.name, bt.track, bt.academic_year
         db.flush()
-        if pphone:
-            parent = db.execute(select(User).where(User.role == "parent", User.phone == pphone)).scalars().first()
+        if p:
+            # One parent account per mobile number in this college, linked to each of their children.
+            parent = _find_parent(db, cid, p["phone"], p["email"])
             if parent is None:
-                pname = r.get("parent_name") or f"Parent of {name}"
-                parent = User(id=f"usr_{uuid.uuid4().hex[:16]}", college_id=cid, email=f"{pphone}@parents.invalid", name=pname,
-                              phone=pphone, role="parent", avatar_initials=_initials(pname), language_pref="ta",
+                pname = p["name"] or f"Parent of {name}"
+                parent = User(id=f"usr_{uuid.uuid4().hex[:16]}", college_id=cid, email=p["email"] or f"{p['phone']}@parents.invalid",
+                              name=pname, phone=p["phone"], role="parent", avatar_initials=_initials(pname), language_pref="ta",
                               hashed_password=get_password_hash(secrets.token_urlsafe(32)))       # parents sign in with OTP
                 db.add(parent)
-                db.flush()
+                parents_new += 1
+            else:
+                if p["email"] and parent.email.endswith("@parents.invalid"):
+                    parent.email = p["email"]
+                if p["name"] and parent.name.startswith("Parent of "):
+                    parent.name = p["name"]
+            db.flush()
+            # DPDP: the consent (paper form checked by the college) is recorded with the parent data in the
+            # same transaction; a row without it never gets here (_parent_row rejects it).
+            if consent_svc.current(db, cur.id, "parent_data_processing") != "granted":
+                consent_svc.record(db, college_id=cid, student_id=cur.id, granted_by=parent.id, purpose="parent_data_processing",
+                                   status="granted", method="paper_form_upload",
+                                   evidence_ref=f"import:{p['consent_ref']}; recorded_by:{current_user.sub}"[:512])
+                consents += 1
             linked = db.execute(select(ParentStudent.id).where(ParentStudent.parent_user_id == parent.id,
                                                                ParentStudent.student_id == cur.id)).first()
             if not linked:
@@ -297,6 +353,7 @@ async def import_students(file: UploadFile = File(...), dry_run: bool = Query(Tr
     if keycloak_mode():
         for uid in new_users:
             emit(db, "identity.invite_user", {"user_id": uid}, college_id=cid, entity_type="user", entity_id=uid)
+    summary.update({"parents_new": parents_new, "consents_recorded": consents})
     record_audit(db, current_user, "students.imported", "college", cid, summary)        # counts only
     db.commit()
     return {"dry_run": False, "imported": True, "summary": summary, "errors": []}

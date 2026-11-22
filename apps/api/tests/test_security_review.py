@@ -92,34 +92,52 @@ def test_wrong_codes_are_capped_per_number_across_codes():
     assert client.post(VERIFY, json={"phone": PHONE, "otp": "123456"}).status_code == 429
 
 
+def _fresh_ip_client():
+    """A client with its own address, so earlier runs' audit rows cannot shift the count."""
+    import uuid
+    n = uuid.uuid4().int
+    return TestClient(app, client=(f"10.{n % 250}.{(n >> 8) % 250}.{(n >> 16) % 250 + 1}", 50000))
+
+
 def test_requests_are_limited_per_ip(monkeypatch):
-    from routers.auth import _ip_count
-    import datetime
-    db = SessionLocal()
-    try:
-        used = _ip_count(db, "auth.otp_requested", "testclient", datetime.datetime.utcnow() - datetime.timedelta(minutes=10))
-    finally:
-        db.close()
-    monkeypatch.setattr(settings, "OTP_IP_REQUESTS_PER_WINDOW", used + 2)
-    assert client.post(REQ, json={"phone": "9000000011"}).status_code == 200
-    assert client.post(REQ, json={"phone": "9000000012"}).status_code == 200
-    r = client.post(REQ, json={"phone": "9000000013"})     # a third number from the same network
+    net = _fresh_ip_client()
+    monkeypatch.setattr(settings, "OTP_IP_REQUESTS_PER_WINDOW", 2)
+    assert net.post(REQ, json={"phone": "9000000011"}).status_code == 200
+    assert net.post(REQ, json={"phone": "9000000012"}).status_code == 200
+    r = net.post(REQ, json={"phone": "9000000013"})        # a third number from the same network
     assert r.status_code == 429 and r.headers["Retry-After"] == "600"
 
 
 def test_wrong_codes_are_limited_per_ip(monkeypatch):
-    from routers.auth import _ip_count
-    import datetime
-    db = SessionLocal()
-    try:
-        used = _ip_count(db, "auth.otp_failed", "testclient", datetime.datetime.utcnow() - datetime.timedelta(minutes=10))
-    finally:
-        db.close()
-    monkeypatch.setattr(settings, "OTP_IP_VERIFY_FAILS_PER_WINDOW", used + 1)
-    code = _code()
-    assert client.post(VERIFY, json={"phone": PHONE, "otp": _wrong(code)}).status_code == 400
-    assert client.post(VERIFY, json={"phone": PHONE, "otp": code}).status_code == 429      # even the right code
+    net = _fresh_ip_client()
+    monkeypatch.setattr(settings, "OTP_IP_VERIFY_FAILS_PER_WINDOW", 1)
+    code = net.post(REQ, json={"phone": PHONE}).json()["demo_otp"]
+    assert net.post(VERIFY, json={"phone": PHONE, "otp": _wrong(code)}).status_code == 400
+    assert net.post(VERIFY, json={"phone": PHONE, "otp": code}).status_code == 429      # even the right code
 
+
+def test_answer_is_the_same_for_registered_and_unknown_numbers(monkeypatch):
+    """Same status and body (apart from the development-only demo code), and both wait for the floor."""
+    import time
+    monkeypatch.setattr(settings, "OTP_RESPONSE_FLOOR_MS", 300)
+    slow = []
+
+    def slow_send(*a, **k):                 # a slow mail server must not slow the answer
+        time.sleep(0.5)
+        slow.append(1)
+    import routers.auth as auth_router
+    monkeypatch.setattr(auth_router, "_deliver_parent_otp", slow_send)
+    timings, bodies = [], []
+    for phone in (PHONE, "9000000041"):
+        t = time.monotonic()
+        r = client.post(REQ, json={"phone": phone})
+        timings.append(time.monotonic() - t)
+        body = r.json()
+        body.pop("demo_otp", None)
+        bodies.append((r.status_code, body))
+    assert bodies[0] == bodies[1]
+    assert all(t >= 0.3 for t in timings)
+    assert slow == [1]                       # only the registered number got a code (after the response)
 
 def test_phone_is_stored_as_a_keyed_hash():
     from routers.auth import _phone_hash

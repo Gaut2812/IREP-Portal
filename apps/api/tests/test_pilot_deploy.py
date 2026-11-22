@@ -202,15 +202,17 @@ def test_parent_code_is_emailed_and_works(live_otp):
         db.close()
 
 
-def test_mail_failure_is_a_503_and_leaves_no_code(live_otp, monkeypatch):
+def test_mail_failure_gives_the_same_answer_and_is_audited(live_otp, monkeypatch):
     def down(*a, **k):
         raise gateways.GatewayError("smtp down")
     monkeypatch.setattr(gateways, "send_email", down)
     r = client.post("/api/v1/auth/parent/otp/request", json={"phone": PARENT_PHONE})
-    assert r.status_code == 503
+    unknown = client.post("/api/v1/auth/parent/otp/request", json={"phone": "9000000031"})
+    assert r.status_code == unknown.status_code == 200 and r.json()["message"] == unknown.json()["message"]
     db = SessionLocal()
     try:
-        assert db.execute(select(OtpAttempt)).first() is None
+        failed = db.execute(select(AuditLog).filter_by(action="auth.otp_delivery_failed").order_by(AuditLog.created_at.desc())).scalars().first()
+        assert failed is not None and "smtp down" in failed.detail["error"]
     finally:
         db.close()
 

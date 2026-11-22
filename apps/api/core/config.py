@@ -88,6 +88,8 @@ class Settings(BaseSettings):
     PARENT_OTP_CHANNEL: str = os.getenv("PARENT_OTP_CHANNEL", "email")    # email | sms (needs SMS_PROVIDER=fast2sms or msg91)
     # Parent OTP abuse limits per client IP (generous: mobile carriers put many parents behind one IP)
     OTP_IP_REQUESTS_PER_WINDOW: int = int(os.getenv("OTP_IP_REQUESTS_PER_WINDOW", "60"))      # per 10 minutes
+    # Every OTP request answers after at least this long, registered number or not (no timing oracle)
+    OTP_RESPONSE_FLOOR_MS: int = int(os.getenv("OTP_RESPONSE_FLOOR_MS", "400"))
     OTP_IP_VERIFY_FAILS_PER_WINDOW: int = int(os.getenv("OTP_IP_VERIFY_FAILS_PER_WINDOW", "30"))  # per 10 minutes
     # Files: local disk now, S3-compatible later (services/storage.py)
     STORAGE_ADAPTER: str = os.getenv("STORAGE_ADAPTER", "local")

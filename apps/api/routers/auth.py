@@ -4,11 +4,13 @@ import datetime
 import hashlib
 import hmac
 import re
+import logging
 import secrets
+import time
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
@@ -172,7 +174,46 @@ def _parent_by_phone(db: Session, phone: str) -> Optional[User]:
 
 
 @router.post("/parent/otp/request")
-def request_parent_otp(req: ParentOTPRequest, request: Request, db: Session = Depends(get_db)):
+def request_parent_otp(req: ParentOTPRequest, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """Same status, body and timing whether or not the number is registered: the code is sent after
+    the response (background task, held in memory only), a delivery failure is audited instead of
+    answered, and every answer takes at least OTP_RESPONSE_FLOOR_MS."""
+    started = time.monotonic()
+    try:
+        return _request_parent_otp(req, request, background, db)
+    finally:
+        left = settings.OTP_RESPONSE_FLOOR_MS / 1000 - (time.monotonic() - started)
+        if left > 0:
+            time.sleep(left)
+
+
+def _deliver_parent_otp(parent_id: str, otp: str, ph: str, college_id: str) -> None:
+    """Runs after the response. The code exists only in this call's memory (never in the outbox)."""
+    from core.database import SessionLocal
+    db = SessionLocal()
+    try:
+        parent = db.get(User, parent_id)
+        if parent is None:
+            return
+        if (settings.NOTIFY_ADAPTER or "fake").lower() == "live":
+            from services.gateways import GatewayError, send_parent_otp
+            try:
+                outcome = send_parent_otp(parent, otp, OTP_TTL_MINUTES)
+            except GatewayError as e:
+                logging.getLogger("irep.auth").warning("parent OTP delivery failed: %s", e.__class__.__name__)
+                record_audit(db, None, "auth.otp_delivery_failed", "phone", ph[:16], {"error": str(e)[:120]}, college_id=college_id)
+                db.commit()
+                return
+            if outcome.startswith("skipped"):
+                record_audit(db, None, "auth.otp_delivery_skipped", "phone", ph[:16], {"reason": outcome}, college_id=college_id)
+                db.commit()
+        else:
+            get_notification_adapter().deliver(parent, "sms", "IREP sign-in OTP", f"Your IREP OTP is {otp}. Valid for {OTP_TTL_MINUTES} minutes.")
+    finally:
+        db.close()
+
+
+def _request_parent_otp(req: ParentOTPRequest, request: Request, background: BackgroundTasks, db: Session):
     phone = _normalize_phone(req.phone)
     ph = _phone_hash(phone)
     now = datetime.datetime.utcnow()
@@ -197,16 +238,11 @@ def request_parent_otp(req: ParentOTPRequest, request: Request, db: Session = De
     if parent:
         # Sent directly (never through the outbox): an outbox row would hold the code in plain text.
         # Email by default; SMS only when PARENT_OTP_CHANNEL=sms and SMS_PROVIDER is fast2sms or msg91.
-        if (settings.NOTIFY_ADAPTER or "fake").lower() == "live":
-            from services.gateways import GatewayError, send_parent_otp
-            try:
-                channel = send_parent_otp(parent, otp, OTP_TTL_MINUTES)
-            except GatewayError:
-                db.rollback()
-                raise HTTPException(status_code=503, detail="We could not send the code just now. Try again in a minute or contact the college office.")
-        else:
-            get_notification_adapter().deliver(parent, "sms", "IREP sign-in OTP", f"Your IREP OTP is {otp}. Valid for {OTP_TTL_MINUTES} minutes.")
-            channel = "demo"
+        # After the response, so a registered number does not answer more slowly.
+        live = (settings.NOTIFY_ADAPTER or "fake").lower() == "live"
+        sms = settings.PARENT_OTP_CHANNEL.lower() == "sms" and settings.SMS_PROVIDER.lower() in ("fast2sms", "msg91")
+        channel = ("sms" if sms else "email") if live else "demo"
+        background.add_task(_deliver_parent_otp, parent.id, otp, ph, college_id)
     record_audit(db, None, "auth.otp_requested", "phone", ph[:16], {"known": bool(parent), "channel": channel}, college_id=college_id, ip_address=_client_ip(request))
     db.commit()
     where = "to the email address registered with the college" if settings.PARENT_OTP_CHANNEL.lower() == "email" else "by SMS"

@@ -11,6 +11,7 @@ import os
 # per-IP OTP limits are lifted here and tested on purpose in tests/test_security_review.py.
 os.environ.setdefault("OTP_IP_REQUESTS_PER_WINDOW", "100000")
 os.environ.setdefault("OTP_IP_VERIFY_FAILS_PER_WINDOW", "100000")
+os.environ.setdefault("OTP_RESPONSE_FLOOR_MS", "0")        # tested on purpose in tests/test_security_review.py
 
 import pytest
 

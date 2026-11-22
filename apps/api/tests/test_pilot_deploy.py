@@ -36,6 +36,7 @@ def _prod(**over):
         STUDY_BUDDY_ADAPTER="fake", LIVE_CLASS_ADAPTER="teams", GRAPH_TENANT_ID="t", GRAPH_CLIENT_ID="c",
         GRAPH_CLIENT_SECRET="s", NOTIFY_ADAPTER="live", SMTP_HOST="smtp.example.in", SMTP_FROM="no-reply@example.in",
         SMS_PROVIDER="off", PARENT_OTP_CHANNEL="email", STORAGE_ADAPTER="local", OUTBOX_RUNNER="celery",
+        AV_ADAPTER="clamd",
     )
     good.update(over)
     return settings.model_copy(update=good)

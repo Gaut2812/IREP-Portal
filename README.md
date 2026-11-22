@@ -107,6 +107,9 @@ Sign-in rules:
 | 44 | Notification centre (every role; delivery preferences) | `/notifications` |
 | 43 | Approvals (trainer; leave and Cyber Range access) | `/trainer/approvals` |
 | 34+ | Moderation words (college; block or flag) | `/college/moderation` |
+| 37 | Mock interviews (trainer: slots, rubric scoring, notes, recording) | `/trainer/interviews` |
+| 38 | Mock drives (college: test and interview rounds, results, shortlist; a "drive" event on 42) | `/college/drives` |
+| 39 | Placement readiness (college: branch, batch, student drill-down; aggregates and bands) | `/college/readiness` |
 | 40 | Feedback survey (parent; set up by the college) | `/parent/surveys`, `/college/surveys` |
 | 41 | College messages (trainer chats, announcements at scale) | `/college/messages` |
 | 42 | Events (college; invitations, RSVP counts, placement posts) | `/college/events` |

@@ -92,7 +92,7 @@ export default function CollegeEventsPage() {
               <input type="datetime-local" className={cls} value={form.starts_at} data-testid="event-start" onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
             </label>
             <input className={cls} placeholder={t("events.location")} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-            <select className={cls} value={form.batch_id} aria-label={t("events.batch")} onChange={(e) => setForm({ ...form, batch_id: e.target.value })}>
+            <select className={cls} value={form.batch_id} aria-label={t("events.batch")} data-testid="event-batch" onChange={(e) => setForm({ ...form, batch_id: e.target.value })}>
               <option value="">{t("events.all_batches")}</option>
               {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>

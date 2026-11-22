@@ -1477,6 +1477,9 @@ class InterviewSlot(TenantModel):
     starts_at: Mapped[datetime.datetime] = mapped_column(DateTime, index=True)
     duration_min: Mapped[int] = mapped_column(Integer, default=40)
     status: Mapped[str] = mapped_column(String(16), default="open")              # open, booked, cancelled
+    # Screen 38 (L17): set when a mock drive's interview round created this slot
+    drive_round_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("drive_rounds.id", name="fk_slot_drive_round"),
+                                                          nullable=True, index=True)
 
 
 class InterviewBooking(TenantModel):
@@ -1606,3 +1609,34 @@ class SupportSession(TenantModel):
     expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
     ended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     ended_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class MockDrive(TenantModel):
+    """Screen 38: a company-pattern mock drive. Created with its event (42, kind "drive", L29)."""
+    __tablename__ = "mock_drives"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(64), ForeignKey("events.id", name="fk_drive_event"), unique=True, index=True)
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    company_pattern: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(24), default="draft")     # draft, published, results_published
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    results_published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class DriveRound(TenantModel):
+    """One round of a mock drive: a practice test (22/46) or interview slots on 37 (L17)."""
+    __tablename__ = "drive_rounds"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    drive_id: Mapped[str] = mapped_column(String(64), ForeignKey("mock_drives.id", name="fk_round_drive"), index=True)
+    round_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)          # test, interview
+    test_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("practice_tests.id", name="fk_round_test"), nullable=True)
+    round_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)   # technical, hr, ai_coding
+    trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id", name="fk_round_trainer"), nullable=True)
+    starts_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    duration_min: Mapped[int] = mapped_column(Integer, default=40)
+    slot_count: Mapped[int] = mapped_column(Integer, default=0)
+    cutoff: Mapped[float] = mapped_column(Float, default=0)               # test: percent; interview: overall score

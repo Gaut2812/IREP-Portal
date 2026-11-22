@@ -9,7 +9,7 @@
 | Link | Direction | What moves | Status |
 | --- | --- | --- | --- |
 | L05 | 42 ↔ 17 | Invitations down; RSVPs and counts up | active |
-| L29 | 42 → 12, 34, 38 | Upcoming list on 12; placement-update posts in the placement group on 34; mock drives on 38 | 12 and 34 are built and tested. 38 comes in S15, so the row stays `planned` until then |
+| L29 | 42 → 12, 34, 38 | Upcoming list on 12; placement-update posts in the placement group on 34; mock drives on 38 | Active: a `drive` event creates its drive on 38 (S15) |
 | L31 | 14 → 18, 15 | A parent call on a flag sends the parent an alert, opens a message in the trainer thread (18) and shows a support alert on the overview (15) | active |
 | L34 | inputs → 12, 13, 14, 15, 19, 39 | Nightly readiness: attendance from the register, then the score, band and monthly delta | active (v1) |
 | L21 | 25 → 14 | AI usage counts | planned (25 is S10) |

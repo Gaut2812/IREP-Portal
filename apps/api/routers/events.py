@@ -14,6 +14,7 @@ from core.security import TokenPayload, require_role
 from core.tenant import get_child_for_parent, get_user_name
 from models.schema import Batch, DiscussionGroup, Event, GroupMessage, ParentStudent, Rsvp, Student
 from services.audit import record_audit
+from services.drives import ensure_for_event as ensure_drive_for_event
 from services.notifications import notify_user
 
 router = APIRouter(tags=["Events"])
@@ -110,7 +111,11 @@ def create_event(req: EventIn, current_user: TokenPayload = Depends(COLLEGE), db
     e = Event(id=f"evt_{uuid.uuid4().hex[:16]}", college_id=current_user.college_id, status="draft", created_by=current_user.sub,
               **req.model_dump())
     db.add(e)
+    db.flush()
     record_audit(db, current_user, "event.created", "event", e.id, {"kind": e.kind, "audience": e.audience})
+    drive = ensure_drive_for_event(db, e, current_user.sub)          # L29: a mock drive is an event type (-> 38)
+    if drive is not None:
+        record_audit(db, current_user, "drive.created", "mock_drive", drive.id, {"event_id": e.id})
     db.commit()
     return _college_row(e, {})
 
@@ -129,6 +134,7 @@ def update_event(event_id: str, req: EventIn, current_user: TokenPayload = Depen
     _validate(db, req, current_user)
     for k, v in req.model_dump().items():
         setattr(e, k, v)
+    ensure_drive_for_event(db, e, current_user.sub)                  # L29: kind changed to drive, or a new batch
     db.commit()
     return _college_row(e, {})
 
@@ -155,6 +161,7 @@ def publish_event(event_id: str, current_user: TokenPayload = Depends(COLLEGE), 
     if e.starts_at <= datetime.datetime.now():
         raise HTTPException(status_code=422, detail="The event must start in the future")
     e.status, e.published_at = "published", datetime.datetime.utcnow()
+    ensure_drive_for_event(db, e, current_user.sub)
     students, parents = _audience_users(db, e)
     when = _when(e)
     for uid in students:

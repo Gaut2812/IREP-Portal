@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 import core.active_users  # noqa: F401  (clears the "still active?" cache when an account changes)
-from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent, college_structure, college_settings, trainer_batches, schedule, attendance, leave_approvals, content_library, events, monthly_cards, support, assessments, labs, study_buddy, certificates, usage, college_messages, surveys, super_admin
+from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent, college_structure, college_settings, trainer_batches, schedule, attendance, leave_approvals, content_library, events, monthly_cards, support, assessments, labs, study_buddy, certificates, usage, college_messages, surveys, super_admin, drives, placement_readiness
 
 class _RedactSecrets(logging.Filter):
     """Access logs never show bearer tokens or link signatures (WebSockets pass ?token=, media links ?sig=)."""
@@ -98,6 +98,8 @@ app.include_router(usage.router, prefix=settings.API_V1_PREFIX)
 app.include_router(college_messages.router, prefix=settings.API_V1_PREFIX)
 app.include_router(surveys.router, prefix=settings.API_V1_PREFIX)
 app.include_router(super_admin.router, prefix=settings.API_V1_PREFIX)
+app.include_router(drives.router, prefix=settings.API_V1_PREFIX)
+app.include_router(placement_readiness.router, prefix=settings.API_V1_PREFIX)
 
 
 def _super_admin_claimed(token: str) -> bool:

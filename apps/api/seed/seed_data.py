@@ -658,6 +658,10 @@ def init_db_and_seed():
             seed_screen22(db, college_id="col_demo_001")
             db.commit()
 
+            from seed.seed_screen38 import seed_screen38
+            seed_screen38(db, college_id="col_demo_001")
+            db.commit()
+
             from seed.seed_lab_exercises import seed_lab_exercises
             seed_lab_exercises(db, college_id="col_demo_001")
             db.commit()
@@ -1266,6 +1270,9 @@ def init_db_and_seed():
         db.flush()
         from seed.seed_screen22 import seed_screen22
         seed_screen22(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen38 import seed_screen38
+        seed_screen38(db, college_id="col_demo_001")
         db.flush()
         from seed.seed_lab_exercises import seed_lab_exercises
         seed_lab_exercises(db, college_id="col_demo_001")

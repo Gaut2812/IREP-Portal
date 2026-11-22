@@ -42,6 +42,8 @@ def events():
     db = SessionLocal()
     try:
         db.execute(delete(Rsvp).where(Rsvp.event_id.in_(made or ["_"])))
+        from seed.seed_screen42 import _remove_drives
+        _remove_drives(db, made)                     # a "drive" event has a mock drive (38, L29)
         db.execute(delete(Event).where(Event.id.in_(made or ["_"])))
         db.execute(delete(GroupMessage).where(GroupMessage.id.like("gm_evt_%"), GroupMessage.created_at >= started))
         db.execute(delete(Notification).where(Notification.kind == "event", Notification.created_at >= started))

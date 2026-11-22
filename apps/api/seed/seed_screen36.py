@@ -51,6 +51,7 @@ def seed_screen36(db, college_id: str = "col_demo_001") -> None:
         existing = db.execute(select(Interview).filter_by(id=iid)).scalar_one_or_none()
         if existing:
             existing.overall_score = overall
+            existing.recording_key = f"recordings/interviews/priya_round{n}.mp4"     # 37 may have replaced it
             continue
         at = datetime.datetime.combine(today - datetime.timedelta(days=days_ago), datetime.time(16, 0))
         db.add(Interview(id=iid, college_id=college_id, student_id=PRIYA, trainer_id=ARUN, round_number=n, round_type="technical",

@@ -333,9 +333,9 @@ def test_trainer_teams_account_can_be_set_and_cleared():
     from ops.set_teams_upn import set_upn
     db = SessionLocal()
     try:
-        before = db.execute(select(User).filter_by(role="trainer")).scalars().first()
         from models.schema import Trainer
-        t = db.execute(select(Trainer).filter_by(user_id=before.id)).scalar_one()
+        t = db.get(Trainer, "trn_arun_01")                       # a seeded trainer with a profile row
+        before = db.get(User, t.user_id)
         old = t.teams_upn
         assert set_upn(db, before.email.upper(), "Sid@College.onmicrosoft.com").teams_upn == "sid@college.onmicrosoft.com"
         assert set_upn(db, before.email, None).teams_upn is None

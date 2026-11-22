@@ -74,6 +74,10 @@ def load_playwright(path: Path):
             if not tags:
                 continue
             statuses = [res.get("status") for t in spec.get("tests", []) for res in t.get("results", [])]
+            if statuses and statuses[-1] == "skipped":
+                # a deliberate test.skip (e.g. quiet hours at CI time) proves nothing either way;
+                # the link still needs at least one passing test elsewhere
+                continue
             passed = bool(statuses) and statuses[-1] in ("passed",) and spec.get("ok", False)
             yield f"{spec.get('file', '?')}::{spec.get('title', '?')}", tags, passed, "playwright"
 

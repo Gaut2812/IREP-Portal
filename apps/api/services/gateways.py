@@ -1,8 +1,8 @@
 """Outbound email and SMS for the pilot (NOTIFY_ADAPTER=live).
 
 - Email: plain SMTP with STARTTLS (any provider; Brevo's free tier works for a pilot).
-- SMS: MSG91 flow API with DLT-approved templates. It is a switch, OFF by default
-  (SMS_PROVIDER=off): while it is off, anything meant for SMS goes to the user's email instead,
+- SMS: Fast2SMS (bulkV2, SMS_PROVIDER=fast2sms) or MSG91 (flow API with DLT-approved templates,
+  SMS_PROVIDER=msg91). It is a switch, OFF by default (SMS_PROVIDER=off): while it is off, anything meant for SMS goes to the user's email instead,
   so parents still hear about leave decisions, events and support plans at no cost.
 
 Gateway errors raise, so the outbox retries the delivery (architecture rule 3). The parent
@@ -58,13 +58,48 @@ def send_sms(phone: str, template_id: str, variables: dict, client: Optional[htt
         raise GatewayError(f"MSG91 error: {data.get('message')}")
 
 
+def send_fast2sms(phone: str, *, message: Optional[str] = None, otp: Optional[str] = None,
+                  client: Optional[httpx.Client] = None) -> None:
+    """Fast2SMS bulkV2 POST, key in the "authorization" header (never in the URL, so it stays out of
+    proxy and access logs). route q sends `message`; route otp sends only the code (variables_values)."""
+    if not settings.FAST2SMS_API_KEY:
+        raise GatewayError("Fast2SMS is not configured (FAST2SMS_API_KEY)")
+    number = _indian_mobile(phone)[2:]                  # Fast2SMS takes the 10-digit number
+    if otp is not None and settings.FAST2SMS_OTP_ROUTE.lower() == "otp":
+        body = {"route": "otp", "variables_values": otp, "numbers": number}
+    else:
+        body = {"route": settings.FAST2SMS_ROUTE or "q", "message": message or "", "language": "english",
+                "flash": 0, "numbers": number}
+    http = client or httpx.Client(timeout=20)
+    r = http.post(settings.FAST2SMS_URL, json=body,
+                  headers={"authorization": settings.FAST2SMS_API_KEY, "content-type": "application/json",
+                           "cache-control": "no-cache"})
+    try:
+        data = r.json()
+    except ValueError:
+        data = {}
+    if r.status_code >= 400 or data.get("return") is not True:
+        # the reply never contains the key; keep only Fast2SMS's own message
+        raise GatewayError(f"Fast2SMS returned {r.status_code}: {str(data.get('message'))[:120]}")
+
+
+def _sms(phone: str, text: str, otp: Optional[str] = None) -> None:
+    provider = settings.SMS_PROVIDER.lower()
+    if provider == "fast2sms":
+        send_fast2sms(phone, message=text, otp=otp)
+    elif otp is not None:
+        send_sms(phone, settings.MSG91_OTP_TEMPLATE_ID, {"otp": otp})
+    else:
+        send_sms(phone, settings.MSG91_TEMPLATE_ID, {"message": text[:300]})
+
+
 def real_email(email: Optional[str]) -> bool:
     """Placeholder addresses (import without a parent email: <mobile>@parents.invalid) are not mailboxes."""
     return bool(email) and "@" in email and not email.lower().endswith(".invalid")
 
 
 def sms_on() -> bool:
-    return settings.SMS_PROVIDER.lower() == "msg91"
+    return settings.SMS_PROVIDER.lower() in ("fast2sms", "msg91")
 
 
 def deliver(user, channel: str, title: str, body: Optional[str]) -> str:
@@ -73,7 +108,7 @@ def deliver(user, channel: str, title: str, body: Optional[str]) -> str:
     if channel == "sms" and sms_on():
         if not user.phone:
             return "skipped:no_phone"
-        send_sms(user.phone, settings.MSG91_TEMPLATE_ID, {"message": text[:300]})
+        _sms(user.phone, text[:300])
         return "delivered"
     if channel in ("email", "sms"):                     # SMS switched off: email instead
         if not real_email(user.email):
@@ -84,9 +119,9 @@ def deliver(user, channel: str, title: str, body: Optional[str]) -> str:
 
 
 def send_parent_otp(user, otp: str, minutes: int) -> str:
-    """The sign-in code, by PARENT_OTP_CHANNEL (email by default; sms needs SMS_PROVIDER=msg91)."""
+    """The sign-in code, by PARENT_OTP_CHANNEL (email by default; sms needs SMS_PROVIDER fast2sms or msg91)."""
     if settings.PARENT_OTP_CHANNEL.lower() == "sms" and sms_on():
-        send_sms(user.phone, settings.MSG91_OTP_TEMPLATE_ID, {"otp": otp})
+        _sms(user.phone, f"{otp} is your IREP sign-in code. Valid for {minutes} minutes. Do not share it.", otp=otp)
         return "sms"
     if not real_email(user.email):
         return "skipped:no_email"          # same answer to the caller (no account probing); audit shows it

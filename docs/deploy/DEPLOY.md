@@ -268,6 +268,18 @@ Clean up old images now and then: `docker image prune -a --filter "until=720h"`.
 Parents sign in with their mobile number. The portal then sends a 6-digit code, valid for 5 minutes. This happens in the API in Keycloak mode as well: Keycloak 26 has no email or SMS one-time-code login, so the API issues the parent session (`routers/auth.py`). The code is sent directly, never stored in plain text or queued.
 
 - **`PARENT_OTP_CHANNEL=email`** (default, free): the code goes to the parent's email on file, in English and Tamil. A parent without an email address gets the same "if this number is registered" answer, and the audit log records `skipped:no_email`. Make sure the college office records parent emails.
+- **SMS through Fast2SMS** (paid, **off by default**; the provider IREP uses):
+  1. In the Fast2SMS dashboard, open **Dev API** and copy the API key. Treat it like a password: it goes only in `infra/prod/.env`, never in chat, email or git. If it was ever shared, regenerate it there.
+  2. Recharge the wallet. Quick SMS (`route=q`) needs no DLT template and costs more per SMS. The OTP route (`FAST2SMS_OTP_ROUTE=otp`) sends only the code, in Fast2SMS's fixed text.
+  3. Set:
+     ```
+     SMS_PROVIDER=fast2sms
+     FAST2SMS_API_KEY=...
+     PARENT_OTP_CHANNEL=sms        # optional: codes by SMS; leave "email" to send only notices by SMS
+     ```
+  4. Run `docker compose up -d api worker beat`, then request a parent code with your own mobile number.
+
+  The key travels only in the `authorization` header of a POST, never in a URL, so it stays out of logs.
 - **SMS through MSG91** (paid, **off by default**):
   1. Register your sender ID and two templates on the DLT portal (TRAI rules): an OTP template with an `##otp##` variable, and a notice template with a `##message##` variable.
   2. Create the same templates in MSG91. Then set:

@@ -194,7 +194,7 @@ def request_parent_otp(req: ParentOTPRequest, request: Request, db: Session = De
     channel = None
     if parent:
         # Sent directly (never through the outbox): an outbox row would hold the code in plain text.
-        # Email by default; SMS only when PARENT_OTP_CHANNEL=sms and SMS_PROVIDER=msg91.
+        # Email by default; SMS only when PARENT_OTP_CHANNEL=sms and SMS_PROVIDER is fast2sms or msg91.
         if (settings.NOTIFY_ADAPTER or "fake").lower() == "live":
             from services.gateways import GatewayError, send_parent_otp
             try:

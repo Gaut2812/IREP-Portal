@@ -75,12 +75,17 @@ class Settings(BaseSettings):
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")                       # e.g. "IREP Portal <no-reply@your-domain>"
     SMTP_STARTTLS: bool = os.getenv("SMTP_STARTTLS", "true").lower() == "true"
     # SMS is a switch, off by default: notices meant for SMS go to email instead
-    SMS_PROVIDER: str = os.getenv("SMS_PROVIDER", "off")              # off | msg91
+    SMS_PROVIDER: str = os.getenv("SMS_PROVIDER", "off")              # off | fast2sms | msg91
+    # Fast2SMS bulkV2 (https://www.fast2sms.com/dev/bulkV2): API key in the "authorization" header
+    FAST2SMS_API_KEY: str = os.getenv("FAST2SMS_API_KEY", "")
+    FAST2SMS_URL: str = os.getenv("FAST2SMS_URL", "https://www.fast2sms.com/dev/bulkV2")
+    FAST2SMS_ROUTE: str = os.getenv("FAST2SMS_ROUTE", "q")            # q = Quick SMS (free text) for notices
+    FAST2SMS_OTP_ROUTE: str = os.getenv("FAST2SMS_OTP_ROUTE", "q")    # q (code inside our text) | otp (Fast2SMS OTP route)
     MSG91_AUTH_KEY: str = os.getenv("MSG91_AUTH_KEY", "")
     MSG91_TEMPLATE_ID: str = os.getenv("MSG91_TEMPLATE_ID", "")       # DLT-approved flow for notices (var: message)
     MSG91_OTP_TEMPLATE_ID: str = os.getenv("MSG91_OTP_TEMPLATE_ID", "")   # DLT-approved flow for the OTP (var: otp)
     MSG91_URL: str = os.getenv("MSG91_URL", "https://control.msg91.com/api/v5/flow")
-    PARENT_OTP_CHANNEL: str = os.getenv("PARENT_OTP_CHANNEL", "email")    # email | sms (needs SMS_PROVIDER=msg91)
+    PARENT_OTP_CHANNEL: str = os.getenv("PARENT_OTP_CHANNEL", "email")    # email | sms (needs SMS_PROVIDER=fast2sms or msg91)
     # Parent OTP abuse limits per client IP (generous: mobile carriers put many parents behind one IP)
     OTP_IP_REQUESTS_PER_WINDOW: int = int(os.getenv("OTP_IP_REQUESTS_PER_WINDOW", "60"))      # per 10 minutes
     OTP_IP_VERIFY_FAILS_PER_WINDOW: int = int(os.getenv("OTP_IP_VERIFY_FAILS_PER_WINDOW", "30"))  # per 10 minutes

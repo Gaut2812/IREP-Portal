@@ -102,7 +102,7 @@ Demo logins: `priya.r@demo.edu`, `arun.k@demo.edu`, `admin@demo.edu` (password `
 13. **Identity.** `AUTH_PROVIDER=local` (dev default) or `keycloak` (required in production).
     - In Keycloak mode the API verifies RS256 tokens (`core/keycloak.py`). It maps realm role, `irep_user_id` and `college_id` claims to `TokenPayload`.
     - Only admins can edit `irep_user_id` and `college_id` (realm user profile), so users cannot change tenant.
-    - Parents keep the API's mobile-number OTP, delivered by email (default) or MSG91 SMS (`PARENT_OTP_CHANNEL`). In Keycloak mode a local token is accepted only for the parent role, and `/auth/login` returns 410.
+    - Parents keep the API's mobile-number OTP, delivered by email (default) or SMS via Fast2SMS/MSG91 (`PARENT_OTP_CHANNEL`). In Keycloak mode a local token is accepted only for the parent role, and `/auth/login` returns 410.
     - Never commit a realm export with users or secrets. `infra/keycloak/realm-irep.json` is a dev realm template.
 
 ## Definition of done (per screen or PR)
@@ -132,7 +132,7 @@ Changes to auth, messaging policy, Microsoft Graph, labs, Judge0, migrations tha
 - Roles: `placement_officer` uses the college UI (sign-in card "College"). Deactivated accounts cannot sign in; tokens already issued stay valid until expiry (known gap, see docs/screens/02).
 - `packages/api-client`: generated types; after any route or model change run `cd packages/api-client && npm run generate` (CI fails if stale). Web imports them type-only: `import type { RequestBody } from "@irep/api-client"`.
 - Readiness v1 (L34): `services/readiness.run_nightly` (Celery beat 01:30 IST, or `POST /admin/jobs/readiness`) recomputes attendance from `session_attendance` (Excused left out), snapshots once a day with a monthly delta, then runs the at-risk rules. Parent calls (L31) in quiet hours wait in the outbox (`at_risk.parent_call`).
-- Pilot deployment (`infra/prod`, `docs/deploy/`): Caddy + Compose on one VM, nightly `backup.sh` (pg_dump of both DBs + uploads, 7 days, `BACKUP_REMOTE`). `ENVIRONMENT=production` runs `core/production.problems()` at start-up; `ALLOW_DEMO_ADAPTERS` (judge0, labs, study_buddy, live_classes) keeps named features on demo adapters. `NOTIFY_ADAPTER=live` sends via `services/gateways.py` (SMTP; MSG91 only when `SMS_PROVIDER=msg91`, else SMS falls back to email).
+- Pilot deployment (`infra/prod`, `docs/deploy/`): Caddy + Compose on one VM, nightly `backup.sh` (pg_dump of both DBs + uploads, 7 days, `BACKUP_REMOTE`). `ENVIRONMENT=production` runs `core/production.problems()` at start-up; `ALLOW_DEMO_ADAPTERS` (judge0, labs, study_buddy, live_classes) keeps named features on demo adapters. `NOTIFY_ADAPTER=live` sends via `services/gateways.py` (SMTP; SMS only when `SMS_PROVIDER=fast2sms` (default choice) or `msg91`, else SMS falls back to email).
 - Parent OTP stays in the API in Keycloak mode (Keycloak 26 has no email/SMS OTP): `PARENT_OTP_CHANNEL=email` (default) or `sms`. Files: always `services/storage.get_storage()` (keys, not paths); `S3Storage` is a stub.
 - Specs: `docs/screens/NN-*.md` before building a screen.
 - Study Buddy (25): `STUDY_BUDDY_ADAPTER=fake` (dev) or `anthropic` (Claude; production requires it; install `anthropic` on that server, it is not in requirements.txt yet). Redacts emails and phones; trainers see counts only (L21).

@@ -64,8 +64,8 @@ def test_development_defaults_are_refused_in_production():
     ({"ALLOW_DEMO_ADAPTERS": "judge0,auth"}, "unknown names: auth"),
     ({"ALLOW_DEMO_ADAPTERS": "labs,study_buddy"}, "JUDGE0_ADAPTER must be judge0"),
     ({"SMS_PROVIDER": "msg91"}, "MSG91_AUTH_KEY"),
-    ({"SMS_PROVIDER": "twilio"}, "SMS_PROVIDER must be off or msg91"),
-    ({"PARENT_OTP_CHANNEL": "sms"}, "PARENT_OTP_CHANNEL=sms needs SMS_PROVIDER=msg91"),
+    ({"SMS_PROVIDER": "twilio"}, "SMS_PROVIDER must be off, fast2sms or msg91"),
+    ({"PARENT_OTP_CHANNEL": "sms"}, "PARENT_OTP_CHANNEL=sms needs SMS_PROVIDER=fast2sms or msg91"),
     ({"STORAGE_ADAPTER": "s3"}, "STORAGE_ADAPTER must be local"),
     ({"GRAPH_CLIENT_SECRET": ""}, "LIVE_CLASS_ADAPTER=teams needs"),
     ({"LIVE_CLASS_ADAPTER": "fake"}, "LIVE_CLASS_ADAPTER must be teams"),
@@ -343,3 +343,56 @@ def test_trainer_teams_account_can_be_set_and_cleared():
             set_upn(db, "priya.r@demo.edu", "x@y")          # a student, not a trainer
     finally:
         db.close()
+
+
+# --- Fast2SMS --------------------------------------------------------------------------------
+
+def _fast2sms(seen, reply=None, status=200):
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(status, json=reply if reply is not None else {"return": True, "request_id": "r1", "message": ["SMS sent successfully."]})
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_fast2sms_posts_with_the_key_in_the_header_only(monkeypatch):
+    import json as _json
+    monkeypatch.setattr(settings, "FAST2SMS_API_KEY", "test-key-not-real")
+    monkeypatch.setattr(settings, "FAST2SMS_ROUTE", "q")
+    seen = []
+    gateways.send_fast2sms("+91 98765 43214", message="Leave approved", client=_fast2sms(seen))
+    req = seen[0]
+    assert req.method == "POST" and str(req.url) == "https://www.fast2sms.com/dev/bulkV2"
+    assert req.headers["authorization"] == "test-key-not-real" and "test-key-not-real" not in str(req.url)
+    body = _json.loads(req.content)
+    assert body == {"route": "q", "message": "Leave approved", "language": "english", "flash": 0, "numbers": "9876543214"}
+
+
+def test_fast2sms_otp_route_and_errors(monkeypatch):
+    import json as _json
+    monkeypatch.setattr(settings, "FAST2SMS_API_KEY", "k")
+    monkeypatch.setattr(settings, "FAST2SMS_OTP_ROUTE", "otp")
+    seen = []
+    gateways.send_fast2sms("9876543214", message="x", otp="482913", client=_fast2sms(seen))
+    assert _json.loads(seen[0].content) == {"route": "otp", "variables_values": "482913", "numbers": "9876543214"}
+    with pytest.raises(gateways.GatewayError) as e:
+        gateways.send_fast2sms("9876543214", message="x", client=_fast2sms([], {"return": False, "status_code": 412, "message": "Invalid Authentication"}, 412))
+    assert "k" != str(e.value) and "Invalid Authentication" in str(e.value)
+    monkeypatch.setattr(settings, "FAST2SMS_API_KEY", "")
+    with pytest.raises(gateways.GatewayError):
+        gateways.send_fast2sms("9876543214", message="x")
+
+
+def test_parent_code_by_fast2sms(monkeypatch):
+    sent = []
+    monkeypatch.setattr(settings, "SMS_PROVIDER", "fast2sms")
+    monkeypatch.setattr(settings, "PARENT_OTP_CHANNEL", "sms")
+    monkeypatch.setattr(gateways, "send_fast2sms", lambda phone, message=None, otp=None: sent.append((phone, message, otp)))
+    assert gateways.send_parent_otp(Who(email="p@x.in", phone="9876543214"), "123456", 5) == "sms"
+    assert sent == [("9876543214", "123456 is your IREP sign-in code. Valid for 5 minutes. Do not share it.", "123456")]
+    assert gateways.deliver(Who(email="p@x.in", phone="9876543214"), "sms", "Event", "Tomorrow") == "delivered"
+    assert sent[1][1].startswith("Event")
+
+
+def test_fast2sms_production_settings():
+    assert problems(_prod(SMS_PROVIDER="fast2sms", FAST2SMS_API_KEY="k", PARENT_OTP_CHANNEL="sms")) == []
+    assert any("FAST2SMS_API_KEY" in p for p in problems(_prod(SMS_PROVIDER="fast2sms", FAST2SMS_API_KEY="")))

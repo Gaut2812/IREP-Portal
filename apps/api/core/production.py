@@ -63,14 +63,16 @@ def problems(settings) -> List[str]:
     if not (settings.SMTP_HOST and settings.SMTP_FROM):
         out.append("SMTP_HOST and SMTP_FROM are required: parent sign-in codes and notices go by email.")
     sms = settings.SMS_PROVIDER.lower()
-    if sms not in ("off", "msg91"):
-        out.append("SMS_PROVIDER must be off or msg91.")
+    if sms not in ("off", "fast2sms", "msg91"):
+        out.append("SMS_PROVIDER must be off, fast2sms or msg91.")
+    if sms == "fast2sms" and not settings.FAST2SMS_API_KEY:
+        out.append("SMS_PROVIDER=fast2sms needs FAST2SMS_API_KEY (Fast2SMS dashboard > Dev API).")
     if sms == "msg91" and not (settings.MSG91_AUTH_KEY and settings.MSG91_TEMPLATE_ID and settings.MSG91_OTP_TEMPLATE_ID):
         out.append("SMS_PROVIDER=msg91 needs MSG91_AUTH_KEY, MSG91_TEMPLATE_ID and MSG91_OTP_TEMPLATE_ID (DLT-approved templates).")
     if settings.PARENT_OTP_CHANNEL.lower() not in ("email", "sms"):
         out.append("PARENT_OTP_CHANNEL must be email or sms.")
-    if settings.PARENT_OTP_CHANNEL.lower() == "sms" and sms != "msg91":
-        out.append("PARENT_OTP_CHANNEL=sms needs SMS_PROVIDER=msg91.")
+    if settings.PARENT_OTP_CHANNEL.lower() == "sms" and sms not in ("fast2sms", "msg91"):
+        out.append("PARENT_OTP_CHANNEL=sms needs SMS_PROVIDER=fast2sms or msg91.")
 
     # files and background work
     if settings.STORAGE_ADAPTER.lower() != "local":

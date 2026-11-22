@@ -23,8 +23,8 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -43,7 +43,7 @@ jobs:
         run: python -m pytest tests -q
       - name: Worker tests (Celery task and broker-less runner)
         run: python -m pytest ../workers/tests -q -p no:cacheprovider
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: api-links
@@ -68,8 +68,8 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -98,8 +98,8 @@ jobs:
       DATABASE_URL: sqlite:///irep_ci.db
       API_PYTHON: python
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -110,10 +110,10 @@ jobs:
         run: |
           python -m alembic upgrade head
           python seed/run_seed.py
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           package_json_file: apps/web/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -139,7 +139,7 @@ jobs:
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/e2e-links.json
         run: pnpm exec playwright test --reporter=line,json,github   # github: failures become public check annotations
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: e2e-links
@@ -154,10 +154,10 @@ jobs:
       DATABASE_URL: sqlite:///irep_ci.db
       API_PYTHON: python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Start Keycloak with the dev realm
         run: docker compose -f infra/keycloak/docker-compose.yml up -d
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -175,10 +175,10 @@ jobs:
         env:
           KEYCLOAK_IT: "1"
         run: python -m pytest tests/test_keycloak_live.py -q
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           package_json_file: apps/web/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -197,8 +197,8 @@ jobs:
     needs: [api, web]
     if: always()
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
         with:
           path: reports
           merge-multiple: true

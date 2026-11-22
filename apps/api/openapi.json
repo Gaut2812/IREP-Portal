@@ -7999,6 +7999,7 @@
           "Screen 48 · Audit and consent"
         ],
         "summary": "Record Consent",
+        "description": "S16 DPDP. A parent grants for a minor child only right after signing in with the mobile OTP\n(identity-bound, 15 minutes). A minor asking for an optional purpose creates a request for the parents.",
         "operationId": "record_consent_api_v1_consent_post",
         "security": [
           {
@@ -8083,6 +8084,16 @@
             }
           },
           {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Lang"
+            }
+          },
+          {
             "name": "X-Demo-Role",
             "in": "header",
             "required": false,
@@ -8099,6 +8110,141 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/parent/consent": {
+      "get": {
+        "tags": [
+          "Screen 48 · Audit and consent"
+        ],
+        "summary": "Parent Consent Overview",
+        "description": "Every linked child with each purpose, its notice and any request waiting for the parent.",
+        "operationId": "parent_consent_overview_api_v1_parent_consent_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Lang"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/college/students/{student_id}/dob": {
+      "put": {
+        "tags": [
+          "Screen 48 · Audit and consent"
+        ],
+        "summary": "Set Dob",
+        "description": "S16 DPDP: the college records the date of birth (it decides who is a minor).",
+        "operationId": "set_dob_api_v1_college_students__student_id__dob_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DobIn"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -8662,6 +8808,180 @@
         ],
         "summary": "College Download",
         "operationId": "college_download_api_v1_college_data_requests__request_id__export_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/data-requests": {
+      "post": {
+        "tags": [
+          "Screen 48 · Audit and consent"
+        ],
+        "summary": "Self Service Request",
+        "description": "A parent (for a linked child) or an adult student (for themselves) asks for a copy or deletion.",
+        "operationId": "self_service_request_api_v1_me_data_requests_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelfRequestIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Screen 48 · Audit and consent"
+        ],
+        "summary": "My Data Requests",
+        "operationId": "my_data_requests_api_v1_me_data_requests_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/data-requests/{request_id}/export": {
+      "get": {
+        "tags": [
+          "Screen 48 · Audit and consent"
+        ],
+        "summary": "My Export",
+        "operationId": "my_export_api_v1_me_data_requests__request_id__export_get",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -19416,6 +19736,20 @@
         ],
         "title": "DataRequestIn"
       },
+      "DobIn": {
+        "properties": {
+          "date_of_birth": {
+            "type": "string",
+            "format": "date",
+            "title": "Date Of Birth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_of_birth"
+        ],
+        "title": "DobIn"
+      },
       "DriveIn": {
         "properties": {
           "company_pattern": {
@@ -20989,6 +21323,38 @@
           "url"
         ],
         "title": "SandboxIn"
+      },
+      "SelfRequestIn": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "pattern": "^(export|deletion)$",
+            "title": "Kind"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Reason"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "reason"
+        ],
+        "title": "SelfRequestIn"
       },
       "SendIn": {
         "properties": {

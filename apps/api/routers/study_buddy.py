@@ -52,6 +52,10 @@ def history(current_user: TokenPayload = Depends(STUDENT), db: Session = Depends
 def ask(req: AskIn, current_user: TokenPayload = Depends(STUDENT), db: Session = Depends(get_db)):
     student = get_student_for_user(current_user, db)
     sid, college_id = student.id, student.college_id
+    from services import consent as consent_svc
+    if consent_svc.is_minor(student) and not consent_svc.allowed(db, student, "ai_hints"):
+        # S16 DPDP: questions go to an AI service; a minor needs a parent's verifiable consent first
+        raise HTTPException(status_code=403, detail=consent_svc.PARENTAL_REQUIRED["ai_hints"])
     if _test_in_progress(db, sid):
         raise HTTPException(status_code=409, detail={"reason": "test_in_progress", "message": "Study Buddy is paused while your practice test is running."})
     usage = _usage(db, student)

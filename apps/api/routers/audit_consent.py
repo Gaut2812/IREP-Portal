@@ -137,25 +137,112 @@ def _subject_for(current_user: TokenPayload, db: Session, student_id: Optional[s
     raise HTTPException(status_code=403, detail="Only a parent or the student can record consent")
 
 
+PARENTAL = {"code": "parental_consent_required",
+            "message": "A parent must agree to this first, because the student is under 18. A request has been sent to the parent.",
+            "message_ta": "மாணவர் 18 வயதுக்குக் குறைவானவர் என்பதால் முதலில் பெற்றோர் ஒப்புதல் தேவை. பெற்றோருக்குக் கோரிக்கை அனுப்பப்பட்டுள்ளது."}
+REAUTH = {"code": "reauth_required",
+          "message": "To give consent, sign in again with the code sent to your mobile number (it confirms it is you).",
+          "message_ta": "ஒப்புதல் தர, உங்கள் கைபேசி எண்ணுக்கு வரும் குறியீட்டுடன் மீண்டும் உள்நுழையுங்கள் (அது நீங்கள்தான் என்பதை உறுதி செய்யும்)."}
+ADULT_DECIDES = {"code": "adult_decides",
+                 "message": "Your child is 18 or older and decides this for themselves.",
+                 "message_ta": "உங்கள் குழந்தை 18 வயது அல்லது அதற்கு மேற்பட்டவர்; இதை அவரே முடிவு செய்வார்."}
+
+
+def _parents_of(db: Session, student_id: str) -> List[str]:
+    return list(db.execute(select(ParentStudent.parent_user_id).where(ParentStudent.student_id == student_id)).scalars())
+
+
 @router.post("/consent", status_code=status.HTTP_201_CREATED)
 def record_consent(req: ConsentIn, current_user: TokenPayload = Depends(require_role(["parent", "student"])), db: Session = Depends(get_db)):
+    """S16 DPDP. A parent grants for a minor child only right after signing in with the mobile OTP
+    (identity-bound, 15 minutes). A minor asking for an optional purpose creates a request for the parents."""
     if req.purpose not in consent_svc.PURPOSES:
         raise HTTPException(status_code=422, detail=f"Unknown purpose. Use one of: {', '.join(consent_svc.PURPOSES)}")
     student = _subject_for(current_user, db, req.student_id)
-    method = "otp_parent" if normalize_role(current_user.role) == "parent" else "in_app"
+    role = normalize_role(current_user.role)
+    minor = consent_svc.is_minor(student)
+    optional = req.purpose in consent_svc.OPTIONAL
+    status_out, method, verified_at = req.status, "in_app", None
+    if role == "parent":
+        method = "otp_parent"
+        if optional and not minor:
+            raise HTTPException(status_code=403, detail=ADULT_DECIDES)
+        if req.status == "granted" and optional and minor:
+            # verifiable parental consent for a minor's optional purpose: OTP sign-in at most 15 minutes ago
+            if not consent_svc.identity_fresh(current_user.auth_time):
+                raise HTTPException(status_code=403, detail=REAUTH)
+        if req.status == "granted" and current_user.auth_time:
+            verified_at = datetime.datetime.utcfromtimestamp(current_user.auth_time)
+    elif optional and minor and req.status == "granted":
+        status_out = "requested"                                    # the parents decide
     row = consent_svc.record(db, college_id=student.college_id, student_id=student.id, granted_by=current_user.sub,
-                             purpose=req.purpose, status=req.status, method=method)
-    record_audit(db, current_user, "consent.recorded", "student", student.id, {"purpose": req.purpose, "status": req.status, "method": method})
+                             purpose=req.purpose, status=status_out, method=method, verified_at=verified_at)
+    action = "consent.requested" if status_out == "requested" else "consent.recorded"
+    record_audit(db, current_user, action, "student", student.id,
+                 {"purpose": req.purpose, "status": status_out, "method": method, "notice_version": row.notice_version,
+                  "identity_verified_at": verified_at.isoformat() if verified_at else None})
+    if status_out == "requested":
+        from core.tenant import get_user_name
+        name = get_user_name(db, student.user_id, "Your child")
+        for uid in _parents_of(db, student.id):
+            notify_user(db, uid, f"{name} asks for your consent", f"For: {req.purpose.replace('_', ' ')}. Open Consent to agree or decline.",
+                        title_ta=f"{name} உங்கள் ஒப்புதலைக் கேட்கிறார்", body_ta="ஒப்புதல் பக்கத்தைத் திறந்து ஏற்கவோ மறுக்கவோ செய்யுங்கள்.",
+                        kind="approval", link="/parent/consent", college_id=student.college_id)
     db.commit()
-    return {"id": row.id, "student_id": student.id, "purpose": row.purpose, "status": row.status}
+    return {"id": row.id, "student_id": student.id, "purpose": row.purpose, "status": row.status, "notice_version": row.notice_version}
+
+
+def _consent_view(db: Session, student, lang: str) -> dict:
+    out = {}
+    for p in consent_svc.PURPOSES:
+        row = consent_svc.latest(db, student.id, p)
+        n = consent_svc.NOTICES.get(p, {})
+        out[p] = {"status": row.status if row else None, "effective": consent_svc.allowed(db, student, p),
+                  "by_parent": bool(row and row.method in consent_svc.PARENT_METHODS),
+                  "needs_parent": p in consent_svc.OPTIONAL and consent_svc.is_minor(student),
+                  "notice": n.get("ta" if lang == "ta" else "en"), "notice_version": n.get("version"),
+                  "recorded_at": row.recorded_at.isoformat() if row else None}
+    return out
 
 
 @router.get("/consent")
-def my_consents(student_id: Optional[str] = None, current_user: TokenPayload = Depends(require_role(["parent", "student"])),
-                db: Session = Depends(get_db)):
+def my_consents(student_id: Optional[str] = None, lang: str = "en",
+                current_user: TokenPayload = Depends(require_role(["parent", "student"])), db: Session = Depends(get_db)):
     student = _subject_for(current_user, db, student_id)
     cur = consent_svc.current_for(db, student.college_id, [student.id]).get(student.id, {})
-    return {"student_id": student.id, "consents": {p: cur.get(p) for p in consent_svc.PURPOSES}}
+    return {"student_id": student.id, "consents": {p: cur.get(p) for p in consent_svc.PURPOSES},
+            "is_minor": consent_svc.is_minor(student), "dob_known": student.date_of_birth is not None,
+            "purposes": _consent_view(db, student, lang),
+            "identity_fresh": normalize_role(current_user.role) == "parent" and consent_svc.identity_fresh(current_user.auth_time)}
+
+
+@router.get("/parent/consent")
+def parent_consent_overview(lang: str = "en", current_user: TokenPayload = Depends(require_role(["parent"])), db: Session = Depends(get_db)):
+    """Every linked child with each purpose, its notice and any request waiting for the parent."""
+    from core.tenant import get_parent_children, get_user_name
+    children = get_parent_children(current_user, db)
+    return {"identity_fresh": consent_svc.identity_fresh(current_user.auth_time),
+            "children": [{"student_id": c.id, "name": get_user_name(db, c.user_id, "Student"), "is_minor": consent_svc.is_minor(c),
+                          "purposes": _consent_view(db, c, lang)} for c in children]}
+
+
+class DobIn(BaseModel):
+    date_of_birth: datetime.date
+
+
+@router.put("/college/students/{student_id}/dob")
+def set_dob(student_id: str, req: DobIn, current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
+    """S16 DPDP: the college records the date of birth (it decides who is a minor)."""
+    s = db.execute(select(Student).where(Student.id == student_id, Student.college_id == current_user.college_id)).scalar_one_or_none()
+    if s is None:
+        raise HTTPException(status_code=404, detail="Student not found in your college")
+    today = datetime.date.today()
+    if not (datetime.date(1950, 1, 1) <= req.date_of_birth <= today.replace(year=today.year - 10)):
+        raise HTTPException(status_code=422, detail="Enter a real date of birth (the student must be at least 10)")
+    s.date_of_birth = req.date_of_birth
+    record_audit(db, current_user, "student.dob_set", "student", s.id, {"is_minor": consent_svc.is_minor(s)})
+    db.commit()
+    return {"student_id": s.id, "date_of_birth": s.date_of_birth.isoformat(), "is_minor": consent_svc.is_minor(s)}
 
 
 @router.get("/admin/consent")
@@ -398,5 +485,65 @@ def staff_download(request_id: str, current_user: TokenPayload = Depends(STAFF),
 def college_download(request_id: str, current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
     r = db.execute(select(DataRequest).where(DataRequest.id == request_id, DataRequest.college_id == current_user.college_id)).scalar_one_or_none()
     if r is None:
+        raise HTTPException(status_code=404, detail="Request not found")
+    return _download(db, r, current_user)
+
+
+# ---------------------------------------------------------------- S16 DPDP: self-service requests
+
+class SelfRequestIn(BaseModel):
+    kind: str = Field(pattern="^(export|deletion)$")
+    reason: str = Field(min_length=10, max_length=2000)
+    student_id: Optional[str] = None                 # a parent names the child
+
+
+ASK_PARENT = {"code": "ask_parent",
+              "message": "You are under 18, so a parent makes this request for you from the parent's Consent page.",
+              "message_ta": "நீங்கள் 18 வயதுக்குக் குறைவானவர்; பெற்றோர் தங்கள் ஒப்புதல் பக்கத்திலிருந்து இந்தக் கோரிக்கையைச் செய்வார்."}
+
+
+@router.post("/me/data-requests", status_code=status.HTTP_201_CREATED)
+def self_service_request(req: SelfRequestIn, current_user: TokenPayload = Depends(require_role(["parent", "student"])),
+                         db: Session = Depends(get_db)):
+    """A parent (for a linked child) or an adult student (for themselves) asks for a copy or deletion."""
+    role = normalize_role(current_user.role)
+    s = _subject_for(current_user, db, req.student_id)
+    if role == "student" and consent_svc.is_minor(s):
+        raise HTTPException(status_code=403, detail=ASK_PARENT)
+    open_dup = db.execute(select(DataRequest.id).where(DataRequest.subject_student_id == s.id, DataRequest.kind == req.kind,
+                                                       DataRequest.status.in_(("received", "in_progress")))).first()
+    if open_dup:
+        raise HTTPException(status_code=409, detail="An open request of this kind already exists for this student")
+    r = DataRequest(id=f"dr_{uuid.uuid4().hex[:16]}", college_id=s.college_id, kind=req.kind, subject_student_id=s.id,
+                    requested_by=current_user.sub, reason=req.reason.strip(), status="received",
+                    due_on=datetime.date.today() + datetime.timedelta(days=REQUEST_DAYS))
+    db.add(r)
+    db.flush()
+    record_audit(db, current_user, "data_request.created", "data_request", r.id, {"kind": r.kind, "self_service": role})
+    roles = ("super_admin",) if r.kind == "deletion" else ("irep_admin", "super_admin")
+    for uid in db.execute(select(User.id).where(User.role.in_(roles), User.is_active.is_(True))).scalars():
+        notify_user(db, uid, f"New {r.kind} request (from a {role})", f"Due by {r.due_on.isoformat()}",
+                    title_ta="புதிய தரவுக் கோரிக்கை", kind="approval", link="/admin/audit/requests")
+    for uid in db.execute(select(User.id).where(User.college_id == s.college_id, User.role == "college_admin",
+                                                User.is_active.is_(True))).scalars():
+        notify_user(db, uid, f"A {role} asked for a data {r.kind}", f"Due by {r.due_on.isoformat()}",
+                    title_ta="தரவுக் கோரிக்கை பெறப்பட்டது", kind="approval", link="/college/settings", college_id=s.college_id)
+    db.commit()
+    return {"id": r.id, "kind": r.kind, "status": r.status, "due_on": r.due_on.isoformat(), "student_id": s.id}
+
+
+@router.get("/me/data-requests")
+def my_data_requests(current_user: TokenPayload = Depends(require_role(["parent", "student"])), db: Session = Depends(get_db)):
+    rows = db.execute(select(DataRequest).where(DataRequest.requested_by == current_user.sub)
+                      .order_by(DataRequest.created_at.desc())).scalars().all()
+    return {"items": [{"id": r.id, "kind": r.kind, "student_id": r.subject_student_id, "status": r.status,
+                       "due_on": r.due_on.isoformat(), "has_export": bool(r.result_ref), "decision_note": r.decision_note,
+                       "created_at": r.created_at.isoformat()} for r in rows]}
+
+
+@router.get("/me/data-requests/{request_id}/export")
+def my_export(request_id: str, current_user: TokenPayload = Depends(require_role(["parent", "student"])), db: Session = Depends(get_db)):
+    r = db.get(DataRequest, request_id)
+    if r is None or r.requested_by != current_user.sub or r.kind != "export":
         raise HTTPException(status_code=404, detail="Request not found")
     return _download(db, r, current_user)

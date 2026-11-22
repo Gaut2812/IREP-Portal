@@ -17,6 +17,7 @@ class TokenPayload(BaseModel):
     name: Optional[str] = None
     avatar: Optional[str] = None
     exp: Optional[int] = None
+    auth_time: Optional[int] = None          # when the person signed in (parent OTP: the identity check)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """bcrypt only (constant-time inside checkpw). A stored value that is not a bcrypt hash never

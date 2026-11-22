@@ -60,7 +60,7 @@ The web app runs at `http://localhost:3000`. Set `NEXT_PUBLIC_API_URL` if the AP
 | College admin | `admin@demo.edu` / `password123` | `/college` |
 | IREP staff | `staff@irep.demo` / `password123` (link "IREP staff sign-in") | `/admin/colleges` |
 | Super admin | `super@irep.demo` / `password123` (same "IREP staff sign-in") | `/admin/super` |
-| Parent | Mobile `9876543210` (Ramesh K) or `9876543214` (Lakshmi S), then the OTP | `/parent` |
+| Parent | Mobile `9876543210` (Ramesh K) or `9876543214` (Lakshmi S), then the OTP; `9876543216` (Selvi S, parent of the minor Vinoth S, `vinoth.s@demo.edu`) for the DPDP consent flow | `/parent` |
 
 In development the API returns the OTP in its response and the sign-in card shows it as "Demo OTP". In production it is sent only by SMS. The **View as** switcher in the top bar signs in as each demo role.
 
@@ -119,6 +119,7 @@ Sign-in rules:
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
 | 49 | Support desk (report a problem from any screen; IREP staff reply) | `/support`, `/admin/support` |
 | 47+ | Billing (S16: monthly invoices from the MoU, usage, credits, GST; super admin issues, colleges download) | `/admin/billing`, `/college/billing` |
+| DPDP | Consent for minors (S16: notices in English and Tamil, a parent approves with a fresh OTP sign-in, self-service data requests) | `/parent/consent`, `/student/privacy` |
 | SA | Super admin: IREP staff accounts, logged support sessions ([permission matrix](docs/PERMISSIONS.md)) | `/admin/super` |
 
 ## Sign-in with Keycloak (optional in development)

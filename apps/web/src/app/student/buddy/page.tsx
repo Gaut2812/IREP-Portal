@@ -49,8 +49,8 @@ export default function StudyBuddyPage() {
       setMsgs((m) => [...m, { id: `local-a-${Date.now()}`, role: "assistant", content: r.answer }]);
       setUsage(r.usage);
     } catch (err) {
-      const d = err instanceof ApiError ? err.detail : null;
-      setError(typeof d === "object" && d && "message" in (d as object) ? String((d as { message: string }).message) : t("buddy.ask_failed"));
+      // fetchApi already turns {message, message_ta} into the user's language
+      setError(err instanceof ApiError && err.detail ? String(err.detail) : t("buddy.ask_failed"));
       await load();
     } finally {
       setBusy(false);

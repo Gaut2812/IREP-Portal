@@ -66,6 +66,7 @@ def _issue(user: User) -> AuthResponse:
     token = create_access_token({
         "sub": user.id, "email": user.email, "role": user.role, "college_id": user.college_id,
         "name": user.name, "avatar": user.avatar_initials,
+        "auth_time": int(time.time()),         # S16: identity-bound parental consent
     })
     return AuthResponse(access_token=token, user={
         "id": user.id, "email": user.email, "role": user.role, "name": user.name, "avatar": user.avatar_initials,

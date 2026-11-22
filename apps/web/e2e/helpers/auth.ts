@@ -27,12 +27,12 @@ function toWebRole(apiRole: string): DemoRole {
 /**
  * Log in through the real API with the seeded demo account for `role`
  * and seed localStorage so the app starts authenticated with a real JWT.
- * Optionally pass `phone` to log in as a different seeded parent.
+ * Optionally pass `phone` (another seeded parent) or `identifier` (another seeded account of that role).
  */
 export async function loginAs(
   page: Page,
   role: DemoRole,
-  options: { lang?: "en" | "ta"; phone?: string } = {}
+  options: { lang?: "en" | "ta"; phone?: string; identifier?: string } = {}
 ): Promise<{ token: string; user: any }> {
   const creds = CREDENTIALS[role];
   let data: any;
@@ -53,7 +53,7 @@ export async function loginAs(
     }
   } else {
     const res = await page.request.post(`${API_BASE}/auth/login`, {
-      data: { role: role === "super" ? "admin" : role, identifier: creds.identifier, password: creds.password },
+      data: { role: role === "super" ? "admin" : role, identifier: options.identifier || creds.identifier, password: creds.password },
     });
     if (!res.ok()) throw new Error(`Login failed for ${role}: ${res.status()}`);
     data = await res.json();

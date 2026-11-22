@@ -71,6 +71,8 @@ class Student(TenantModel):
     # S0 cohort structure
     branch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("branches.id"), nullable=True, index=True)
     batch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("batches.id"), nullable=True, index=True)
+    # S16 DPDP: under 18 -> optional purposes need verifiable parental consent (services/consent.py)
+    date_of_birth: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
     track: Mapped[str] = mapped_column(String(64), default="AI & Data Science")
     academic_year: Mapped[str] = mapped_column(String(16), default="2026-27")
 
@@ -862,9 +864,11 @@ class ConsentRecord(TenantModel):
     subject_student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
     granted_by_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
     purpose: Mapped[str] = mapped_column(String(32), nullable=False, index=True)   # services/consent.PURPOSES
-    status: Mapped[str] = mapped_column(String(16), nullable=False)                # granted, withdrawn
+    status: Mapped[str] = mapped_column(String(16), nullable=False)                # granted, withdrawn, requested (a minor asked)
     method: Mapped[str] = mapped_column(String(24), nullable=False)                # otp_parent, paper_form_upload, in_app
     evidence_ref: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    notice_version: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)      # the notice the person saw (S16)
+    verified_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)  # parent's OTP sign-in (identity check)
     recorded_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, default=datetime.datetime.utcnow, index=True)
 
 

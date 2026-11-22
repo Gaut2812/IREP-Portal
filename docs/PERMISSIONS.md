@@ -64,7 +64,10 @@ There is no public sign-up for any role:
 | Question bank (staff side) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Audit trail (48); student and parent names only inside a support session | ❌ | ❌ | ❌ | ❌ | 👁 | 👁 |
 | **Student or parent records**: consent list and history (48), a data-export file | ❌ | ❌ | ❌ | ❌ | 👁 **only inside an active support session** | 👁 **only inside an active support session** |
-| Data requests: raise | ❌ | ❌ | ❌ | ✅ own college | ❌ | ❌ |
+| Data requests: raise | ✅ for themselves, 18+ only (S16) | ✅ for a linked child (S16) | ❌ | ✅ own college | ❌ | ❌ |
+| **Optional consents for a minor** (AI Study Buddy, public portfolio, recordings, SMS): grant (S16) | asks only | ✅ linked child, OTP sign-in within 15 min | ❌ | ❌ (paper form via import) | ❌ | ❌ |
+| Optional consents for an adult student (S16) | ✅ own | ❌ (the student decides) | ❌ | ❌ | ❌ | ❌ |
+| Record a student's date of birth (S16) | ❌ | ❌ | ❌ | ✅ own college | ❌ | ❌ |
 | Data **export** requests: build or reject (names hidden without a session) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | **Data deletion requests: approve or reject** | ❌ | ❌ | ❌ | ❌ | ❌ (👁 in the queue) | ✅ |
 | Support desk tickets (49) | ✅ own | ✅ own | ✅ own | ✅ own | ✅ all | ✅ all |

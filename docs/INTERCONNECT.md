@@ -203,6 +203,9 @@ Every approval, release and removal writes an audit entry (48, via `services/aud
 | `data_request.created` / `data_request.completed` | yes | yes | college admin | 02 ↔ 48 |
 | `support.ticket_replied` | no | yes | requester | 49 → 44 |
 | `consent.recorded` | yes | no | — | 48 |
+| `consent.requested` (a minor asks for an optional purpose; S16) | yes | yes | linked parents | student privacy → parent consent |
+| `data_request.created` (self-service by a parent or an adult student; S16) | yes | yes | IREP staff (deletion: super admin), college admins | parent consent, student privacy → 48 |
+| `student.dob_set` (college records a date of birth; decides who is a minor) | yes | no | — | 03 |
 | `college.created` | yes | yes | first college admin | 45 |
 | `invoice.issued` | yes | yes | college admins | 47 |
 | `invoice.generated` / `invoice.paid` / `invoice.voided` / `billing.credit_added` | yes | no | — | 47 |

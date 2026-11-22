@@ -58,6 +58,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.sprint_board"), href: "/student/projects/board", icon: KanbanSquare },
     { label: t("nav.mock_interviews"), href: "/student/interviews", icon: Video },
     { label: t("nav.ai_study_buddy"), href: "/student/buddy", icon: Bot },
+    { label: t("nav.my_privacy"), href: "/student/privacy", icon: KeyRound },
     { label: t("nav.certificates"), href: "/student/certificates", icon: Award },
     { label: t("nav.portfolio"), href: "/student/portfolio", icon: Briefcase },
     { label: t("nav.live_sessions"), href: "/student/live", icon: Radio },
@@ -106,6 +107,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.events"), href: "/parent/events", icon: Calendar },
     { label: t("nav.message_trainer"), href: "/parent/messages", icon: MessageSquare },
     { label: t("nav.feedback_survey"), href: "/parent/surveys", icon: MessageSquare },
+    { label: t("nav.consent"), href: "/parent/consent", icon: ShieldCheck },
   ];
 
   // IREP staff (screens 45-49)

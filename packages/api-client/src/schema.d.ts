@@ -2058,8 +2058,52 @@ export interface paths {
         /** My Consents */
         get: operations["my_consents_api_v1_consent_get"];
         put?: never;
-        /** Record Consent */
+        /**
+         * Record Consent
+         * @description S16 DPDP. A parent grants for a minor child only right after signing in with the mobile OTP
+         *     (identity-bound, 15 minutes). A minor asking for an optional purpose creates a request for the parents.
+         */
         post: operations["record_consent_api_v1_consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parent/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Parent Consent Overview
+         * @description Every linked child with each purpose, its notice and any request waiting for the parent.
+         */
+        get: operations["parent_consent_overview_api_v1_parent_consent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/students/{student_id}/dob": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Dob
+         * @description S16 DPDP: the college records the date of birth (it decides who is a minor).
+         */
+        put: operations["set_dob_api_v1_college_students__student_id__dob_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2195,6 +2239,44 @@ export interface paths {
         };
         /** College Download */
         get: operations["college_download_api_v1_college_data_requests__request_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/data-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Data Requests */
+        get: operations["my_data_requests_api_v1_me_data_requests_get"];
+        put?: never;
+        /**
+         * Self Service Request
+         * @description A parent (for a linked child) or an adult student (for themselves) asks for a copy or deletion.
+         */
+        post: operations["self_service_request_api_v1_me_data_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/data-requests/{request_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Export */
+        get: operations["my_export_api_v1_me_data_requests__request_id__export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4941,6 +5023,14 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** DobIn */
+        DobIn: {
+            /**
+             * Date Of Birth
+             * Format: date
+             */
+            date_of_birth: string;
+        };
         /** DriveIn */
         DriveIn: {
             /**
@@ -5494,6 +5584,15 @@ export interface components {
         SandboxIn: {
             /** Url */
             url: string;
+        };
+        /** SelfRequestIn */
+        SelfRequestIn: {
+            /** Kind */
+            kind: string;
+            /** Reason */
+            reason: string;
+            /** Student Id */
+            student_id?: string | null;
         };
         /** SendIn */
         SendIn: {
@@ -9979,6 +10078,7 @@ export interface operations {
         parameters: {
             query?: {
                 student_id?: string | null;
+                lang?: string;
             };
             header?: {
                 "X-Demo-Role"?: string | null;
@@ -10025,6 +10125,76 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parent_consent_overview_api_v1_parent_consent_get: {
+        parameters: {
+            query?: {
+                lang?: string;
+            };
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_dob_api_v1_college_students__student_id__dob_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DobIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10315,6 +10485,105 @@ export interface operations {
         };
     };
     college_download_api_v1_college_data_requests__request_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_data_requests_api_v1_me_data_requests_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    self_service_request_api_v1_me_data_requests_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelfRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_export_api_v1_me_data_requests__request_id__export_get: {
         parameters: {
             query?: never;
             header?: {

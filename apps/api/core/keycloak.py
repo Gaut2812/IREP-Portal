@@ -91,7 +91,7 @@ class KeycloakVerifier:
         name = c.get("name") or c.get("preferred_username") or ""
         initials = "".join(p[0] for p in name.split()[:2]).upper() or "IR"
         return TokenPayload(sub=user_id, email=c.get("email"), role=roles[0], college_id=college_id,
-                            name=name, avatar=initials, exp=c.get("exp"))
+                            name=name, avatar=initials, exp=c.get("exp"), auth_time=c.get("auth_time"))
 
 
 _verifier: Optional[KeycloakVerifier] = None

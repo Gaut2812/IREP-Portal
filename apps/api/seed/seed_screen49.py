@@ -19,6 +19,10 @@ SEEDED_MONTHS = ((2026, 9), (2026, 10))
 def seed_screen49(db, college_id: str = "col_demo_001") -> None:
     keep = or_(*[and_(MonthlyCard.year == y, MonthlyCard.month == m) for y, m in SEEDED_MONTHS])
     db.execute(delete(MonthlyCard).where(MonthlyCard.college_id == college_id, not_(keep)))
+    # the seeded cards go back to their demo state (September sent, October approved) if a test or demo moved them
+    for card in db.execute(select(MonthlyCard).where(MonthlyCard.college_id == college_id, keep)).scalars():
+        card.status = "sent" if card.month == 9 else "approved"
+        card.approved_by = card.approved_by or "usr_arun_01"
     db.execute(delete(SupportMessage))
     db.execute(delete(SupportTicket))
     db.execute(delete(Notification).where(Notification.kind.in_(["support", "report"])))

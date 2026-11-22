@@ -4,6 +4,7 @@ Structure, student import (CSV, dry run first), trainer mapping and semester
 promotion. Everything is scoped to the college in the caller's token.
 """
 import csv
+import datetime
 import io
 import re
 import secrets
@@ -27,7 +28,7 @@ router = APIRouter(prefix="/college", tags=["Screen 03 · Branches and batches"]
 COLLEGE = require_role(["college_admin"])
 MAX_ROWS = 5000
 CSV_COLUMNS = ["register_no", "name", "email", "phone", "branch_code", "batch", "semester", "parent_name", "parent_phone",
-               "parent_email", "parent_consent", "parent_consent_ref"]
+               "parent_email", "parent_consent", "parent_consent_ref", "dob"]
 CONSENT_YES = ("yes", "y", "true", "1", "granted")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -299,6 +300,15 @@ async def import_students(file: UploadFile = File(...), dry_run: bool = Query(Tr
         parent = _parent_row(db, cid, r, file_parents)
         if isinstance(parent, str):
             err(parent); continue
+        dob = None
+        if r.get("dob"):
+            try:
+                dob = datetime.date.fromisoformat(r["dob"])
+            except ValueError:
+                err("dob must be a date like 2006-08-14 (YYYY-MM-DD)"); continue
+            if not (datetime.date(1950, 1, 1) <= dob <= datetime.date.today().replace(year=datetime.date.today().year - 10)):
+                err("dob is not a plausible date of birth"); continue
+        r["_dob"] = dob
         plan.append((r, br, bt, cur, email, phone, parent))
 
     summary = {"rows": len(rows), "errors": len(errors), "new": sum(1 for p in plan if p[3] is None),
@@ -323,6 +333,8 @@ async def import_students(file: UploadFile = File(...), dry_run: bool = Query(Tr
             u = db.get(User, cur.user_id)
             u.name, u.email, u.phone = name, email, phone or u.phone
         cur.branch, cur.branch_id, cur.batch_id = br.name, br.id, bt.id
+        if r.get("_dob"):
+            cur.date_of_birth = r["_dob"]                            # S16 DPDP: decides who is a minor
         cur.semester, cur.batch_name, cur.track, cur.academic_year = bt.semester, bt.name, bt.track, bt.academic_year
         db.flush()
         if p:

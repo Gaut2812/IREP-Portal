@@ -94,7 +94,9 @@
     "college_messages": "Messages",
     "surveys": "Parent surveys",
     "super_admin": "Super admin",
-    "billing": "Billing"
+    "billing": "Billing",
+    "my_privacy": "My data & consent",
+    "consent": "Consent"
   },
   "student": {
     "readiness_score": "Readiness score",
@@ -1999,5 +2001,63 @@
     "paid_ref": "Paid, reference",
     "outstanding": "Outstanding",
     "credit_left": "Credit left"
+  },
+  "privacy": {
+    "parent_title": "Consent",
+    "student_title": "My data & consent",
+    "parent_intro": "Choose what IREP and the college may do with your child's data. Each item says exactly what it means. You can change your mind at any time.",
+    "student_intro": "You are 18 or older, so you decide each item yourself. You can change your mind at any time.",
+    "student_intro_minor": "You are under 18. For these items you can ask; a parent agrees or declines on their Consent page.",
+    "dob_unknown": "The college has not recorded your date of birth yet, so you are treated as under 18 until it does.",
+    "load_failed": "Could not load consent. Try again.",
+    "save_failed": "Could not save your choice. Try again.",
+    "reauth": "To agree to something for a child under 18, you must have signed in with the code sent to your mobile in the last 15 minutes.",
+    "reauth_button": "Sign in again",
+    "child_minor": "Under 18: you decide these for your child.",
+    "child_adult": "18 or older: your child decides the optional items.",
+    "adult_decides": "Your child decides this",
+    "agree": "Agree",
+    "approve": "Approve request",
+    "decline": "Decline",
+    "withdraw": "Withdraw",
+    "ask_parent": "Ask my parent",
+    "waiting_parent": "Waiting for your parent",
+    "asked_parent": "Request sent. Your parent will see it on their Consent page.",
+    "parent_view_on": "Your parent can see your progress (attendance, scores, reports).",
+    "parent_view_off": "Your parent cannot see your progress right now.",
+    "notice_version": "Notice version",
+    "purpose": {
+      "parent_data_processing": "Progress shared with the parent",
+      "ai_hints": "AI Study Buddy",
+      "public_portfolio": "Public portfolio link",
+      "recordings": "Class and interview recordings",
+      "sms_alerts": "SMS alerts"
+    },
+    "state": {
+      "on": "On",
+      "off": "Off",
+      "requested": "Requested"
+    },
+    "req_title": "Your data",
+    "req_intro": "Ask for a copy of the data held about the student, or for it to be deleted. We answer within 30 days.",
+    "req_minor": "You are under 18, so a parent makes this request for you from their Consent page.",
+    "req_child": "Child",
+    "req_kind": "Request",
+    "req_reason": "Tell us why (at least 10 characters)",
+    "req_submit": "Send request",
+    "req_sent": "Request sent. You will be told when it is done.",
+    "req_failed": "Could not send the request. Try again.",
+    "req_due": "due",
+    "req_download": "Download copy",
+    "kind": {
+      "export": "A copy of the data",
+      "deletion": "Delete the data"
+    },
+    "req_status": {
+      "received": "received",
+      "in_progress": "in progress",
+      "completed": "completed",
+      "rejected": "rejected"
+    }
   }
 }

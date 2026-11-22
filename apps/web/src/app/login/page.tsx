@@ -4,12 +4,13 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, Role } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
+import { fetchApi, ApiError } from "@/lib/api";
 import { GraduationCap, Users, UserCheck, Building2, Languages, ArrowRight, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const { language, toggleLanguage, t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
 
   const [selectedRole, setSelectedRole] = useState<Role>("student");
   const [identifier, setIdentifier] = useState("priya.r@demo.edu");
@@ -19,6 +20,9 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [demoOtp, setDemoOtp] = useState<string | null>(null);
+  const [langTouched, setLangTouched] = useState(false);
 
   const roleConfigs = [
     { id: "student" as Role, title: t("login.roles.student"), icon: GraduationCap, defaultEmail: "priya.r@demo.edu" },
@@ -30,71 +34,53 @@ export default function LoginPage() {
   const handleRoleSelect = (role: Role) => {
     setSelectedRole(role);
     setError("");
+    setFieldErrors({});
+    setOtpSent(false);
+    setOtp("");
     const cfg = roleConfigs.find(r => r.id === role);
     if (cfg) setIdentifier(cfg.defaultEmail);
   };
 
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (selectedRole === "parent") {
+      if (phone.replace(/\D/g, "").length < 10) errs.phone = t("login.err_phone");
+      if (otpSent && !/^\d{6}$/.test(otp.trim())) errs.otp = t("login.err_otp");
+    } else {
+      if (!identifier.trim()) errs.identifier = t("login.err_identifier");
+      if (!password) errs.password = t("login.err_password");
+    }
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const finish = (data: { access_token: string; user: any }) => {
+    login(data.access_token, data.user);
+    const pref = data.user?.language_pref;
+    if (langTouched) setLanguage(language, true);            // choice made on this screen is saved
+    else if (pref === "en" || pref === "ta") setLanguage(pref, false);   // otherwise use the saved preference
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
-
+    if (!validate()) return;
+    setLoading(true);
     try {
       if (selectedRole === "parent") {
         if (!otpSent) {
-          // Request OTP
-          const res = await fetch("http://localhost:8000/api/v1/auth/parent/otp/request", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone })
-          });
-          const data = await res.json();
+          const data = await fetchApi<{ demo_otp?: string; message: string }>("/auth/parent/otp/request", { method: "POST", body: JSON.stringify({ phone }) });
           setOtpSent(true);
-          setOtp(data.demo_otp || "123456");
-          setLoading(false);
-          return;
-        } else {
-          // Verify OTP
-          const res = await fetch("http://localhost:8000/api/v1/auth/parent/otp/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone, otp })
-          });
-          if (!res.ok) throw new Error("Invalid OTP");
-          const data = await res.json();
-          login(data.access_token, data.user);
+          setDemoOtp(data.demo_otp || null);
           return;
         }
+        finish(await fetchApi("/auth/parent/otp/verify", { method: "POST", body: JSON.stringify({ phone, otp: otp.trim() }) }));
+        return;
       }
-
-      // Standard login
-      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role: selectedRole,
-          identifier,
-          password
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error("Invalid login credentials. Please use password123");
-      }
-
-      const data = await res.json();
-      login(data.access_token, data.user);
+      finish(await fetchApi("/auth/login", { method: "POST", body: JSON.stringify({ role: selectedRole, identifier: identifier.trim(), password }) }));
     } catch (err: any) {
-      // Fallback offline mock for immediate test drive if API is not running
-      const fallbackProfile = {
-        id: selectedRole === "student" ? "usr_priya_01" : (selectedRole === "trainer" ? "usr_arun_01" : (selectedRole === "college" ? "usr_kavitha_01" : "usr_ramesh_01")),
-        email: identifier,
-        role: selectedRole,
-        name: selectedRole === "student" ? "Priya R" : (selectedRole === "trainer" ? "Arun Kumar" : (selectedRole === "college" ? "Dr. Kavitha" : "Mr. Ramesh K")),
-        avatar: selectedRole === "student" ? "PR" : (selectedRole === "trainer" ? "AK" : (selectedRole === "college" ? "DC" : "RK")),
-        college_id: "col_demo_001"
-      };
-      login("mock_token", fallbackProfile);
+      // No offline fallback: a failed sign-in never logs anyone in.
+      setError(err instanceof ApiError ? err.detail : t("login.err_offline"));
     } finally {
       setLoading(false);
     }
@@ -160,7 +146,8 @@ export default function LoginPage() {
         {/* Language switch button top right */}
         <div className="absolute top-6 right-6">
           <button
-            onClick={toggleLanguage}
+            onClick={() => { setLangTouched(true); setLanguage(language === "en" ? "ta" : "en", false); }}
+            data-testid="login-lang"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-sm border border-[#E2E8F0] rounded-lg text-xs font-bold text-[#0F1F3A] hover:bg-[#F8FAFC] transition-all"
           >
             <Languages className="w-3.5 h-3.5 text-[#2B5CD0]" />
@@ -184,6 +171,8 @@ export default function LoginPage() {
                 <button
                   key={r.id}
                   type="button"
+                  data-testid={`role-${r.id}`}
+                  aria-pressed={isSelected}
                   onClick={() => handleRoleSelect(r.id)}
                   className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
                     isSelected
@@ -197,7 +186,7 @@ export default function LoginPage() {
                   <div>
                     <div className="text-xs font-semibold leading-none">{r.title}</div>
                     <div className="text-[10px] text-[#64748B] font-normal mt-0.5">
-                      {r.id === "student" ? "Sem 2-7" : (r.id === "parent" ? "OTP Login" : "Staff")}
+                      {r.id === "student" ? t("login.sem_hint") : (r.id === "parent" ? t("login.otp_hint") : t("login.staff_hint"))}
                     </div>
                   </div>
                 </button>
@@ -206,13 +195,13 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium" role="alert" data-testid="login-error">
               {error}
             </div>
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleSignIn} className="space-y-4">
+          <form onSubmit={handleSignIn} className="space-y-4" noValidate>
             {selectedRole === "parent" ? (
               /* Parent Mobile + OTP view */
               <div className="space-y-3">
@@ -222,27 +211,35 @@ export default function LoginPage() {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Enter 10-digit mobile number"
-                    className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all"
-                    required
+                    placeholder={t("login.phone_placeholder")}
+                    disabled={otpSent}
+                    aria-invalid={!!fieldErrors.phone}
+                    data-testid="login-phone"
+                    className={`w-full px-3.5 py-2.5 bg-[#F8FAFC] border ${fieldErrors.phone ? "border-red-400" : "border-[#E2E8F0]"} rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all disabled:opacity-70`}
                   />
+                  {fieldErrors.phone && <p className="text-[11px] text-red-600 mt-1">{fieldErrors.phone}</p>}
+                  {otpSent && <button type="button" onClick={() => { setOtpSent(false); setOtp(""); setDemoOtp(null); }} className="text-[11px] text-[#2B5CD0] underline mt-1">{t("login.resend")}</button>}
                 </div>
 
                 {otpSent && (
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="block text-xs font-bold text-[#0F1F3A]">{t("login.otp_label")}</label>
-                      <span className="text-[10px] text-[#2BB3A0] font-bold">Demo OTP: 123456</span>
+                      {demoOtp ? <span className="text-[10px] text-[#2BB3A0] font-bold" data-testid="demo-otp">{t("login.demo_otp").replace("{otp}", demoOtp)}</span> : <span className="text-[10px] text-[#64748B]">{t("login.otp_sent")}</span>}
                     </div>
                     <input
                       type="text"
                       maxLength={6}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value)}
-                      placeholder="Enter 6-digit OTP"
-                      className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs text-[#0F1F3A] tracking-widest font-mono text-center focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all"
-                      required
+                      placeholder={t("login.otp_placeholder")}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      aria-invalid={!!fieldErrors.otp}
+                      data-testid="login-otp"
+                      className={`w-full px-3.5 py-2.5 bg-[#F8FAFC] border ${fieldErrors.otp ? "border-red-400" : "border-[#E2E8F0]"} rounded-xl text-xs text-[#0F1F3A] tracking-widest font-mono text-center focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all`}
                     />
+                    {fieldErrors.otp && <p className="text-[11px] text-red-600 mt-1">{fieldErrors.otp}</p>}
                   </div>
                 )}
               </div>
@@ -251,31 +248,35 @@ export default function LoginPage() {
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-[#0F1F3A] mb-1">
-                    {selectedRole === "student" ? "Register Number / Email" : "College Email ID"}
+                    {selectedRole === "student" ? t("login.student_id_label") : t("login.staff_id_label")}
                   </label>
                   <input
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Enter ID or email"
-                    className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all"
-                    required
+                    placeholder={t("login.id_placeholder")}
+                    aria-invalid={!!fieldErrors.identifier}
+                    data-testid="login-identifier"
+                    className={`w-full px-3.5 py-2.5 bg-[#F8FAFC] border ${fieldErrors.identifier ? "border-red-400" : "border-[#E2E8F0]"} rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all`}
                   />
+                  {fieldErrors.identifier && <p className="text-[11px] text-red-600 mt-1">{fieldErrors.identifier}</p>}
                 </div>
 
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="block text-xs font-bold text-[#0F1F3A]">{t("login.password_label")}</label>
-                    <span className="text-[10px] text-[#64748B]">Demo: password123</span>
+                    <span className="text-[10px] text-[#64748B]">{t("login.demo_password")}</span>
                   </div>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all"
-                    required
+                    aria-invalid={!!fieldErrors.password}
+                    data-testid="login-password"
+                    className={`w-full px-3.5 py-2.5 bg-[#F8FAFC] border ${fieldErrors.password ? "border-red-400" : "border-[#E2E8F0]"} rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all`}
                   />
+                  {fieldErrors.password && <p className="text-[11px] text-red-600 mt-1">{fieldErrors.password}</p>}
                 </div>
               </div>
             )}
@@ -284,6 +285,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
+              data-testid="login-submit"
               className="w-full py-3 px-4 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <span>

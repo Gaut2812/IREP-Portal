@@ -36,3 +36,10 @@ Thumbs.db
 *.db
 *.sqlite3
 
+
+# Playwright artifacts
+apps/web/test-results/
+apps/web/playwright-report/
+
+# Generated report PDFs
+apps/api/static/reports/

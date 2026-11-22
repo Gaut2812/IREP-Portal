@@ -1,379 +1,364 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { RoleGuard } from "@/components/RoleGuard";
+import { useLanguage } from "@/lib/LanguageContext";
+import { fetchApi } from "@/lib/api";
 import {
-  Users, ClipboardCheck, Code2, AlertTriangle,
-  Calendar, CheckCircle2, Clock, ArrowRight, FileText,
-  BookOpen, ExternalLink, Filter, PlusCircle
+  Code2, ExternalLink, Filter, AlertCircle, RefreshCw, CheckCircle2, X
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import Link from "next/link";
-import { fetchApi } from "@/lib/api";
 
 interface CodingProblemSummary {
-  id: string;
-  slug: string;
-  title: string;
-  difficulty: string;
-  topic: string;
-  week_info: string;
-  total_submissions: number;
-  accepted_submissions: number;
-  solved_percentage: number;
+  id: string; slug?: string; title: string; difficulty: string; topic: string; week_info: string;
+  total_submissions: number; accepted_submissions: number; solved_percentage: number;
+}
+interface SupportRow {
+  flag_id: string; student_id: string; name: string; batch: string; score: number; issue: string; reason_key: string;
+  severity: string; action: string; action_label: string; parent_notified: boolean; status: string;
+}
+interface DashboardData {
+  trainer: { name: string; designation: string };
+  kpis: {
+    active_batches: { value: number; students: number; colleges: number };
+    today_attendance: { value: number | null; delta_vs_last_week: number | null; sessions: number; day: string };
+    pending_code_reviews: { value: number; older_than_2_days: number };
+    at_risk_students: { value: number; parents_notified: number; open_flags: number };
+  };
+  batch_readiness: { batch_id: string; batch: string; score: number; color: string }[];
+  today_schedule: { date: string; label: string; is_today: boolean; items: { id: string; time: string; batch: string; topic: string; status: string; status_label: string; can_enter: boolean; room: string }[] };
+  students_needing_support: SupportRow[];
+  thresholds: { score_below: number; attendance_below: number };
+  quick_actions: { key: string; href: string; variant: string }[];
 }
 
+function fill(template: string, vars: Record<string, string | number>) {
+  return Object.entries(vars).reduce((acc, [k, v]) => acc.replace(`{${k}}`, String(v)), template);
+}
+
+const actionChip: Record<string, string> = { parent_call: "chip-red", extra_saturday: "chip-amber", mentor: "chip-blue" };
+const statusChip: Record<string, string> = { Done: "chip-green", Next: "chip-blue", Live: "chip-green", Later: "bg-slate-100 text-slate-600" };
+
 export default function TrainerDashboardPage() {
+  const { t, language } = useLanguage();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
+  const [resolving, setResolving] = useState<SupportRow | null>(null);
+  const [resolveNote, setResolveNote] = useState("");
+
   const [codingProblems, setCodingProblems] = useState<CodingProblemSummary[]>([]);
-  const [loadingProblems, setLoadingProblems] = useState<boolean>(true);
-  const [selectedWeek, setSelectedWeek] = useState<string>("All");
+  const [loadingProblems, setLoadingProblems] = useState(true);
+  const [selectedWeek, setSelectedWeek] = useState("All");
 
-  const readinessData = [
-    { batch: "CSE-A", score: 82 },
-    { batch: "CSE-B", score: 76 },
-    { batch: "IT-A", score: 71 },
-    { batch: "AI & DS", score: 79 },
-    { batch: "Cyber", score: 68 }
-  ];
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setData(await fetchApi<DashboardData>(`/trainer/dashboard?lang=${language}`));
+    } catch (err: any) {
+      setError(err?.detail || err?.message || "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [language]);
 
-  const todaySchedule = [
-    { time: "9:00 AM", batch: "CSE-A · Sem 5", topic: "System design basics", status: "Done", statusColor: "chip-green" },
-    { time: "11:00 AM", batch: "AI & DS · Sem 5", topic: "Future Skills: LLM APIs & RAG", status: "Next", statusColor: "chip-blue" },
-    { time: "2:00 PM", batch: "IT-A · Sem 4", topic: "SQL window functions", status: "Later", statusColor: "bg-slate-100 text-slate-600" },
-    { time: "3:30 PM", batch: "Cyber · Sem 5", topic: "OWASP lab: XSS", status: "Later", statusColor: "bg-slate-100 text-slate-600" }
-  ];
-
-  const studentsNeedingSupport = [
-    { name: "Karthik S.", batch: "CSE-B", score: 52, issue: "Attendance 71%", action: "Parent call", actionClass: "chip-red" },
-    { name: "Divya M.", batch: "IT-A", score: 56, issue: "DSA tests", action: "Extra Sat", actionClass: "chip-amber" },
-    { name: "Rahul V.", batch: "Cyber", score: 58, issue: "Project delay", action: "Mentor", actionClass: "chip-blue" }
-  ];
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    async function loadProblems() {
+    (async () => {
       try {
-        const res = await fetchApi<CodingProblemSummary[]>("/trainer/coding-problems");
-        if (Array.isArray(res) && res.length > 0) {
-          setCodingProblems(res);
-        } else {
-          setCodingProblems(getFallbackProblems());
-        }
-      } catch (err) {
-        setCodingProblems(getFallbackProblems());
+        const res = await fetchApi<{ problems: CodingProblemSummary[] } | CodingProblemSummary[]>("/trainer/coding-problems");
+        setCodingProblems(Array.isArray(res) ? res : res.problems || []);
+      } catch {
+        setCodingProblems([]);
       } finally {
         setLoadingProblems(false);
       }
-    }
-    loadProblems();
+    })();
   }, []);
 
-  const filteredProblems = selectedWeek === "All"
-    ? codingProblems
-    : codingProblems.filter(p => p.week_info?.includes(`Week ${selectedWeek}`));
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const runAction = async (row: SupportRow) => {
+    setActing(row.flag_id);
+    try {
+      const res = await fetchApi<{ parent_notified: boolean; notified_now: boolean; status: string }>(`/trainer/flags/${row.flag_id}/actions`, {
+        method: "POST", body: JSON.stringify({ action_type: row.action }),
+      });
+      setToast(fill(t("trainer_dashboard.action_recorded"), { a: row.action_label, n: row.name }) + (res.notified_now ? ` · ${t("trainer_dashboard.parent_alerted")}` : ""));
+      setData((prev) => prev ? {
+        ...prev,
+        students_needing_support: prev.students_needing_support.map((r) => r.flag_id === row.flag_id ? { ...r, parent_notified: res.parent_notified, status: res.status } : r),
+      } : prev);
+    } catch (err: any) {
+      setToast(err?.detail || t("trainer_dashboard.error_title"));
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const submitResolve = async () => {
+    if (!resolving || !resolveNote.trim()) return;
+    try {
+      await fetchApi(`/trainer/flags/${resolving.flag_id}/resolve`, { method: "POST", body: JSON.stringify({ note: resolveNote }) });
+      setToast(t("trainer_dashboard.resolved"));
+      setResolving(null);
+      setResolveNote("");
+      load();
+    } catch (err: any) {
+      setToast(err?.detail || t("trainer_dashboard.error_title"));
+    }
+  };
+
+  const filteredProblems = selectedWeek === "All" ? codingProblems : codingProblems.filter((p) => p.week_info?.includes(`Week ${selectedWeek}`));
+  const card = "bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-2";
+  const quickLabel = (key: string) => t(`trainer_dashboard.${key}`);
 
   return (
-    <AppShell pageTitle="Trainer Dashboard">
-      <div className="space-y-6 max-w-7xl mx-auto pb-10">
-        
-        {/* ROW 1: 4 Metric Cards (PDF 8) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Active Batches */}
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-2">
-            <div className="text-xs text-[#64748B] font-medium">Active Batches</div>
-            <div className="text-3xl font-black text-[#0F1F3A]">5</div>
-            <div className="text-[11px] text-[#64748B]">248 students · 2 colleges</div>
-          </div>
+    <RoleGuard allowedRoles={["trainer"]}>
+      <AppShell pageTitle={t("trainer_dashboard.title")}>
+        <div className="space-y-6 max-w-7xl mx-auto pb-10" data-testid="trainer-dashboard">
+          {loading && (
+            <div className="space-y-6 animate-pulse" aria-busy="true" aria-label={t("trainer_dashboard.loading")}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 bg-white rounded-xl border border-[#E2E8F0]" />)}</div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="h-64 bg-white rounded-xl border border-[#E2E8F0]" /><div className="h-64 bg-white rounded-xl border border-[#E2E8F0]" /></div>
+            </div>
+          )}
 
-          {/* Card 2: Today's Attendance */}
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-2">
-            <div className="text-xs text-[#64748B] font-medium">Today's Attendance</div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-[#0F1F3A]">91%</span>
-              <span className="text-xs font-bold text-[#15803D]">▲ 3% vs last week</span>
+          {!loading && error && (
+            <div className="bg-white rounded-2xl border border-[#FECACA] p-8 text-center space-y-3 max-w-md mx-auto">
+              <AlertCircle className="w-8 h-8 text-[#D93636] mx-auto" />
+              <h2 className="text-base font-bold text-[#0F1F3A]">{t("trainer_dashboard.error_title")}</h2>
+              <p className="text-xs text-[#64748B]">{error}</p>
+              <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg"><RefreshCw className="w-3.5 h-3.5" /> {t("trainer_dashboard.retry")}</button>
             </div>
-            <div className="text-[11px] text-[#64748B]">4 of 5 sessions completed</div>
-          </div>
+          )}
 
-          {/* Card 3: Pending Code Reviews */}
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-2">
-            <div className="text-xs text-[#64748B] font-medium">Pending Code Reviews</div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-[#0F1F3A]">17</span>
-              <span className="text-xs font-bold text-[#D93636]">6 older than 2 days</span>
-            </div>
-            <div className="text-[11px] text-[#64748B]">Pull requests from Team Phoenix</div>
-          </div>
-
-          {/* Card 4: At-Risk Students */}
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-2">
-            <div className="text-xs text-[#64748B] font-medium">At-Risk Students</div>
-            <div className="text-3xl font-black text-[#D93636]">12</div>
-            <div className="text-[11px] text-[#64748B]">Parents notified: 9</div>
-          </div>
-        </div>
-
-        {/* ROW 2: Batch Readiness Bar Chart + Today's Schedule (PDF 8) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Chart */}
-          <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-              <h3 className="font-bold text-xs text-[#0F1F3A]">Batch readiness score</h3>
-              <span className="text-[11px] text-[#64748B]">Average · this semester</span>
-            </div>
-            <div className="h-56 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={readinessData}>
-                  <XAxis dataKey="batch" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="score" radius={[6, 6, 0, 0]}>
-                    {readinessData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.score >= 75 ? "#2BB3A0" : "#2B5CD0"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center justify-center gap-4 text-[11px] text-[#64748B] pt-1">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2BB3A0]" /> 75+ Placement Ready</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2B5CD0]" /> Below 75</span>
-            </div>
-          </div>
-
-          {/* Today's Schedule */}
-          <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-              <h3 className="font-bold text-xs text-[#0F1F3A]">Today's schedule</h3>
-              <span className="text-[11px] text-[#64748B] font-semibold">Thu, Oct 9</span>
-            </div>
-            <div className="space-y-2.5">
-              {todaySchedule.map((item) => (
-                <div
-                  key={item.time}
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-16 text-xs font-bold text-[#0F1F3A]">{item.time}</span>
-                    <div>
-                      <div className="text-xs font-bold text-[#0F1F3A]">{item.topic}</div>
-                      <div className="text-[10px] text-[#64748B]">{item.batch}</div>
-                    </div>
-                  </div>
-                  {item.status === "Next" ? (
-                    <Link
-                      href="/live/sess_thu_rag"
-                      className="px-3 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white text-xs font-bold rounded-lg shadow-sm"
-                    >
-                      Enter Room
-                    </Link>
+          {!loading && !error && data && (
+            <>
+              {/* Row 1 KPI cards (PDF 8) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="trainer-kpis">
+                <div className={card}>
+                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.active_batches")}</div>
+                  <div className="text-3xl font-black text-[#0F1F3A]">{data.kpis.active_batches.value}</div>
+                  <div className="text-[11px] text-[#64748B]">{fill(t(data.kpis.active_batches.colleges === 1 ? "trainer_dashboard.students_colleges" : "trainer_dashboard.students_colleges_plural"), { s: data.kpis.active_batches.students, c: data.kpis.active_batches.colleges })}</div>
+                </div>
+                <div className={card}>
+                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.today_attendance")}</div>
+                  {data.kpis.today_attendance.value === null ? (
+                    <div className="text-sm text-[#64748B] py-2">{t("trainer_dashboard.no_attendance")}</div>
                   ) : (
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${item.statusColor}`}>
-                      {item.status}
-                    </span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-[#0F1F3A]">{data.kpis.today_attendance.value}%</span>
+                      {data.kpis.today_attendance.delta_vs_last_week !== null && (
+                        <span className={`text-xs font-bold ${data.kpis.today_attendance.delta_vs_last_week >= 0 ? "text-[#15803D]" : "text-[#D93636]"}`}>
+                          {data.kpis.today_attendance.delta_vs_last_week >= 0 ? "▲" : "▼"} {Math.abs(data.kpis.today_attendance.delta_vs_last_week)}% {t("trainer_dashboard.vs_last_week")}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-[#64748B]">{fill(t("trainer_dashboard.sessions_today"), { n: data.kpis.today_attendance.sessions })} · {data.kpis.today_attendance.day}</div>
+                </div>
+                <div className={card}>
+                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.pending_reviews")}</div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-[#0F1F3A]">{data.kpis.pending_code_reviews.value}</span>
+                    {data.kpis.pending_code_reviews.older_than_2_days > 0 ? (
+                      <span className="text-xs font-bold text-[#D93636]">{fill(t("trainer_dashboard.older_than"), { n: data.kpis.pending_code_reviews.older_than_2_days })}</span>
+                    ) : (
+                      <span className="text-xs font-bold text-[#15803D]">{t("trainer_dashboard.queue_clear")}</span>
+                    )}
+                  </div>
+                  <Link href="/trainer/reviews" className="text-[11px] text-[#2B5CD0] font-semibold hover:underline">{t("trainer_dashboard.review_prs")} →</Link>
+                </div>
+                <div className={card}>
+                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.at_risk")}</div>
+                  <div className="text-3xl font-black text-[#D93636]">{data.kpis.at_risk_students.value}</div>
+                  <div className="text-[11px] text-[#64748B]">{fill(t("trainer_dashboard.parents_notified"), { n: data.kpis.at_risk_students.parents_notified })}</div>
+                </div>
+              </div>
+
+              {/* Row 2 chart + schedule */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
+                    <h3 className="font-bold text-xs text-[#0F1F3A]">{t("trainer_dashboard.batch_readiness")}</h3>
+                    <span className="text-[11px] text-[#64748B]">{t("trainer_dashboard.average_semester")}</span>
+                  </div>
+                  <div className="h-56 w-full pt-2" data-testid="batch-readiness-chart">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data.batch_readiness}>
+                        <XAxis dataKey="batch" tick={{ fontSize: 11 }} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Bar dataKey="score" radius={[6, 6, 0, 0]} label={{ position: "top", fontSize: 11, fill: "#0F1F3A" }}>
+                          {data.batch_readiness.map((entry) => <Cell key={entry.batch_id} fill={entry.score >= 75 ? "#2BB3A0" : "#2B5CD0"} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-[11px] text-[#64748B] pt-1">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2BB3A0]" /> {t("trainer_dashboard.legend_ready")}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2B5CD0]" /> {t("trainer_dashboard.legend_below")}</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
+                    <h3 className="font-bold text-xs text-[#0F1F3A]">{data.today_schedule.is_today ? t("trainer_dashboard.today_schedule") : t("trainer_dashboard.next_day_schedule")}</h3>
+                    <span className="text-[11px] text-[#64748B] font-semibold">{data.today_schedule.label}</span>
+                  </div>
+                  {data.today_schedule.items.length === 0 ? (
+                    <p className="text-xs text-[#64748B] py-6 text-center">{t("trainer_dashboard.no_schedule")}</p>
+                  ) : (
+                    <div className="space-y-2.5" data-testid="today-schedule">
+                      {data.today_schedule.items.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="w-16 text-xs font-bold text-[#0F1F3A] flex-shrink-0">{item.time}</span>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-[#0F1F3A] truncate">{item.topic}</div>
+                              <div className="text-[10px] text-[#64748B]">{item.batch}</div>
+                            </div>
+                          </div>
+                          {item.can_enter ? (
+                            <Link href={item.room} className="px-3 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white text-xs font-bold rounded-lg shadow-sm flex-shrink-0">{t("trainer_dashboard.enter_room")}</Link>
+                          ) : (
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${statusChip[item.status] || "bg-slate-100 text-slate-600"}`}>{item.status_label}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ROW 3: Weekly DSA Curriculum & Coding Lab Widget (Screen 24 Integration) */}
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4" data-testid="trainer-dsa-widget">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Code2 className="w-5 h-5 text-[#2B5CD0]" />
-                <h3 className="font-bold text-sm text-[#0F1F3A]">Weekly DSA Curriculum · Coding Lab</h3>
-                <span className="chip-purple text-[10px]">Trainer: Arun Kumar</span>
               </div>
-              <p className="text-xs text-[#64748B] mt-0.5">
-                20 Structured Problems across Weeks 1-8 · Solved on weekly basis by placement students
-              </p>
-            </div>
 
-            {/* Filter by Week */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-[#64748B] font-medium flex items-center gap-1">
-                <Filter className="w-3.5 h-3.5" /> Week:
-              </span>
-              <select
-                value={selectedWeek}
-                onChange={(e) => setSelectedWeek(e.target.value)}
-                className="bg-[#F8FAFC] border border-[#CBD5E1] text-xs font-semibold text-[#0F1F3A] rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer"
-              >
-                <option value="All">All Weeks (1-8)</option>
-                <option value="1">Week 1 (Arrays & Pointers)</option>
-                <option value="2">Week 2 (Sliding Window)</option>
-                <option value="3">Week 3 (Stacks & Queues)</option>
-                <option value="4">Week 4 (Linked Lists)</option>
-                <option value="5">Week 5 (Binary Search)</option>
-                <option value="6">Week 6 (Trees & BST)</option>
-                <option value="7">Week 7 (Dynamic Programming)</option>
-                <option value="8">Week 8 (Graphs & DSU)</option>
-              </select>
-            </div>
-          </div>
+              {/* Row 3 weekly DSA widget (Screen 24 integration) */}
+              <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4" data-testid="trainer-dsa-widget">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
+                  <div className="flex items-center gap-2">
+                    <Code2 className="w-5 h-5 text-[#2B5CD0]" />
+                    <h3 className="font-bold text-sm text-[#0F1F3A]">{t("trainer_dashboard.dsa_widget")}</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[#64748B] font-medium flex items-center gap-1"><Filter className="w-3.5 h-3.5" /> Week:</span>
+                    <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="bg-[#F8FAFC] border border-[#CBD5E1] text-xs font-semibold text-[#0F1F3A] rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer" aria-label="Week">
+                      <option value="All">All Weeks (1-8)</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => <option key={w} value={String(w)}>Week {w}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
+                      <th className="pb-2.5 font-semibold">Problem</th><th className="pb-2.5 font-semibold">Schedule</th><th className="pb-2.5 font-semibold">Topic</th>
+                      <th className="pb-2.5 font-semibold">Difficulty</th><th className="pb-2.5 font-semibold text-center">Submissions</th><th className="pb-2.5 font-semibold text-center">Solved %</th><th className="pb-2.5 font-semibold text-right"></th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-[#E2E8F0]">
+                      {loadingProblems ? (
+                        <tr><td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">…</td></tr>
+                      ) : filteredProblems.length === 0 ? (
+                        <tr><td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">No problems for this week.</td></tr>
+                      ) : filteredProblems.map((prob) => (
+                        <tr key={prob.id} className="hover:bg-[#F8FAFC]">
+                          <td className="py-2.5 font-bold text-[#0F1F3A]">{prob.title}</td>
+                          <td className="py-2.5 text-[#64748B]">{prob.week_info}</td>
+                          <td className="py-2.5"><span className="chip-blue text-[10px]">{prob.topic}</span></td>
+                          <td className="py-2.5"><span className={prob.difficulty === "Easy" ? "chip-green text-[10px]" : prob.difficulty === "Medium" ? "chip-amber text-[10px]" : "chip-red text-[10px]"}>{prob.difficulty}</span></td>
+                          <td className="py-2.5 text-center font-mono text-[#0F1F3A]">{prob.total_submissions}</td>
+                          <td className="py-2.5 text-center font-bold text-[#15803D] text-[11px]">{prob.solved_percentage}%</td>
+                          <td className="py-2.5 text-right"><Link href={`/student/coding/${prob.id}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-[11px] rounded-lg"><span>Open</span><ExternalLink className="w-2.5 h-2.5" /></Link></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          {/* Table of DSA Problems */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
-                  <th className="pb-2.5 font-semibold">Problem Title</th>
-                  <th className="pb-2.5 font-semibold">Curriculum Schedule</th>
-                  <th className="pb-2.5 font-semibold">Topic</th>
-                  <th className="pb-2.5 font-semibold">Difficulty</th>
-                  <th className="pb-2.5 font-semibold text-center">Submissions</th>
-                  <th className="pb-2.5 font-semibold text-center">Solved %</th>
-                  <th className="pb-2.5 font-semibold text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {loadingProblems ? (
-                  <tr>
-                    <td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">
-                      Loading weekly curriculum problems...
-                    </td>
-                  </tr>
-                ) : filteredProblems.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">
-                      No problems found for Week {selectedWeek}.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredProblems.map((prob) => (
-                    <tr key={prob.id} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="py-2.5 font-bold text-[#0F1F3A]">
-                        {prob.title}
-                      </td>
-                      <td className="py-2.5 text-[#64748B] font-medium">
-                        {prob.week_info}
-                      </td>
-                      <td className="py-2.5">
-                        <span className="chip-blue text-[10px]">{prob.topic}</span>
-                      </td>
-                      <td className="py-2.5">
-                        <span className={
-                          prob.difficulty === "Easy"
-                            ? "chip-green text-[10px]"
-                            : prob.difficulty === "Medium"
-                              ? "chip-amber text-[10px]"
-                              : "chip-red text-[10px]"
-                        }>
-                          {prob.difficulty}
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-center font-mono text-[#0F1F3A]">
-                        {prob.total_submissions}
-                      </td>
-                      <td className="py-2.5 text-center">
-                        <span className="font-bold text-[#15803D] text-[11px]">
-                          {prob.solved_percentage}%
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <Link
-                          href={`/student/coding/${prob.id}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-[11px] rounded-lg shadow-sm transition-all"
-                        >
-                          <span>Solve</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+              {/* Row 4 support table + quick actions */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
+                    <h3 className="font-bold text-xs text-[#0F1F3A]">{t("trainer_dashboard.needing_support")}</h3>
+                    <span className="text-[11px] text-[#D93636] font-semibold">{fill(t("trainer_dashboard.score_below"), { n: data.thresholds.score_below })}</span>
+                  </div>
+                  {data.students_needing_support.length === 0 ? (
+                    <p className="text-xs text-[#64748B] py-6 text-center">{t("trainer_dashboard.no_support")}</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left" data-testid="support-table">
+                        <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
+                          <th className="pb-2 font-semibold">{t("trainer_dashboard.student")}</th><th className="pb-2 font-semibold">{t("trainer_dashboard.batch")}</th>
+                          <th className="pb-2 font-semibold">{t("trainer_dashboard.score")}</th><th className="pb-2 font-semibold">{t("trainer_dashboard.issue")}</th>
+                          <th className="pb-2 font-semibold text-right">{t("trainer_dashboard.action")}</th>
+                        </tr></thead>
+                        <tbody className="divide-y divide-[#E2E8F0]">
+                          {data.students_needing_support.map((st) => (
+                            <tr key={st.flag_id} className="hover:bg-[#F8FAFC]">
+                              <td className="py-2.5 font-bold text-[#0F1F3A]">{st.name}{st.parent_notified && <span className="ml-1.5 text-[9px] text-[#15803D] font-semibold" title={t("trainer_dashboard.notified")}>✓</span>}</td>
+                              <td className="py-2.5 text-[#64748B]">{st.batch}</td>
+                              <td className="py-2.5"><span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 font-bold text-[11px]">{st.score}</span></td>
+                              <td className="py-2.5 text-[#64748B]">{st.issue}</td>
+                              <td className="py-2.5 text-right whitespace-nowrap">
+                                <button type="button" disabled={acting === st.flag_id} onClick={() => runAction(st)} className={`${actionChip[st.action] || "chip-blue"} cursor-pointer disabled:opacity-50`} data-testid="support-action">{st.action_label}</button>
+                                <button type="button" onClick={() => { setResolving(st); setResolveNote(""); }} className="ml-1.5 text-[10px] text-[#64748B] hover:text-[#0F1F3A] underline" aria-label={`${t("trainer_dashboard.resolve")} ${st.name}`}>{t("trainer_dashboard.resolve")}</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
+                  <h3 className="font-bold text-xs text-[#0F1F3A] border-b border-[#E2E8F0] pb-2">{t("trainer_dashboard.quick_actions")}</h3>
+                  <div className="grid grid-cols-2 gap-2.5 pt-1" data-testid="quick-actions">
+                    {data.quick_actions.map((qa) => (
+                      <Link key={qa.key} href={qa.href} className={`py-2.5 px-3 text-center font-bold text-xs rounded-xl transition-all ${qa.variant === "blue" ? "bg-[#2B5CD0] hover:bg-[#1E46B0] text-white shadow" : qa.variant === "teal" ? "bg-[#2BB3A0] hover:bg-[#249B8A] text-white shadow" : "border border-[#CBD5E1] hover:bg-[#F8FAFC] text-[#0F1F3A]"}`}>
+                        {quickLabel(qa.key)}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* ROW 4: Students Needing Support + Quick Actions (PDF 8) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Table (2 cols) */}
-          <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-              <h3 className="font-bold text-xs text-[#0F1F3A]">Students needing support</h3>
-              <span className="text-[11px] text-[#D93636] font-semibold">Score below 60</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
-                    <th className="pb-2 font-semibold">Student</th>
-                    <th className="pb-2 font-semibold">Batch</th>
-                    <th className="pb-2 font-semibold">Score</th>
-                    <th className="pb-2 font-semibold">Issue</th>
-                    <th className="pb-2 font-semibold text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#E2E8F0]">
-                  {studentsNeedingSupport.map((st) => (
-                    <tr key={st.name} className="hover:bg-[#F8FAFC]">
-                      <td className="py-2.5 font-bold text-[#0F1F3A]">{st.name}</td>
-                      <td className="py-2.5 text-[#64748B]">{st.batch}</td>
-                      <td className="py-2.5">
-                        <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 font-bold text-[11px]">
-                          {st.score}
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-[#64748B]">{st.issue}</td>
-                      <td className="py-2.5 text-right">
-                        <span className={`${st.actionClass} cursor-pointer`}>{st.action}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {toast && (
+          <div role="status" className="fixed bottom-6 right-6 z-50 bg-[#0F1F3A] text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2" data-testid="toast">
+            <CheckCircle2 className="w-4 h-4 text-[#2BB3A0]" /> {toast}
           </div>
+        )}
 
-          {/* Quick Actions (1 col) */}
-          <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3 flex flex-col justify-between">
-            <div>
-              <h3 className="font-bold text-xs text-[#0F1F3A] border-b border-[#E2E8F0] pb-2">Quick actions</h3>
-              <div className="grid grid-cols-2 gap-2.5 pt-3">
-                <button className="py-2.5 px-3 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-xs rounded-xl shadow cursor-pointer">
-                  Mark attendance
-                </button>
-                <button className="py-2.5 px-3 border border-[#CBD5E1] hover:bg-[#F8FAFC] text-[#0F1F3A] font-bold text-xs rounded-xl cursor-pointer">
-                  Create test
-                </button>
-                <button className="py-2.5 px-3 border border-[#CBD5E1] hover:bg-[#F8FAFC] text-[#0F1F3A] font-bold text-xs rounded-xl cursor-pointer">
-                  Review PRs
-                </button>
-                <button className="py-2.5 px-3 border border-[#CBD5E1] hover:bg-[#F8FAFC] text-[#0F1F3A] font-bold text-xs rounded-xl cursor-pointer">
-                  Send parent update
-                </button>
-                <button className="py-2.5 px-3 border border-[#CBD5E1] hover:bg-[#F8FAFC] text-[#0F1F3A] font-bold text-xs rounded-xl cursor-pointer">
-                  Schedule mock
-                </button>
-                <button className="py-2.5 px-3 bg-[#2BB3A0] hover:bg-[#249B8A] text-white font-bold text-xs rounded-xl shadow cursor-pointer">
-                  Monthly report
-                </button>
+        {resolving && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-[#E2E8F0]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-[#0F1F3A]">{t("trainer_dashboard.resolve")} · {resolving.name}</h3>
+                <button onClick={() => setResolving(null)} className="p-1.5 rounded-lg hover:bg-[#F1F5F9]" aria-label={t("trainer_dashboard.cancel")}><X className="w-4 h-4 text-[#64748B]" /></button>
+              </div>
+              <label className="block text-xs font-bold text-[#0F1F3A]">{t("trainer_dashboard.resolve_note")}
+                <textarea value={resolveNote} onChange={(e) => setResolveNote(e.target.value)} rows={3} className="mt-1 w-full px-3 py-2 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-xs font-normal focus:outline-none focus:border-[#2B5CD0]" data-testid="resolve-note" />
+              </label>
+              <div className="flex gap-2">
+                <button onClick={() => setResolving(null)} className="flex-1 py-2 bg-[#F1F5F9] text-[#0F1F3A] font-bold text-xs rounded-xl">{t("trainer_dashboard.cancel")}</button>
+                <button onClick={submitResolve} disabled={!resolveNote.trim()} className="flex-1 py-2 bg-[#2BB3A0] text-white font-bold text-xs rounded-xl disabled:opacity-50">{t("trainer_dashboard.resolve_confirm")}</button>
               </div>
             </div>
-            <div className="text-[11px] text-[#64748B] pt-2 text-center">
-              Next batch review scheduled for Monday
-            </div>
           </div>
-        </div>
-
-      </div>
-    </AppShell>
+        )}
+      </AppShell>
+    </RoleGuard>
   );
-}
-
-function getFallbackProblems(): CodingProblemSummary[] {
-  return [
-    { id: "prob_connected_components", slug: "connected-components", title: "Number of Connected Components in an Undirected Graph", difficulty: "Medium", topic: "Union-Find", week_info: "Week 8 · Pattern drill · 3 of 6 solved", total_submissions: 18, accepted_submissions: 16, solved_percentage: 88 },
-    { id: "prob_two_sum", slug: "two-sum", title: "Two Sum", difficulty: "Easy", topic: "Arrays & Hash Map", week_info: "Week 1 · Foundation · 1 of 3", total_submissions: 42, accepted_submissions: 38, solved_percentage: 90 },
-    { id: "prob_container_water", slug: "container-with-most-water", title: "Container With Most Water", difficulty: "Medium", topic: "Two Pointers", week_info: "Week 1 · Pattern drill · 2 of 3", total_submissions: 35, accepted_submissions: 28, solved_percentage: 80 },
-    { id: "prob_3sum", slug: "3sum", title: "3Sum", difficulty: "Medium", topic: "Two Pointers", week_info: "Week 1 · Advanced drill · 3 of 3", total_submissions: 29, accepted_submissions: 21, solved_percentage: 72 },
-    { id: "prob_longest_substring", slug: "longest-substring", title: "Longest Substring Without Repeating Characters", difficulty: "Medium", topic: "Sliding Window", week_info: "Week 2 · Pattern drill · 1 of 2", total_submissions: 31, accepted_submissions: 25, solved_percentage: 81 },
-    { id: "prob_valid_parentheses", slug: "valid-parentheses", title: "Valid Parentheses", difficulty: "Easy", topic: "Stack", week_info: "Week 3 · Foundation · 1 of 3", total_submissions: 45, accepted_submissions: 42, solved_percentage: 93 },
-    { id: "prob_climbing_stairs", slug: "climbing-stairs", title: "Climbing Stairs", difficulty: "Easy", topic: "Dynamic Programming", week_info: "Week 7 · Foundation · 1 of 3", total_submissions: 38, accepted_submissions: 35, solved_percentage: 92 },
-    { id: "prob_course_schedule", slug: "course-schedule", title: "Course Schedule", difficulty: "Medium", topic: "Graph Topological Sort", week_info: "Week 8 · Advanced drill · 2 of 2", total_submissions: 22, accepted_submissions: 17, solved_percentage: 77 }
-  ];
 }

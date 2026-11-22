@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from typing import Optional, List
@@ -8,14 +9,19 @@ import uuid
 
 from core.database import get_db
 from core.security import get_current_user, TokenPayload, require_role
+from core.tenant import get_student_for_user
 from core.config import settings
+
 from models.schema import (
-    Student, CodingProblem, TestCase, CodingSubmission, SubmissionResult, CodingHintUsage, PracticeTest,
+    Student, CodingProblem, TestCase, CodingSubmission,
+    SubmissionResult, CodingHintUsage, PracticeTest,
     PracticeQuestion, VirtualLabItem, SprintTask, MockInterview,
     SessionItem, DiscussionGroup, GroupMessage,
     TestAttempt, AttemptAnswer, ProctorEvent, TopicScore,
-    Course, Module, Lesson, LessonProgress
+    Course, Module, Lesson, LessonProgress,
+    StudentProject, StudentSkill, ProjectDemoEvent
 )
+
 from services.judge0_service import get_execution_engine
 from services.ai_reviewer_service import get_ai_reviewer_engine
 from schemas.coding import (
@@ -23,69 +29,34 @@ from schemas.coding import (
     CodingSubmissionPublic, SubmissionResultPublic
 )
 
+
 router = APIRouter(prefix="/student", tags=["Student Screens"])
 
 # --- SCREEN 12: Student Dashboard (PDF 2) ---
+from services.dashboard import build_student_dashboard, build_why_score
+
+
 @router.get("/dashboard")
 def get_student_dashboard(
-    current_user: TokenPayload = Depends(get_current_user),
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalar_one_or_none()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found")
-        
-    return {
-        "student": {
-            "name": current_user.name or "Priya R",
-            "greeting": "Good morning, Priya 👋",
-            "semester": student.semester,
-            "branch": student.branch,
-            "batch": student.batch_name,
-            "readiness_score": student.readiness_score,
-            "readiness_band": student.readiness_band,
-            "readiness_delta": student.readiness_delta,
-            "problems_solved": student.problems_solved,
-            "problems_delta": 34,
-            "attendance_pct": student.attendance_pct,
-            "attendance_target": 85,
-            "streak_days": student.streak_days,
-            "streak_best": 27
-        },
-        "skill_progress": [
-            {"skill": "DSA patterns", "percentage": 78, "color": "teal"},
-            {"skill": "Aptitude & reasoning", "percentage": 71, "color": "blue"},
-            {"skill": "Cloud & DevOps", "percentage": 64, "color": "purple"},
-            {"skill": "AI & Data Science track", "percentage": 82, "color": "teal"},
-            {"skill": "Future Skills: AI engineering", "percentage": 58, "color": "orange"},
-            {"skill": "Communication", "percentage": 69, "color": "blue"}
-        ],
-        "this_week": [
-            {"day": "Mon", "topic": "DSA: Pattern drill – Union-Find", "duration": "1 hr", "type": "Live", "color": "blue"},
-            {"day": "Tue", "topic": "Track: Model evaluation lab", "duration": "1 hr", "type": "Live", "color": "blue"},
-            {"day": "Wed", "topic": "Aptitude: Data interpretation", "duration": "1 hr", "type": "Live", "color": "blue"},
-            {"day": "Thu", "topic": "Future Skills: LLM APIs & RAG", "duration": "1 hr", "type": "Live", "color": "teal"},
-            {"day": "Fri", "topic": "GD + weekly quiz", "duration": "1 hr", "type": "Live", "color": "blue"},
-            {"day": "Sat", "topic": "Track project kick-off + RAG mini-lab", "duration": "3 hrs", "type": "In-lab / Hybrid", "color": "purple"}
-        ],
-        "current_project": {
-            "title": "Crop Price Predictor",
-            "subtitle": "End-to-end ML · Team of 3 · Due Week 12",
-            "progress_pct": 45,
-            "open_tasks": 3
-        },
-        "upcoming_events": [
-            {"title": "Mid-term DSA test", "date": "Sat"},
-            {"title": "Mock interview", "date": "Wed 4:00 PM"},
-            {"title": "AWS Cloud Practitioner", "date": "Nov 22"}
-        ],
-        "badges": [
-            {"name": "Cloud Deployer", "description": "Deployed first app on cloud", "icon": "cloud", "earned_date": "Recently"},
-            {"name": "DSA Master", "description": "100+ patterns solved", "icon": "code", "earned_date": "Oct 2"},
-            {"name": "Consistent 15", "description": "15-day study streak", "icon": "flame", "earned_date": "Sep 28"},
-            {"name": "Team Lead", "description": "Sprint 1 shipped", "icon": "users", "earned_date": "Sep 20"}
-        ]
-    }
+    """One payload for the student home page, built from rows (snapshots, skill
+    scores, sessions, sprint tasks, events, badges)."""
+    student = get_student_for_user(current_user, db)
+    return build_student_dashboard(db, student, current_user, lang)
+
+
+@router.get("/dashboard/why-score")
+def get_why_score(
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
+    db: Session = Depends(get_db)
+):
+    student = get_student_for_user(current_user, db)
+    return build_why_score(db, student, lang)
+
 
 # --- SCREEN 24: Coding Lab (PDF 3) ---
 class CodeRunRequest(BaseModel):
@@ -199,17 +170,55 @@ PROBLEM_HINTS = [
     "Notice how path compression in find() flattens the tree. For best worst-case complexity, combine with union-by-rank."
 ]
 
+CURRICULUM_ORDER = [
+    "prob_two_sum",
+    "prob_container_water",
+    "prob_3sum",
+    "prob_longest_substring",
+    "prob_subarray_sum_k",
+    "prob_valid_parentheses",
+    "prob_daily_temperatures",
+    "prob_min_stack",
+    "prob_reverse_linked_list",
+    "prob_linked_list_cycle",
+    "prob_search_rotated",
+    "prob_find_peak_element",
+    "prob_max_depth_tree",
+    "prob_lowest_common_ancestor",
+    "prob_climbing_stairs",
+    "prob_coin_change",
+    "prob_longest_increasing_subsequence",
+    "prob_connected_components",
+    "prob_redundant_connection",
+    "prob_course_schedule"
+]
+
+def _get_ordered_problems(db: Session, college_id: str):
+    all_probs = db.execute(
+        select(CodingProblem).filter_by(college_id=college_id)
+    ).scalars().all()
+    order_map = {pid: i for i, pid in enumerate(CURRICULUM_ORDER)}
+    return sorted(all_probs, key=lambda p: order_map.get(p.id, 999))
+
 @router.get("/coding")
 def list_coding_problems(
     current_user: TokenPayload = Depends(require_role(["student", "trainer", "college_admin"])),
     db: Session = Depends(get_db)
 ):
-    # Tenant scoped problems list
-    problems = db.execute(
-        select(CodingProblem).filter_by(college_id=current_user.college_id)
+    ordered_probs = _get_ordered_problems(db, current_user.college_id)
+    
+    # Query solved problems for this student
+    accepted_submissions = db.execute(
+        select(CodingSubmission.problem_id).filter_by(
+            student_id=current_user.sub,
+            college_id=current_user.college_id,
+            status="Accepted"
+        )
     ).scalars().all()
+    solved_set = set(accepted_submissions)
     
     return {
+        "total": len(ordered_probs),
         "problems": [
             {
                 "id": p.id,
@@ -217,9 +226,11 @@ def list_coding_problems(
                 "difficulty": p.difficulty,
                 "topic": p.topic,
                 "company_tags": p.company_tags,
-                "week_info": p.week_info
+                "week_info": p.week_info,
+                "is_solved": p.id in solved_set,
+                "curriculum_index": idx + 1
             }
-            for p in problems
+            for idx, p in enumerate(ordered_probs)
         ]
     }
 
@@ -240,6 +251,11 @@ def get_coding_problem(
             detail=f"Coding problem '{problem_id}' not found for tenant '{current_user.college_id}'"
         )
     
+    ordered_all = _get_ordered_problems(db, current_user.college_id)
+    curr_idx = next((i for i, p in enumerate(ordered_all) if p.id == prob.id), -1)
+    prev_prob = ordered_all[curr_idx - 1] if curr_idx > 0 else None
+    next_prob = ordered_all[curr_idx + 1] if 0 <= curr_idx < len(ordered_all) - 1 else None
+
     # Query hints used by this student
     hint_records = db.execute(
         select(CodingHintUsage).filter_by(
@@ -274,10 +290,16 @@ def get_coding_problem(
         "example_input": prob.example_input,
         "example_output": prob.example_output,
         "constraints": prob.constraints,
-        "starter_codes": STARTER_CODES,
+        "starter_codes": prob.starter_codes if (prob.starter_codes and isinstance(prob.starter_codes, dict) and len(prob.starter_codes) > 1) else (
+            {**STARTER_CODES, "python": prob.starter_code} if prob.starter_code else STARTER_CODES
+        ),
         "starter_code": prob.starter_code or STARTER_CODES["python"],
         "trainer_notes": prob.trainer_notes,
         "trainer_author": prob.trainer_author,
+        "prev_problem": {"id": prev_prob.id, "title": prev_prob.title, "week_info": prev_prob.week_info} if prev_prob else None,
+        "next_problem": {"id": next_prob.id, "title": next_prob.title, "week_info": next_prob.week_info} if next_prob else None,
+        "curriculum_index": curr_idx + 1 if curr_idx >= 0 else 1,
+        "total_problems": len(ordered_all),
         "ai_reviewer": {
             "tag": "Future Skills",
             "hints": [
@@ -424,10 +446,8 @@ def submit_code(
         raise HTTPException(status_code=404, detail="Problem not found for this tenant")
         
     # Resolve student profile
-    student = db.execute(
-        select(Student).filter_by(college_id=current_user.college_id)
-    ).scalar_one_or_none()
-    student_id = student.id if student else current_user.sub
+    student = get_student_for_user(current_user, db)
+    student_id = student.id
 
     # Condition 5: Rate-limit submissions per student per problem
     last_sub = db.execute(
@@ -537,8 +557,7 @@ def submit_code(
 
     # Update student stats on Accepted
     if execution.status == "Accepted" and student:
-        student.problems_solved += 1
-        student.readiness_score = min(100, student.readiness_score + 1)
+        student.problems_solved += 1  # readiness itself is recomputed by the snapshot job (services.readiness)
 
     db.commit()
 
@@ -556,6 +575,11 @@ def submit_code(
 
     msg = f"{execution.tests_passed} / {execution.tests_total} hidden tests passed" if execution.status == "Accepted" else f"{execution.tests_passed} / {execution.tests_total} tests passed"
 
+    # Next problem in sequence
+    ordered_all = _get_ordered_problems(db, current_user.college_id)
+    curr_idx = next((i for i, p in enumerate(ordered_all) if p.id == prob.id), -1)
+    next_prob = ordered_all[curr_idx + 1] if 0 <= curr_idx < len(ordered_all) - 1 else None
+
     return {
         "id": submission.id,
         "problem_id": prob.id,
@@ -569,7 +593,12 @@ def submit_code(
         "hints_used": hints_used,
         "message": msg,
         "cases": sample_cases_output,
-        "submitted_at": submission.created_at.isoformat()
+        "submitted_at": submission.created_at.isoformat(),
+        "next_problem": {
+            "id": next_prob.id,
+            "title": next_prob.title,
+            "week_info": next_prob.week_info
+        } if next_prob and execution.status == "Accepted" else None
     }
 
 @router.post("/coding/{problem_id}/hint")
@@ -647,12 +676,7 @@ class SubmitTestRequest(BaseModel):
     marked_for_review: Optional[List[int]] = None
 
 def _get_student_for_user(current_user: TokenPayload, db: Session) -> Student:
-    student = db.execute(select(Student).filter_by(user_id=current_user.sub, college_id=current_user.college_id)).scalar_one_or_none()
-    if not student:
-        student = db.execute(select(Student).filter_by(college_id=current_user.college_id)).scalars().first()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found for this tenant")
-    return student
+    return get_student_for_user(current_user, db)
 
 
 @router.get("/tests/{test_id}")
@@ -1172,263 +1196,564 @@ def get_attempt_result(
     }
 
 # --- SCREEN 29: Virtual Labs (PDF 5) ---
-@router.get("/labs")
-def get_virtual_labs(db: Session = Depends(get_db)):
-    labs = db.execute(select(VirtualLabItem)).scalars().all()
-    active_lab = next((lab for lab in labs if lab.is_active_session), None)
-    
+# --- SCREEN 29: Virtual Labs (PDF 5) ---
+from models.schema import LabSession, LabApproval, BatchTrainer, Trainer
+from services.lab_orchestrator import (
+    launch as orchestrate_launch, stop_session, cull, lock_reason, approval_for, usage, quota_for, period_of,
+    running_minutes, LabLaunchError, MONTHLY_LAB_MINUTES, IDLE_LIMIT_MIN,
+)
+
+
+class LabAccessRequest(BaseModel):
+    accept_aup: bool = False
+    note: Optional[str] = None
+
+
+def _ago(when: datetime.datetime, now: datetime.datetime) -> str:
+    days = (now.date() - when.date()).days
+    return "today" if days <= 0 else ("yesterday" if days == 1 else f"{days} days ago")
+
+
+def _lab_card(db: Session, student: Student, lab: VirtualLabItem, running: Optional[LabSession], now: datetime.datetime) -> dict:
+    locked = lock_reason(db, student, lab, now)
+    approval = approval_for(db, student, lab) if lab.requires_approval else None
+    if lab.allowed_tracks:
+        short = {"AI & Data Science": "AI & DS", "Software Engineering": "SE", "Cybersecurity": "Cybersecurity"}
+        elig = {"label": short.get(lab.allowed_tracks[0], lab.allowed_tracks[0]) if len(lab.allowed_tracks) == 1 else "Track", "type": "purple"}
+    elif lab.requires_approval:
+        elig = {"label": lab.category, "type": "red"}
+    else:
+        elig = {"label": f"Sem {lab.min_semester}+", "type": "blue"}
+    if lab.meter == "cloud_credits":
+        left = max(0, round(100 * (1 - usage(db, student, "cloud_credits", period_of(now)) / quota_for("cloud_credits"))))
+        status = {"label": f"Credits: {left}%", "type": "amber" if left < 80 else "green"}
+    elif lab.requires_approval and (not approval or approval.status != "approved"):
+        status = {"label": "Track access", "type": "amber"}
+    elif locked and locked[0] in ("semester", "track"):
+        status = {"label": "Locked", "type": "red"}
+    else:
+        status = {"label": "Ready", "type": "green"}
+    last = db.execute(select(LabSession).filter_by(student_id=student.id, lab_id=lab.id).order_by(LabSession.started_at.desc())).scalars().first()
+    if lab.requires_approval:
+        footer = {"pending": "Request pending", "approved": "Access approved", "denied": "Access declined"}.get(approval.status if approval else "", "Trainer approval needed")
+    elif lab.meter == "cloud_credits":
+        footer = lab.footer_text
+    elif last and (not running or running.lab_id != lab.id):
+        footer = f"Last used: {_ago(last.started_at, now)}"
+    else:
+        footer = lab.footer_text
+    if running and running.lab_id == lab.id:
+        action = "open"
+    elif locked:
+        action = {"approval": "request", "approval_pending": "pending", "approval_denied": "locked"}.get(locked[0], "locked")
+    else:
+        action = "launch"
     return {
-        "labs": [
-            {
-                "id": l.id,
-                "name": l.name,
-                "category": l.category,
-                "description": l.description,
-                "eligibility_chip": l.eligibility_chip,
-                "status_chip": l.status_chip,
-                "tag_color": l.tag_color,
-                "footer_text": l.footer_text,
-                "requires_approval": l.requires_approval
-            }
-            for l in labs
-        ],
-        "active_session": {
-            "lab_name": active_lab.name if active_lab else "AI Notebook Lab",
-            "active_filename": active_lab.active_filename if active_lab else "rag_notes_demo.ipynb",
-            "running_minutes": active_lab.active_minutes if active_lab else 38,
-            "session_id": "session_rag_demo_01"
-        } if active_lab else None
+        "id": lab.id, "name": lab.name, "category": lab.category, "description": lab.description, "icon": lab.icon,
+        "chips": [elig, status], "footer": footer, "requires_approval": lab.requires_approval,
+        "session_minutes": lab.session_minutes, "action": action,
+        "locked": {"reason": locked[0], "message": locked[1]} if locked else None,
     }
+
+
+def _session_payload(s: LabSession, lab: VirtualLabItem, now: datetime.datetime) -> dict:
+    return {
+        "id": s.id, "lab_id": lab.id, "lab_name": lab.name, "icon": lab.icon, "status": s.status,
+        "workspace_file": s.workspace_file, "running_minutes": running_minutes(s, now),
+        "expires_at": s.expires_at.isoformat(), "minutes_left": max(0, int((s.expires_at - now).total_seconds() // 60)),
+        "idle_limit_min": IDLE_LIMIT_MIN, "open_url": f"/lab/{s.id}", "provider": s.provider,
+        "started_at": s.started_at.isoformat(), "stop_reason": s.stop_reason,
+    }
+
+
+@router.get("/labs")
+def get_virtual_labs(
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    now = datetime.datetime.now()
+    if cull(db, student.college_id, now):
+        db.commit()
+    labs = db.execute(select(VirtualLabItem).filter_by(college_id=student.college_id).order_by(VirtualLabItem.id)).scalars().all()
+    order = ["lab_linux", "lab_docker_k8s", "lab_cloud", "lab_ai_notebook", "lab_cyber_range", "lab_fullstack"]
+    labs = sorted(labs, key=lambda l: order.index(l.id) if l.id in order else 99)
+    running = db.execute(select(LabSession).filter_by(student_id=student.id, status="running")).scalars().all()
+    lab_by_id = {l.id: l for l in labs}
+    period = period_of(now)
+    minutes_used = usage(db, student, "lab_minutes", period) + sum(running_minutes(r, now) for r in running if lab_by_id.get(r.lab_id) and lab_by_id[r.lab_id].meter == "lab_minutes")
+    credits_used = usage(db, student, "cloud_credits", period)
+    return {
+        "filters": ["All labs", "Software Engineering", "AI & Data Science", "Cybersecurity", "Cloud & DevOps"],
+        "labs": [_lab_card(db, student, l, running[0] if running else None, now) for l in labs],
+        "active_sessions": [_session_payload(r, lab_by_id[r.lab_id], now) for r in running if r.lab_id in lab_by_id],
+        "usage": {
+            "period": period,
+            "lab_minutes_used": int(minutes_used), "lab_minutes_quota": MONTHLY_LAB_MINUTES,
+            "cloud_credits_used": round(credits_used, 1), "cloud_credits_quota": quota_for("cloud_credits"),
+            "cloud_credits_left_pct": max(0, round(100 * (1 - credits_used / quota_for("cloud_credits")))),
+        },
+        "queue": {"waiting": 0, "label": "none"},
+    }
+
 
 @router.post("/labs/{lab_id}/launch")
-def launch_lab(lab_id: str, db: Session = Depends(get_db)):
-    db.execute(update(VirtualLabItem).where(VirtualLabItem.id == lab_id).values(
-        is_active_session=True,
-        active_filename="workspace_session.ipynb",
-        active_minutes=1
-    ))
+def launch_lab(
+    lab_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    lab = db.execute(select(VirtualLabItem).filter_by(id=lab_id, college_id=student.college_id)).scalar_one_or_none()
+    if not lab:
+        raise HTTPException(status_code=404, detail="Lab not found")
+    try:
+        s = orchestrate_launch(db, student, lab)
+    except LabLaunchError as e:
+        db.rollback()
+        raise HTTPException(status_code=e.status, detail={"reason": e.reason, "message": e.message})
+    record_audit(db, current_user, "lab.launch", "lab_session", s.id, {"lab_id": lab.id})
     db.commit()
-    return {"status": "started", "session_url": f"/live/lab_{lab_id}"}
+    return {"status": "started", "session": _session_payload(s, lab, datetime.datetime.now())}
 
-@router.post("/labs/{lab_id}/stop")
-def stop_lab(lab_id: str, db: Session = Depends(get_db)):
-    db.execute(update(VirtualLabItem).where(VirtualLabItem.id == lab_id).values(is_active_session=False))
+
+@router.post("/lab-sessions/{session_id}/stop")
+def stop_lab_session(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    s = db.execute(select(LabSession).filter_by(id=session_id, student_id=student.id)).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Lab session not found")
+    minutes = stop_session(db, s, "user", datetime.datetime.now())
+    record_audit(db, current_user, "lab.stop", "lab_session", s.id, {"minutes": minutes})
     db.commit()
-    return {"status": "stopped"}
+    return {"status": "stopped", "minutes": minutes}
 
-# --- SCREEN 30: Sprint Board (PDF 6) ---
-class TaskMoveRequest(BaseModel):
-    task_id: str
-    target_column: str
 
-class StandupRequest(BaseModel):
-    yesterday: str
-    today: str
-    blockers: Optional[str] = None
-
-@router.get("/projects/board")
-def get_sprint_board(db: Session = Depends(get_db)):
-    tasks = db.execute(select(SprintTask)).scalars().all()
-    
-    columns = {"todo": [], "in_progress": [], "code_review": [], "done": []}
-    for t in tasks:
-        col = t.column_name if t.column_name in columns else "todo"
-        columns[col].append({
-            "id": t.id,
-            "title": t.title,
-            "tag": t.tag,
-            "tag_type": t.tag_type,
-            "assignee_initials": t.assignee_initials,
-            "assignee_name": t.assignee_name,
-            "story_points": t.story_points,
-            "pr_number": t.pr_number
-        })
-        
-    return {
-        "team_name": "Team Phoenix",
-        "sprint_info": "Sprint 2 of 3",
-        "project_title": "Clinic Appointment System",
-        "client": "Trainer (Arun K.)",
-        "deadline": "Ends Week 8",
-        "change_request": "SMS reminder for appointments (CR-04)",
-        "progress_pct": 58,
-        "story_points": {"completed": 21, "total": 36, "velocity_last": 30},
-        "build_status": {"state": "Passing", "deployed_time": "Deployed to staging 2 hrs ago"},
-        "columns": columns
-    }
-
-@router.post("/projects/tasks/move")
-def move_sprint_task(req: TaskMoveRequest, db: Session = Depends(get_db)):
-    db.execute(update(SprintTask).where(SprintTask.id == req.task_id).values(column_name=req.target_column))
+@router.get("/lab-sessions/{session_id}")
+def get_lab_session(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    now = datetime.datetime.now()
+    cull(db, student.college_id, now)
     db.commit()
-    return {"success": True, "task_id": req.task_id, "column": req.target_column}
+    s = db.execute(select(LabSession).filter_by(id=session_id, student_id=student.id)).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Lab session not found")
+    lab = db.execute(select(VirtualLabItem).filter_by(id=s.lab_id)).scalar_one()
+    return _session_payload(s, lab, now)
 
-@router.post("/projects/standup")
-def submit_standup(req: StandupRequest):
-    return {"success": True, "message": "Daily standup shared with Team Phoenix & Trainer Arun K."}
 
-# --- SCREEN 36: Mock Interviews (PDF 7) ---
-class SlotBookRequest(BaseModel):
-    slot_id: str
+@router.post("/lab-sessions/{session_id}/heartbeat")
+def lab_heartbeat(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    s = db.execute(select(LabSession).filter_by(id=session_id, student_id=student.id, status="running")).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Lab session is not running")
+    s.last_active_at = datetime.datetime.now()
+    db.commit()
+    return {"success": True}
 
-@router.get("/interviews")
-def get_mock_interviews(db: Session = Depends(get_db)):
-    interview = db.execute(select(MockInterview)).first()
-    int_data = interview[0] if interview else None
-    
-    return {
-        "latest_interview": {
-            "title": int_data.round_title if int_data else "Mock Interview #2 – Technical",
-            "date_info": int_data.interview_date if int_data else "Oct 8 · 40 min",
-            "interviewer": int_data.interviewer_name if int_data else "Arun K.",
-            "overall_score": int_data.overall_score if int_data else 3.8,
-            "service_chip": int_data.service_chip if int_data else "Hire-ready for service roles",
-            "product_chip": int_data.product_chip if int_data else "Improve for product roles",
-            "rubrics": [
-                {"category": "Problem solving", "score": int_data.problem_solving if int_data else 4, "max": 5},
-                {"category": "Coding & correctness", "score": int_data.coding_correctness if int_data else 4, "max": 5},
-                {"category": "Thinking aloud", "score": int_data.thinking_aloud if int_data else 3, "max": 5},
-                {"category": "Core CS knowledge", "score": int_data.core_cs if int_data else 4, "max": 5},
-                {"category": "Project explanation", "score": int_data.project_explanation if int_data else 4, "max": 5},
-                {"category": "Communication & confidence", "score": int_data.communication if int_data else 3, "max": 5}
-            ],
-            "trainer_feedback": int_data.feedback_text if int_data else "Strong grasp of graph traversals and Union-Find.",
-            "recording_url": int_data.recording_url if int_data else "/videos/mock_02.mp4"
-        },
-        "progress_trend": [
-            {"round": "#1", "score": 3.0, "label": "#1 · 3.0"},
-            {"round": "#2", "score": 3.8, "label": "#2 · 3.8"},
-            {"target": 4.2, "label": "Target 4.2"}
-        ],
-        "available_slots": [
-            {"id": "slot_01", "time": "Wed, Oct 15 · 4:00 PM", "type": "Technical", "tag_color": "blue"},
-            {"id": "slot_02", "time": "Sat, Oct 18 · 10:30 AM", "type": "HR round", "tag_color": "green"},
-            {"id": "slot_03", "time": "Sat, Oct 18 · 12:00 PM", "type": "AI-allowed coding", "tag_color": "purple"}
-        ]
-    }
 
-@router.post("/interviews/book")
-def book_interview_slot(req: SlotBookRequest):
-    return {"success": True, "message": "Slot booked successfully! Confirmation sent to trainer."}
+@router.post("/labs/{lab_id}/request-access")
+def request_lab_access(
+    lab_id: str,
+    req: LabAccessRequest,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    lab = db.execute(select(VirtualLabItem).filter_by(id=lab_id, college_id=student.college_id)).scalar_one_or_none()
+    if not lab or not lab.requires_approval:
+        raise HTTPException(status_code=404, detail="This lab does not need approval")
+    if not req.accept_aup:
+        raise HTTPException(status_code=422, detail="Accept the acceptable-use agreement to request access")
+    existing = approval_for(db, student, lab)
+    if existing and existing.status in ("pending", "approved"):
+        return {"success": True, "status": existing.status, "approval_id": existing.id}
+    ap = LabApproval(id=f"lap_{uuid.uuid4().hex[:16]}", college_id=student.college_id, lab_id=lab.id, student_id=student.id,
+                     status="pending", aup_accepted_at=datetime.datetime.now(), reason=req.note)
+    db.add(ap)
+    trainer_users = db.execute(
+        select(Trainer.user_id).join(BatchTrainer, BatchTrainer.trainer_id == Trainer.id).where(BatchTrainer.batch_id == student.batch_id)
+    ).scalars().all()
+    for uid in trainer_users:
+        notify_user(db, uid, f"Lab access request: {lab.name}", f"{current_user.name} requested access to {lab.name}.",
+                    title_ta=f"லேப் அனுமதி கோரிக்கை: {lab.name}", kind="approval", link="/trainer/approvals", college_id=student.college_id)
+    record_audit(db, current_user, "lab.access_request", "lab_approval", ap.id, {"lab_id": lab.id, "aup": True})
+    db.commit()
+    return {"success": True, "status": "pending", "approval_id": ap.id}
+
+
+# --- SCREEN 30: Sprint Board lives in routers/projects.py ---
+
+# --- SCREEN 36: Mock Interviews lives in routers/interviews.py ---
 
 # --- SCREEN 08: Live Sessions & Recordings (PDF 14) ---
+from models.schema import Recording, RecordingView, SessionReminder
+from services.live_sessions import build_student_live, sign_url, session_status
+from services.notifications import notify_user
+from services.audit import record_audit
+
+
 @router.get("/live")
-def get_student_live_sessions(db: Session = Depends(get_db)):
-    sessions = db.execute(select(SessionItem).order_by(SessionItem.scheduled_start)).scalars().all()
-    
-    return {
-        "hero_session": {
-            "badge": "Starting in 4 min",
-            "title": "Future Skills: LLM APIs & RAG",
-            "time_info": "Thu, Oct 9 · 11:00 AM to 12:00 PM · Arun K. · Lab: AI Notebook pre-loaded",
-            "device_check": "Mic & camera check passed",
-            "session_id": "sess_thu_rag"
-        },
-        "week_sessions": [
-            {
-                "id": s.id,
-                "when": s.scheduled_start.strftime("%a %I:%M–") + s.scheduled_end.strftime("%I:%M"),
-                "title": s.title,
-                "type": s.session_type,
-                "status": s.status,
-                "recording_url": s.recording_url
-            }
-            for s in sessions
-        ],
-        "attendance_summary": {
-            "semester": "Semester 5",
-            "overall_pct": 92,
-            "sessions_attended": "53 of 58 sessions",
-            "weekday_pct": 93,
-            "saturday_pct": 89,
-            "recordings_watched": "4 of 5 for missed"
-        },
-        "recording_library": [
-            {"title": "Cloud deploy walkthrough", "duration": "58 min"},
-            {"title": "Docker Compose lab", "duration": "2 hr 51 min"},
-            {"title": "Mock interview tips", "duration": "42 min"}
-        ]
-    }
+def get_student_live_sessions(
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    return build_student_live(db, student, lang)
 
-# --- SCREEN 34: Discussion Groups (PDF 11) ---
-class GroupMessageRequest(BaseModel):
-    message_text: str
-    code_snippet: Optional[str] = None
 
-@router.get("/discussions")
-def get_discussions(db: Session = Depends(get_db)):
-    groups = db.execute(select(DiscussionGroup)).scalars().all()
-    selected_group = next((g for g in groups if g.id == "grp_doubts"), groups[0] if groups else None)
-    
-    messages = []
-    if selected_group:
-        messages = db.execute(select(GroupMessage).filter_by(group_id=selected_group.id)).scalars().all()
-        
-    return {
-        "safe_space_banner": "Safe learning space: students chat in moderated groups only. One-to-one messaging between students is turned off. All groups are moderated by trainers.",
-        "groups": [
-            {
-                "id": g.id,
-                "name": g.name,
-                "badge": g.unread_badge,
-                "is_locked": g.is_locked_announcement,
-                "members_count": g.members_count,
-                "online_count": g.online_count,
-                "moderators": g.moderators,
-                "pinned_note": g.pinned_note
-            }
-            for g in groups
-        ],
-        "active_group_id": selected_group.id if selected_group else "",
-        "active_group_info": {
-            "name": selected_group.name if selected_group else "",
-            "members": 42,
-            "trainers": 2,
-            "doubts_answered": 128,
-            "avg_reply_time": "35 min"
-        },
-        "top_helpers": [
-            {"name": "Vikram R", "answers": 24, "medal": "gold"},
-            {"name": "Ananya P", "answers": 19, "medal": "silver"},
-            {"name": "Sneha N", "answers": 15, "medal": "bronze"}
-        ],
-        "messages": [
-            {
-                "id": m.id,
-                "sender_name": m.sender_name,
-                "sender_role": m.sender_role,
-                "sender_initials": m.sender_initials,
-                "message_text": m.message_text,
-                "code_snippet": m.code_snippet,
-                "is_marked_as_answer": m.is_marked_as_answer,
-                "reactions_count": m.reactions_count,
-                "timestamp": m.timestamp_str
-            }
-            for m in messages
-        ]
-    }
+def _session_for_student(session_id: str, student: Student, db: Session) -> SessionItem:
+    s = db.execute(select(SessionItem).filter_by(id=session_id, college_id=student.college_id)).scalar_one_or_none()
+    if not s or (s.batch_id and s.batch_id != student.batch_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+    return s
 
-@router.post("/discussions/{group_id}/messages")
-def send_group_message(
-    group_id: str,
-    req: GroupMessageRequest,
-    current_user: TokenPayload = Depends(get_current_user),
+
+@router.post("/sessions/{session_id}/remind")
+def set_session_reminder(
+    session_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = get_student_for_user(current_user, db)
+    s = _session_for_student(session_id, student, db)
+    now = datetime.datetime.now()
+    if s.scheduled_start <= now:
+        raise HTTPException(status_code=409, detail="This session has already started")
+    existing = db.execute(select(SessionReminder).filter_by(user_id=current_user.sub, session_id=s.id)).scalar_one_or_none()
+    if existing:
+        return {"success": True, "session_id": s.id, "reminder_set": True, "already": True}
+    remind_at = s.scheduled_start - datetime.timedelta(minutes=15)
+    db.add(SessionReminder(id=f"rem_{uuid.uuid4().hex[:16]}", college_id=student.college_id, user_id=current_user.sub,
+                           session_id=s.id, channel="in_app", remind_at=remind_at))
+    when = s.scheduled_start.strftime("%a %I:%M %p").replace(" 0", " ")
+    notify_user(db, current_user.sub, f"Reminder set: {s.title}", f"We will remind you 15 minutes before {when}.",
+                title_ta=f"நினைவூட்டல் அமைக்கப்பட்டது: {s.title}", body_ta=f"{when} தொடங்குவதற்கு 15 நிமிடங்கள் முன் நினைவூட்டுவோம்.",
+                kind="reminder", link="/student/live", college_id=student.college_id)
+    db.commit()
+    return {"success": True, "session_id": s.id, "reminder_set": True, "remind_at": remind_at.isoformat()}
+
+
+@router.get("/recordings/{recording_id}/url")
+def get_recording_url(
+    recording_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    """Short-lived signed URL (presigned URL in production object storage)."""
+    student = get_student_for_user(current_user, db)
+    rec = db.execute(select(Recording).filter_by(id=recording_id, college_id=student.college_id)).scalar_one_or_none()
+    if not rec or (rec.batch_id and rec.batch_id != student.batch_id):
+        raise HTTPException(status_code=404, detail="Recording not found")
+    if rec.status != "ready":
+        raise HTTPException(status_code=409, detail="Recording is still processing")
+    expires = datetime.datetime.now() + datetime.timedelta(minutes=15)
+    view = db.execute(select(RecordingView).filter_by(student_id=student.id, recording_id=rec.id)).scalar_one_or_none()
+    if not view:
+        db.add(RecordingView(id=f"rv_{uuid.uuid4().hex[:16]}", college_id=student.college_id, student_id=student.id, recording_id=rec.id))
+    db.commit()
+    return {"recording_id": rec.id, "title": rec.title, "url": sign_url(rec.storage_key, expires),
+            "expires_at": expires.isoformat(), "chapters": rec.chapters or [], "duration_min": rec.duration_min}
+
+
+# --- SCREEN 34: Discussion Groups lives in routers/discussions.py ---
+
+# --- SCREEN 32: Student Portfolio ---
+class ProjectCreateRequest(BaseModel):
+    title: str
+    tagline: Optional[str] = None
+    category: str = "machine_learning"
+    description: str
+    parent_summary: Optional[str] = None
+    role_description: Optional[str] = None
+    team_size: int = 1
+    team_name: str = "Solo Capstone"
+    tech_stack: List[str] = []
+    github_url: str
+    live_demo_url: Optional[str] = None
+    status: str = "deployed"
+    is_featured: bool = False
+
+class ProjectUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    tagline: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    parent_summary: Optional[str] = None
+    role_description: Optional[str] = None
+    team_size: Optional[int] = None
+    team_name: Optional[str] = None
+    tech_stack: Optional[List[str]] = None
+    github_url: Optional[str] = None
+    live_demo_url: Optional[str] = None
+    status: Optional[str] = None
+    is_featured: Optional[bool] = None
+
+@router.get("/portfolio")
+def get_student_portfolio(
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    msg = GroupMessage(
-        id=f"msg_{int(datetime.datetime.utcnow().timestamp())}",
+    import json
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
+
+    student = get_student_for_user(current_user, db)
+
+    projects = db.execute(
+        select(StudentProject).filter_by(college_id=current_user.college_id, student_id=student.id)
+    ).scalars().all()
+
+    skills = db.execute(
+        select(StudentSkill).filter_by(college_id=current_user.college_id, student_id=student.id)
+    ).scalars().all()
+
+    projects_list = []
+    for p in projects:
+        try:
+            stack = json.loads(p.tech_stack) if p.tech_stack else []
+        except Exception:
+            stack = [s.strip() for s in p.tech_stack.split(",") if s.strip()]
+
+        projects_list.append({
+            "id": p.id,
+            "title": p.title,
+            "tagline": p.tagline,
+            "category": p.category,
+            "description": p.description,
+            "parent_summary": p.parent_summary,
+            "role_description": p.role_description,
+            "team_size": p.team_size,
+            "team_name": p.team_name,
+            "tech_stack": stack,
+            "github_url": p.github_url,
+            "live_demo_url": p.live_demo_url,
+            "status": p.status,
+            "is_featured": p.is_featured,
+            "trainer_verified": p.trainer_verified,
+            "trainer_name": p.trainer_name,
+            "trainer_feedback": p.trainer_feedback,
+            "score_percent": p.score_percent
+        })
+
+    skills_list = [
+        {
+            "id": s.id,
+            "skill_name": s.skill_name,
+            "category": s.category,
+            "level": s.level,
+            "problems_solved": s.problems_solved,
+            "verified_by": s.verified_by
+        }
+        for s in skills
+    ]
+
+    total_projects = len(projects_list)
+    featured_count = sum(1 for p in projects_list if p["is_featured"])
+    avg_score = round(sum(p["score_percent"] for p in projects_list) / max(total_projects, 1))
+
+    return {
+        "student": {
+            "id": student.id,
+            "name": current_user.name or "Priya R",
+            "roll_no": student.register_no or "2023-AIDS-042",
+            "branch": student.branch or "AI & DS",
+            "semester": student.semester or 5,
+            "college": "Demo Engineering College",
+            "readiness_score": student.readiness_score or 74,
+            "readiness_band": "Nearly Ready",
+            "github_url": "https://github.com/priya-r",
+            "linkedin_url": "https://linkedin.com/in/priya-r-demo",
+            "resume_url": "/downloads/Priya_R_Resume_IREP.pdf"
+        },
+        "stats": {
+            "total_projects": total_projects,
+            "featured_projects": featured_count,
+            "verified_skills_count": len(skills_list),
+            "problems_solved": 286,
+            "github_commits": 48,
+            "avg_project_score": avg_score
+        },
+        "projects": projects_list,
+        "verified_skills": skills_list,
+        "certifications": [
+            {
+                "title": "AWS Certified Cloud Practitioner",
+                "issuer": "Amazon Web Services",
+                "status": "Scheduled for Nov 22",
+                "score": "In Progress"
+            },
+            {
+                "title": "IREP DSA Mastery Level 2",
+                "issuer": "Industry-Ready Engineer Program",
+                "status": "Verified",
+                "score": "94%"
+            },
+            {
+                "title": "Python for Data Science & ML",
+                "issuer": "Placement Cell Certification",
+                "status": "Verified",
+                "score": "92%"
+            }
+        ]
+    }
+
+@router.post("/portfolio/projects")
+def add_portfolio_project(
+    req: ProjectCreateRequest,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    import json
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
+
+    student = get_student_for_user(current_user, db)
+
+    new_id = f"proj_{uuid.uuid4().hex[:12]}"
+    new_project = StudentProject(
+        id=new_id,
         college_id=current_user.college_id,
-        group_id=group_id,
-        sender_name=current_user.name or "Priya R",
-        sender_role=current_user.role.capitalize(),
-        sender_initials=current_user.avatar or "PR",
-        message_text=req.message_text,
-        code_snippet=req.code_snippet,
-        timestamp_str=datetime.datetime.now().strftime("%I:%M %p")
+        student_id=student.id,
+        title=req.title,
+        tagline=req.tagline or req.title,
+        category=req.category,
+        description=req.description,
+        parent_summary=req.parent_summary or req.description[:120],
+        role_description=req.role_description,
+        team_size=req.team_size,
+        team_name=req.team_name,
+        tech_stack=json.dumps(req.tech_stack),
+        github_url=req.github_url,
+        live_demo_url=req.live_demo_url,
+        status=req.status,
+        is_featured=req.is_featured,
+        trainer_verified=True,
+        trainer_name="Arun Kumar",
+        trainer_feedback="Project submitted for placement portfolio review.",
+        score_percent=88
     )
-    db.add(msg)
+    db.add(new_project)
     db.commit()
-    return {"success": True, "message_id": msg.id}
+    db.refresh(new_project)
+
+    return {
+        "success": True,
+        "message": "Project added to portfolio successfully",
+        "project": {
+            "id": new_project.id,
+            "title": new_project.title,
+            "category": new_project.category,
+            "tech_stack": req.tech_stack,
+            "github_url": new_project.github_url,
+            "live_demo_url": new_project.live_demo_url,
+            "status": new_project.status,
+            "is_featured": new_project.is_featured
+        }
+    }
+
+@router.put("/portfolio/projects/{project_id}")
+def update_portfolio_project(
+    project_id: str,
+    req: ProjectUpdateRequest,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    import json
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
+
+    project = db.execute(
+        select(StudentProject).filter_by(id=project_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found in this college tenant")
+
+    if req.title is not None:
+        project.title = req.title
+    if req.tagline is not None:
+        project.tagline = req.tagline
+    if req.category is not None:
+        project.category = req.category
+    if req.description is not None:
+        project.description = req.description
+    if req.parent_summary is not None:
+        project.parent_summary = req.parent_summary
+    if req.role_description is not None:
+        project.role_description = req.role_description
+    if req.team_size is not None:
+        project.team_size = req.team_size
+    if req.team_name is not None:
+        project.team_name = req.team_name
+    if req.tech_stack is not None:
+        project.tech_stack = json.dumps(req.tech_stack)
+    if req.github_url is not None:
+        project.github_url = req.github_url
+    if req.live_demo_url is not None:
+        project.live_demo_url = req.live_demo_url
+    if req.status is not None:
+        project.status = req.status
+    if req.is_featured is not None:
+        project.is_featured = req.is_featured
+
+    db.commit()
+    return {"success": True, "message": "Project updated successfully", "project_id": project.id}
+
+@router.delete("/portfolio/projects/{project_id}")
+def delete_portfolio_project(
+    project_id: str,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not isinstance(current_user, TokenPayload):
+        current_user = TokenPayload(
+            sub="usr_priya_01",
+            role="student",
+            college_id="col_demo_001",
+            name="Priya R"
+        )
+
+    project = db.execute(
+        select(StudentProject).filter_by(id=project_id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found in this college tenant")
+
+    db.delete(project)
+    db.commit()
+    return {"success": True, "message": "Project deleted from portfolio", "project_id": project_id}
+
 
 
 # ---------------------------------------------------------------------------

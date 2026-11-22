@@ -1,23 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { loginAs } from "./helpers/auth";
 
 test.describe("Screen 24 - Coding Lab (/student/coding/:problemId)", () => {
   test.beforeEach(async ({ page }) => {
     // Set student demo user in localStorage before navigating
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "irep_user",
-        JSON.stringify({
-          id: "usr_priya_01",
-          email: "priya.r@demo.edu",
-          role: "student",
-          name: "Priya R",
-          avatar: "PR",
-          college_id: "col_demo_001",
-        })
-      );
-      localStorage.setItem("irep_token", "mock_jwt_token_demo");
-      localStorage.setItem("irep_lang", "en");
-    });
+    await loginAs(page, "student");
   });
 
   test("should render 3-column layout matching PDF 3 with problem statement, editor, and AI reviewer", async ({ page }) => {
@@ -91,19 +78,7 @@ test.describe("Screen 24 - Coding Lab (/student/coding/:problemId)", () => {
 
   test("should enforce RoleGuard and block parent role", async ({ page }) => {
     // Switch role to parent
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "irep_user",
-        JSON.stringify({
-          id: "usr_ramesh_01",
-          email: "ramesh.k@example.com",
-          role: "parent",
-          name: "Mr. Ramesh K",
-          avatar: "RK",
-          college_id: "col_demo_001",
-        })
-      );
-    });
+    await loginAs(page, "parent");
 
     await page.goto("/student/coding/prob_connected_components");
 

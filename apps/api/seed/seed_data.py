@@ -10,8 +10,11 @@ from models.schema import (
     PracticeTest, PracticeQuestion, VirtualLabItem, SprintTask,
     MockInterview, DiscussionGroup, GroupMessage, TrainerDirectThread,
     DirectMessage, ParentMonthlyRecord, TestAttempt, AttemptAnswer,
+
     ProctorEvent, TopicScore,
-    Course, Module, Lesson, LessonProgress
+    Course, Module, Lesson, LessonProgress,
+    StudentProject, StudentSkill, ProjectDemoEvent,
+    PullRequest, PullRequestFile, PullRequestComment
 )
 
 def get_screen24_test_cases():
@@ -73,9 +76,412 @@ def get_screen24_test_cases():
         )
     return cases
 
+def seed_portfolio_data(db, college_id="col_demo_001"):
+    import json
+    projects_seed = [
+        StudentProject(
+            id="proj_crop_01",
+            college_id=college_id,
+            student_id="std_priya_01",
+            title="Crop Price Predictor",
+            tagline="Machine learning system for forecasting agricultural market prices using climate & mandi trade data",
+            category="machine_learning",
+            description="Built an end-to-end predictive analytics web platform that estimates wholesale crop prices across Tamil Nadu mandis. Leveraged random forests and gradient boosted regressors trained on 5 years of historical agmarknet and rainfall data to achieve 92% forecasting accuracy.",
+            parent_summary="Priya led the machine learning forecasting model for this farming tool, helping farmers predict market selling prices before harvesting.",
+            role_description="Led ML pipeline development, feature engineering on rainfall/temperature trends, and developed FastAPI prediction endpoints.",
+            team_size=3,
+            team_name="Team AgriVision",
+            tech_stack=json.dumps(["Python", "Scikit-Learn", "FastAPI", "Pandas", "Streamlit", "PostgreSQL"]),
+            github_url="https://github.com/priya-r/crop-price-predictor",
+            live_demo_url="https://crop-price-demo.demo.edu",
+            status="deployed",
+            is_featured=True,
+            trainer_verified=True,
+            trainer_name="Arun Kumar",
+            trainer_feedback="Exceptional model validation and clear modular structure. Priya demonstrated deep grasp of cross-validation and productionizing ML endpoints.",
+            score_percent=94
+        ),
+        StudentProject(
+            id="proj_clinic_02",
+            college_id=college_id,
+            student_id="std_priya_01",
+            title="Clinic Appointment & Token System",
+            tagline="Real-time multi-tenant patient scheduling and digital queue management portal",
+            category="fullstack",
+            description="Full-stack healthcare coordination system supporting doctor schedules, token generation, automated SMS reminders, and real-time waiting room monitors. Designed with atomic database transactions and role-based access control.",
+            parent_summary="Priya developed the secure patient appointment engine and doctor availability schedule.",
+            role_description="Architected the backend REST APIs, PostgreSQL schemas with ACID transactions, and Next.js patient booking UI.",
+            team_size=4,
+            team_name="Team Phoenix",
+            tech_stack=json.dumps(["React", "Next.js", "FastAPI", "PostgreSQL", "Tailwind CSS", "Docker"]),
+            github_url="https://github.com/priya-r/clinic-appointment-portal",
+            live_demo_url="https://clinic-demo.demo.edu",
+            status="in_progress",
+            is_featured=True,
+            trainer_verified=True,
+            trainer_name="Arun Kumar",
+            trainer_feedback="Clean separation of concerns between appointment scheduling and notification queues. Sprint 2 deliverables met ahead of time.",
+            score_percent=88
+        ),
+        StudentProject(
+            id="proj_irrigation_03",
+            college_id=college_id,
+            student_id="std_priya_01",
+            title="IoT Smart Irrigation Controller",
+            tagline="Automated soil moisture sensing and solar pump controller via MQTT telemetry",
+            category="iot",
+            description="Hardware and cloud monitoring rig deploying ESP32 microcontrollers with capacitive soil moisture sensors. Publishes sensor readings to an MQTT broker and triggers automated drip irrigation valves with water conservation analytics.",
+            parent_summary="Priya created the automated water sensor dashboard that helps reduce farm water usage.",
+            role_description="Wrote micro-controller telemetry firmware in C++ and built the telemetry ingestion listener in Python with real-time alerting.",
+            team_size=2,
+            team_name="Team GreenIoT",
+            tech_stack=json.dumps(["ESP32", "C++", "MQTT", "Python", "InfluxDB", "Grafana"]),
+            github_url="https://github.com/priya-r/smart-irrigation-iot",
+            live_demo_url="https://iot-irrigation-demo.demo.edu",
+            status="completed",
+            is_featured=False,
+            trainer_verified=True,
+            trainer_name="Arun Kumar",
+            trainer_feedback="Robust failover logic when network disconnects. Telemetry ingestion loop is well-optimized for low-power edge nodes.",
+            score_percent=90
+        ),
+        StudentProject(
+            id="proj_screener_04",
+            college_id=college_id,
+            student_id="std_priya_01",
+            title="AI Resume Screener & Skill Matcher",
+            tagline="Contextual vector search engine matching candidate resumes to job descriptions",
+            category="machine_learning",
+            description="Natural language processing microservice converting PDF resumes into dense vector embeddings and computing semantic cosine similarity against candidate requirements. Highlights missing skill gaps and suggests syllabus modules.",
+            parent_summary="Priya built an AI tool that scans resumes and scores job qualification matches.",
+            role_description="Implemented PDF text parsing, semantic chunking, vector embedding generation, and candidate ranking algorithms.",
+            team_size=1,
+            team_name="Solo Capstone",
+            tech_stack=json.dumps(["Python", "LangChain", "Gemini API", "ChromaDB", "FastAPI"]),
+            github_url="https://github.com/priya-r/ai-resume-screener",
+            live_demo_url="https://resume-screener-demo.demo.edu",
+            status="completed",
+            is_featured=False,
+            trainer_verified=True,
+            trainer_name="Arun Kumar",
+            trainer_feedback="Great utilization of vector embeddings and semantic search. Evaluation rubrics show strong precision across technical skill keywords.",
+            score_percent=92
+        )
+    ]
+    for p in projects_seed:
+        existing = db.execute(select(StudentProject).where(StudentProject.id == p.id)).scalars().first()
+        if not existing:
+            db.add(p)
+
+    skills_seed = [
+        StudentSkill(
+            id="skill_dsa_01",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Data Structures & Algorithms",
+            category="Core CS",
+            level="Gold",
+            problems_solved=286,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_ml_02",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Machine Learning & Scikit-Learn",
+            category="Core CS",
+            level="Advanced",
+            problems_solved=42,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_fastapi_03",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Python Backend & FastAPI",
+            category="Framework",
+            level="Proficient",
+            problems_solved=38,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_react_04",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="React & Modern Frontend",
+            category="Framework",
+            level="Proficient",
+            problems_solved=30,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_db_05",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Database Design & SQL",
+            category="Core CS",
+            level="Intermediate",
+            problems_solved=54,
+            verified_by="Arun Kumar"
+        ),
+        StudentSkill(
+            id="skill_docker_06",
+            college_id=college_id,
+            student_id="std_priya_01",
+            skill_name="Docker & Linux Systems",
+            category="Cloud",
+            level="Intermediate",
+            problems_solved=18,
+            verified_by="Arun Kumar"
+        )
+    ]
+    for s in skills_seed:
+        existing = db.execute(select(StudentSkill).where(StudentSkill.id == s.id)).scalars().first()
+        if not existing:
+            db.add(s)
+
+    event_seed = [
+        ProjectDemoEvent(
+            id="event_demo_day_nov",
+            college_id=college_id,
+            title="Project Demo Day – Capstone Showcase",
+            event_date="Sat, Nov 8 · 10:00 AM – 1:00 PM",
+            venue="Auditorium A & Live Stream",
+            description="Annual Industry-Ready Engineer Program Capstone Presentation. Parents and industry mentors are invited to watch students present live working software applications.",
+            rsvp_status="none",
+            guest_count=1
+        )
+    ]
+    for ev in event_seed:
+        existing = db.execute(select(ProjectDemoEvent).where(ProjectDemoEvent.id == ev.id)).scalars().first()
+        if not existing:
+            db.add(ev)
+
+    db.commit()
+
+def seed_reviews_data(db, college_id="col_demo_001"):
+    now = datetime.datetime.utcnow()
+    prs_seed = [
+        PullRequest(
+            id="pr_39",
+            college_id=college_id,
+            pr_number="#39",
+            title="Unit tests – booking service PR #39",
+            project_id="proj_clinic_02",
+            project_name="Clinic Appointment & Token System",
+            team_name="Team Phoenix",
+            task_id="task_08",
+            author_id="std_priya_01",
+            author_name="Priya R",
+            author_initials="PR",
+            source_branch="feat/booking-tests",
+            target_branch="main",
+            status="pending",
+            story_points=3,
+            automated_checks_passed=True,
+            automated_checks_summary="14/14 automated tests passing · Lint: 0 errors · Security: Clean",
+            diff_summary="+152 -12 across 2 files",
+            code_quality_score=5,
+            test_coverage_score=5,
+            modularity_score=4,
+            created_at=now - datetime.timedelta(hours=4)
+        ),
+        PullRequest(
+            id="pr_41",
+            college_id=college_id,
+            pr_number="#41",
+            title="JWT refresh tokens PR #41",
+            project_id="proj_clinic_02",
+            project_name="Clinic Appointment & Token System",
+            team_name="Team Phoenix",
+            task_id="task_07",
+            author_id="std_priya_01",
+            author_name="Rahul D",
+            author_initials="RD",
+            source_branch="feat/jwt-refresh",
+            target_branch="main",
+            status="pending",
+            story_points=3,
+            automated_checks_passed=True,
+            automated_checks_summary="12/12 automated tests passing · Lint: 0 errors",
+            diff_summary="+77 -13 across 2 files",
+            code_quality_score=4,
+            test_coverage_score=4,
+            modularity_score=4,
+            created_at=now - datetime.timedelta(hours=7)
+        ),
+        PullRequest(
+            id="pr_28",
+            college_id=college_id,
+            pr_number="#28",
+            title="Random forest mandi price regression model",
+            project_id="proj_crop_01",
+            project_name="Crop Price Predictor",
+            team_name="Team AgriVision",
+            task_id=None,
+            author_id="std_priya_01",
+            author_name="Priya R",
+            author_initials="PR",
+            source_branch="feat/price-regressor",
+            target_branch="main",
+            status="approved",
+            story_points=5,
+            automated_checks_passed=True,
+            automated_checks_summary="18/18 tests passing · Model cross-validation 92%",
+            diff_summary="+112 -15 across 1 file",
+            review_feedback="Exceptional model validation and clear modular structure. Priya demonstrated deep grasp of cross-validation.",
+            code_quality_score=5,
+            test_coverage_score=5,
+            modularity_score=5,
+            reviewed_by="Arun Kumar",
+            reviewed_at=now - datetime.timedelta(days=2),
+            created_at=now - datetime.timedelta(days=3)
+        ),
+        PullRequest(
+            id="pr_14",
+            college_id=college_id,
+            pr_number="#14",
+            title="SMS reminder Celery task scheduler",
+            project_id="proj_clinic_02",
+            project_name="Clinic Appointment & Token System",
+            team_name="Team Phoenix",
+            task_id="task_01",
+            author_id="std_priya_01",
+            author_name="Karthik S",
+            author_initials="KS",
+            source_branch="feat/sms-scheduler",
+            target_branch="main",
+            status="changes_requested",
+            story_points=5,
+            automated_checks_passed=False,
+            automated_checks_summary="1 test failing (mock timeout) · Lint Clean",
+            diff_summary="+55 -10 across 1 file",
+            review_feedback="Please add exponential retry backoff on SMS provider network timeouts before merging.",
+            code_quality_score=3,
+            test_coverage_score=3,
+            modularity_score=4,
+            reviewed_by="Arun Kumar",
+            reviewed_at=now - datetime.timedelta(days=1),
+            created_at=now - datetime.timedelta(days=2)
+        )
+    ]
+    for pr in prs_seed:
+        existing = db.execute(select(PullRequest).where(PullRequest.id == pr.id)).scalars().first()
+        if not existing:
+            db.add(pr)
+
+    files_seed = [
+        PullRequestFile(
+            id="prf_39_01",
+            college_id=college_id,
+            pr_id="pr_39",
+            filename="services/booking_service.py",
+            change_type="modified",
+            additions=84,
+            deletions=12,
+            diff_content="""@@ -32,12 +32,24 @@ class BookingService:
+     def cancel_booking(self, booking_id: str) -> bool:
+-        booking = self.db.query(Booking).get(booking_id)
+-        if not booking:
+-            return False
+-        self.db.delete(booking)
+-        return True
++        booking = self.db.query(Booking).filter_by(id=booking_id).first()
++        if not booking:
++            raise BookingNotFoundException(f"Booking {booking_id} does not exist")
++        if booking.status == "completed":
++            raise InvalidBookingStateException("Completed bookings cannot be cancelled")
++        booking.status = "cancelled"
++        booking.cancelled_at = datetime.utcnow()
++        self.audit_log.record(event="booking_cancelled", entity_id=booking_id)
++        self.db.commit()
++        return True
+@@ -55,6 +67,22 @@ class BookingService:
++    def validate_slot_availability(self, doctor_id: str, slot_time: datetime) -> bool:
++        overlapping = self.db.query(Booking).filter(
++            Booking.doctor_id == doctor_id,
++            Booking.slot_time == slot_time,
++            Booking.status.in_(["confirmed", "reserved"])
++        ).count()
++        return overlapping == 0"""
+        ),
+        PullRequestFile(
+            id="prf_39_02",
+            college_id=college_id,
+            pr_id="pr_39",
+            filename="tests/test_booking.py",
+            change_type="added",
+            additions=68,
+            deletions=0,
+            diff_content="""@@ -0,0 +1,38 @@
++import pytest
++from datetime import datetime, timedelta
++from services.booking_service import BookingService
++
++def test_cancel_active_booking(mock_db):
++    service = BookingService(db=mock_db)
++    result = service.cancel_booking(booking_id="bk_101")
++    assert result is True
++    assert mock_db.get_booking("bk_101").status == "cancelled"
++
++def test_prevent_double_booking(mock_db):
++    service = BookingService(db=mock_db)
++    slot = datetime.utcnow() + timedelta(days=1)
++    assert service.validate_slot_availability("doc_01", slot) is True
++    service.create_booking("doc_01", slot, "patient_01")
++    assert service.validate_slot_availability("doc_01", slot) is False"""
+        ),
+        PullRequestFile(
+            id="prf_41_01",
+            college_id=college_id,
+            pr_id="pr_41",
+            filename="core/security.py",
+            change_type="modified",
+            additions=42,
+            deletions=8,
+            diff_content="""@@ -18,8 +18,18 @@ def create_refresh_token(data: dict) -> str:
+-    expires = datetime.utcnow() + timedelta(days=7)
+-    payload = {**data, "exp": expires}
+-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
++    expires = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
++    payload = {
++        **data,
++        "type": "refresh",
++        "jti": str(uuid.uuid4()),
++        "exp": expires
++    }
++    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
++    return token"""
+        )
+    ]
+    for f in files_seed:
+        existing = db.execute(select(PullRequestFile).where(PullRequestFile.id == f.id)).scalars().first()
+        if not existing:
+            db.add(f)
+
+    comments_seed = [
+        PullRequestComment(
+            id="prc_39_01",
+            college_id=college_id,
+            pr_id="pr_39",
+            file_id="prf_39_01",
+            line_number=38,
+            author_name="Arun Kumar",
+            author_role="Trainer",
+            comment_text="Excellent exception handling! Raising InvalidBookingStateException here instead of silent boolean return makes the API contract robust."
+        )
+    ]
+    for c in comments_seed:
+        existing = db.execute(select(PullRequestComment).where(PullRequestComment.id == c.id)).scalars().first()
+        if not existing:
+            db.add(c)
+
+    db.commit()
+
 def init_db_and_seed():
     print("Creating tables...", flush=True)
-    Base.metadata.create_all(engine)
+    from core.db_init import ensure_schema
+    ensure_schema(engine)
         
     db = SessionLocal()
     try:
@@ -97,6 +503,91 @@ def init_db_and_seed():
             seeded_w = seed_weekly_problems(db, college_id="col_demo_001")
             if seeded_w > 0:
                 print(f"Seeded {seeded_w} weekly DSA problems.", flush=True)
+
+            # Ensure Screen 32 & 33 portfolio and demo day data are seeded
+            existing_p = db.execute(select(StudentProject)).scalars().first()
+            if not existing_p:
+                seed_portfolio_data(db, college_id="col_demo_001")
+                print("Seeded Screen 32/33 portfolio and demo day data.", flush=True)
+
+            # Ensure Screen 31 code reviews PR data are seeded
+            existing_pr = db.execute(select(PullRequest)).scalars().first()
+            if not existing_pr:
+                seed_reviews_data(db, college_id="col_demo_001")
+                print("Seeded Screen 31 code reviews data.", flush=True)
+
+            # Ensure the S0 cohort (branches, batches, 612 students, certificates...) exists
+            from seed.seed_cohort import seed_cohort
+            created = seed_cohort(db, college_id="col_demo_001")
+            if created:
+                db.commit()
+                print("Seeded cohort with " + str(created) + " students.", flush=True)
+
+            from seed.seed_screen12 import seed_screen12
+            if seed_screen12(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 12 readiness snapshots, skills, badges and events.", flush=True)
+
+            from seed.seed_screen13 import seed_screen13
+            if seed_screen13(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 13 at-risk flags.", flush=True)
+
+            from seed.seed_screen19 import seed_screen19
+            if seed_screen19(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 19 MoU report runs.", flush=True)
+
+            from seed.seed_screen15 import seed_screen15
+            if seed_screen15(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 15 monthly cards.", flush=True)
+
+            from seed.seed_screen12 import rebase_demo_dates
+            if rebase_demo_dates(db, college_id="col_demo_001"):
+                db.commit()
+                print("Re-anchored demo calendar to today.", flush=True)
+
+            from seed.seed_screen08 import seed_screen08
+            seed_screen08(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen07 import seed_screen07
+            if seed_screen07(db, college_id="col_demo_001"):
+                db.commit()
+                print("Seeded Screen 07 classroom poll and Q&A.", flush=True)
+
+            from seed.seed_screen29 import seed_screen29
+            seed_screen29(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen30 import seed_screen30
+            seed_screen30(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen36 import seed_screen36
+            seed_screen36(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen34 import seed_screen34
+            seed_screen34(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen35 import seed_screen35
+            seed_screen35(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen01 import seed_screen01
+            seed_screen01(db, college_id="col_demo_001")
+            db.commit()
+
+            # keep at-risk flags consistent with the latest attendance history
+            from services.at_risk import run_rules
+            new_flags = run_rules(db, "col_demo_001")
+            db.commit()
+            if new_flags:
+                print("Opened " + str(new_flags) + " at-risk flags.", flush=True)
+
             print("Database already seeded.", flush=True)
             return
 
@@ -726,6 +1217,43 @@ def init_db_and_seed():
         # 14. Seed Weekly DSA Problems (Weeks 1-8)
         from seed.seed_weekly_dsa import seed_weekly_problems
         seed_weekly_problems(db, college_id="col_demo_001")
+
+        # 14. Screen 32 & 33: Student Portfolio Projects, Skills, and Parent Demo Day Event
+        seed_portfolio_data(db, college_id="col_demo_001")
+
+        # 15. Screen 31: Trainer Code Reviews PR Data
+        seed_reviews_data(db, college_id="col_demo_001")
+
+        # 16. S0 cohort: branches, batches, trainers, 612 students, certificates, internships
+        db.flush()
+        from seed.seed_cohort import seed_cohort
+        seed_cohort(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen12 import seed_screen12
+        seed_screen12(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen13 import seed_screen13
+        seed_screen13(db, college_id="col_demo_001")
+        from seed.seed_screen19 import seed_screen19
+        seed_screen19(db, college_id="col_demo_001")
+        from seed.seed_screen15 import seed_screen15
+        seed_screen15(db, college_id="col_demo_001")
+        from seed.seed_screen08 import seed_screen08
+        seed_screen08(db, college_id="col_demo_001")
+        from seed.seed_screen07 import seed_screen07
+        seed_screen07(db, college_id="col_demo_001")
+        from seed.seed_screen29 import seed_screen29
+        seed_screen29(db, college_id="col_demo_001")
+        from seed.seed_screen30 import seed_screen30
+        seed_screen30(db, college_id="col_demo_001")
+        from seed.seed_screen36 import seed_screen36
+        seed_screen36(db, college_id="col_demo_001")
+        from seed.seed_screen34 import seed_screen34
+        seed_screen34(db, college_id="col_demo_001")
+        from seed.seed_screen35 import seed_screen35
+        seed_screen35(db, college_id="col_demo_001")
+        from seed.seed_screen01 import seed_screen01
+        seed_screen01(db, college_id="col_demo_001")
 
         db.commit()
     finally:

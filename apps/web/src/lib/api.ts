@@ -1,91 +1,73 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+export const WS_BASE = API_BASE.replace(/^http/, "ws");
 
-export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("irep_token") : null;
-  
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-    ...((options.headers as Record<string, string>) || {}),
-  };
-
-  try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers,
-    });
-    
-    if (!res.ok) {
-      throw new Error(`API Error ${res.status}: ${res.statusText}`);
-    }
-    
-    return await res.json();
-  } catch (error) {
-    console.warn(`Fetch to ${endpoint} failed, falling back or propagating:`, error);
-    throw error;
+/** Error raised for non-2xx responses; carries the HTTP status and the API `detail`. */
+export class ApiError extends Error {
+  status: number;
+  detail: string;
+  constructor(status: number, detail: string) {
+    super(`API Error ${status}: ${detail}`);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
   }
 }
+
 
 // ---------------------------------------------------------------------------
 // Screen 11 – My Courses helpers
 // ---------------------------------------------------------------------------
 
-export interface CourseCard {
-  id: string;
-  title: string;
-  title_ta: string | null;
-  track: string;
-  thumbnail_color: string;
-  total_lessons: number;
-  completed_lessons: number;
-  progress_pct: number;
-  resume_lesson_id: string | null;
-  semester_min: number;
+const MOCK_TOKENS = new Set(["mock_jwt_token_demo", "mock_token"]);
+
+function readStoredRole(): string | null {
+  try {
+    const raw = localStorage.getItem("irep_user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.role === "string" ? parsed.role : null;
+  } catch {
+    return null;
+  }
 }
 
-export interface LessonItem {
-  id: string;
-  title: string;
-  type: "video" | "slides" | "notes" | "assignment";
-  duration_min: number | null;
-  content_url: string | null;
-  completed: boolean;
+export function authHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("irep_token");
+  if (token && !MOCK_TOKENS.has(token)) {
+    return { Authorization: `Bearer ${token}` };
+  }
+  const role = readStoredRole();
+  return role ? { "X-Demo-Role": role } : {};
 }
 
-export interface ModuleItem {
-  id: string;
-  title: string;
-  order_index: number;
-  lessons: LessonItem[];
-}
-
-export interface CourseDetail {
-  course: {
-    id: string;
-    title: string;
-    title_ta: string | null;
-    track: string;
-    thumbnail_color: string;
-    semester_min: number;
+export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...authHeaders(),
+    ...((options.headers as Record<string, string>) || {}),
   };
-  modules: ModuleItem[];
+
+  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      if (body && typeof body.detail === "string") detail = body.detail;
+      else if (body && body.detail) detail = JSON.stringify(body.detail);
+    } catch {
+      /* body was not JSON */
+    }
+    throw new ApiError(res.status, detail);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
 }
 
-export async function getCourses(track?: string): Promise<{ courses: CourseCard[] }> {
-  const qs = track ? `?track=${encodeURIComponent(track)}` : "";
-  return fetchApi<{ courses: CourseCard[] }>(`/student/courses${qs}`);
+export async function fetchBlob(endpoint: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${endpoint}`, { headers: authHeaders() });
+  if (!res.ok) throw new ApiError(res.status, res.statusText);
+  return await res.blob();
 }
-
-export async function getCourseDetail(courseId: string): Promise<CourseDetail> {
-  return fetchApi<CourseDetail>(`/student/courses/${courseId}`);
-}
-
-export async function markLessonProgress(
-  courseId: string,
-  lessonId: string
-): Promise<{ success: boolean; lesson_id: string; completed_at: string }> {
-  return fetchApi(`/student/courses/${courseId}/lessons/${lessonId}/progress`, {
-    method: "POST",
-  });
-}
-

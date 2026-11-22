@@ -98,6 +98,7 @@ export default function PracticeTestPage() {
   const [showCopyNotice, setShowCopyNotice] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [resultData, setResultData] = useState<ResultData | null>(null);
   const [reviewFilter, setReviewFilter] = useState<"all" | "correct" | "incorrect">("all");
@@ -165,22 +166,24 @@ export default function PracticeTestPage() {
   }, [loadTestAndAttempt, user?.role]);
 
   // 2. Timer Countdown Engine
+  // One interval for the whole attempt (not rebuilt every second). The updater
+  // only counts down; submitting is a side effect, so it lives in its own effect.
+  const timerRunning = !loading && !isSubmitted && !!attemptId;
   useEffect(() => {
-    if (loading || isSubmitted || secondsLeft <= 0) return;
-
+    if (!timerRunning) return;
     const timer = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleAutoSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setSecondsLeft((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
-
     return () => clearInterval(timer);
-  }, [loading, isSubmitted, secondsLeft]);
+  }, [timerRunning]);
+
+  const autoSubmittedRef = useRef(false);
+  useEffect(() => {
+    if (timerRunning && secondsLeft === 0 && !autoSubmittedRef.current) {
+      autoSubmittedRef.current = true;
+      handleAutoSubmit();
+    }
+  }, [timerRunning, secondsLeft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 3. Background Autosave (Every 10 seconds if dirty)
   const saveAnswersBatch = useCallback(async () => {
@@ -302,6 +305,7 @@ export default function PracticeTestPage() {
   const performSubmit = async () => {
     if (!attemptId) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await fetchApi<ResultData>(`/student/tests/attempts/${attemptId}/submit`, {
         method: "POST",
@@ -314,8 +318,9 @@ export default function PracticeTestPage() {
       setIsSubmitted(true);
       setShowSubmitModal(false);
     } catch (err: any) {
-      console.error("Submission failed:", err);
-      alert(err?.message || "Submission failed. Please retry.");
+      // inline message instead of a blocking alert(); answers stay on screen for a retry
+      setSubmitError(err?.detail || err?.message || "Submission failed. Please retry.");
+      autoSubmittedRef.current = false;
     } finally {
       setSubmitting(false);
     }
@@ -836,7 +841,7 @@ export default function PracticeTestPage() {
               </div>
 
               <button
-                onClick={() => setShowSubmitModal(true)}
+                onClick={() => { setSubmitError(null); setShowSubmitModal(true); }}
                 className="w-full mt-3 py-2.5 bg-[#2BB3A0] hover:bg-[#249B8A] text-white font-bold text-xs rounded-xl shadow transition-all cursor-pointer"
               >
                 {t("practice_test.submit_test")}
@@ -869,6 +874,9 @@ export default function PracticeTestPage() {
                 <strong className="text-[#D93636]">{unansweredCount} {t("practice_test.question")}s</strong>
               </div>
             </div>
+            {submitError && (
+              <div role="alert" data-testid="submit-error" className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium">{submitError}</div>
+            )}
             <div className="flex gap-2.5 pt-2">
               <button
                 onClick={() => setShowSubmitModal(false)}

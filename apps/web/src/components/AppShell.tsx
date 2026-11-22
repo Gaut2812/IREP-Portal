@@ -5,11 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, Role } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   LayoutDashboard, BookOpen, Code2, FileCheck2, Cpu,
   KanbanSquare, Video, Bot, Award, Briefcase, Radio,
   MessageSquare, Calendar, Users, ClipboardCheck,
-  Search, Bell, ChevronDown, Languages, LogOut
+  Search, ChevronDown, Languages, LogOut
 } from "lucide-react";
 
 interface AppShellProps {
@@ -19,7 +20,7 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashboard" }) => {
   const pathname = usePathname();
-  const { user, logout, switchRoleDemo } = useAuth();
+  const { user, logout, switchRoleDemo, switching } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
 
@@ -81,7 +82,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.projects_portfolio"), href: "/parent/portfolio", icon: Briefcase },
     { label: t("nav.certificates"), href: "/parent/certificates", icon: Award },
     { label: t("nav.events"), href: "/parent/events", icon: Calendar },
-    { label: t("nav.message_trainer"), href: "/trainer/messages", icon: MessageSquare },
+    { label: t("nav.message_trainer"), href: "/parent/messages", icon: MessageSquare },
     { label: t("nav.feedback_survey"), href: "/parent/surveys", icon: MessageSquare }
   ];
 
@@ -169,7 +170,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
                 onClick={() => setRoleMenuOpen(!roleMenuOpen)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] text-xs font-semibold rounded-lg hover:bg-[#DBEAFE] transition-all"
               >
-                <span className="capitalize">View as: {role}</span>
+                <span className="capitalize">{switching ? "Signing in..." : `View as: ${role}`}</span>
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
 
@@ -204,11 +205,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
               )}
             </div>
 
-            {/* Notification Bell */}
-            <div className="relative cursor-pointer p-1.5 hover:bg-[#F1F5F9] rounded-full">
-              <Bell className="w-4 h-4 text-[#64748B]" />
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#D93636]" />
-            </div>
+            {/* Notification Bell (Screen 44) */}
+            <NotificationBell />
 
             {/* User Avatar */}
             <div className="w-8 h-8 rounded-full bg-[#2BB3A0] text-white flex items-center justify-center font-bold text-xs shadow-sm">

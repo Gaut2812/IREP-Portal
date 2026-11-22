@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
-from routers import auth, student, trainer, college, parent, live
+from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -13,6 +13,13 @@ async def lifespan(app: FastAPI):
                 "Production environment requires a live Judge0 execution cluster. "
                 "JUDGE0_ADAPTER must be 'judge0' with valid JUDGE0_URL and JUDGE0_AUTH_TOKEN."
             )
+    # Development: keep the local SQLite schema in sync with the models.
+    if settings.ENVIRONMENT.lower() != "production":
+        from core.database import engine
+        from core.db_init import ensure_schema
+        ensure_schema(engine)
+    from services.realtime import register_event_loop
+    register_event_loop()
     yield
 
 app = FastAPI(
@@ -25,7 +32,8 @@ app = FastAPI(
 # CORS middleware for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict to settings.PUBLIC_BASE_URL
+    # development: any origin; production: only the portal itself
+    allow_origins=[settings.PUBLIC_BASE_URL] if settings.ENVIRONMENT.lower() == "production" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,6 +46,13 @@ app.include_router(trainer.router, prefix=settings.API_V1_PREFIX)
 app.include_router(college.router, prefix=settings.API_V1_PREFIX)
 app.include_router(parent.router, prefix=settings.API_V1_PREFIX)
 app.include_router(live.router, prefix=settings.API_V1_PREFIX)
+app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
+app.include_router(admin_jobs.router, prefix=settings.API_V1_PREFIX)
+app.include_router(media.router)
+app.include_router(projects.router, prefix=settings.API_V1_PREFIX)
+app.include_router(interviews.router, prefix=settings.API_V1_PREFIX)
+app.include_router(discussions.router, prefix=settings.API_V1_PREFIX)
+app.include_router(messages_hub.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():

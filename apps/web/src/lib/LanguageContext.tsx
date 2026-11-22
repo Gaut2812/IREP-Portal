@@ -3,12 +3,13 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import en from "@/locales/en.json";
 import ta from "@/locales/ta.json";
+import { API_BASE } from "@/lib/api";
 
 type Language = "en" | "ta";
 
 interface LanguageContextType {
   language: Language;
-  setLanguage: (lang: Language) => void;
+  setLanguage: (lang: Language, sync?: boolean) => void;
   toggleLanguage: () => void;
   t: (key: string) => string;
 }
@@ -32,9 +33,18 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  const setLanguage = (lang: Language) => {
+  const setLanguage = (lang: Language, sync: boolean = true) => {
     setLanguageState(lang);
     localStorage.setItem("irep_lang", lang);
+    // signed-in users keep their choice across devices (PUT /auth/me/language)
+    const token = localStorage.getItem("irep_token");
+    if (sync && token && !token.startsWith("mock")) {
+      fetch(`${API_BASE}/auth/me/language`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ language: lang }),
+      }).catch(() => { /* offline: local choice still applies */ });
+    }
   };
 
   const toggleLanguage = () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { MonacoEditorWrapper } from "@/components/MonacoEditorWrapper";
@@ -26,7 +27,14 @@ import {
   Loader2,
   TrendingUp,
   Zap,
-  BookOpen
+  BookOpen,
+  ChevronRight,
+  ChevronLeft,
+  X,
+  Search,
+  Trophy,
+  Layers,
+  ArrowRight
 } from "lucide-react";
 import Link from "next/link";
 
@@ -39,6 +47,17 @@ interface TestCaseResult {
   expected_output?: string;
   actual_output?: string;
   stdout?: string;
+}
+
+interface ProblemNavItem {
+  id: string;
+  title: string;
+  difficulty: string;
+  topic: string;
+  company_tags?: string;
+  week_info: string;
+  is_solved?: boolean;
+  curriculum_index?: number;
 }
 
 interface ProblemData {
@@ -56,6 +75,10 @@ interface ProblemData {
   starter_code: string;
   trainer_notes: string;
   trainer_author: string;
+  prev_problem?: { id: string; title: string; week_info?: string } | null;
+  next_problem?: { id: string; title: string; week_info?: string } | null;
+  curriculum_index?: number;
+  total_problems?: number;
   ai_reviewer: {
     tag: string;
     hints: Array<{ type: string; text: string; color: string }>;
@@ -90,6 +113,7 @@ interface ReviewResult {
 export default function CodingLabPage({ params }: { params: Promise<{ problemId: string }> }) {
   const resolvedParams = use(params);
   const problemId = resolvedParams.problemId || "prob_connected_components";
+  const router = useRouter();
   const { t } = useLanguage();
 
   const [problem, setProblem] = useState<ProblemData | null>(null);
@@ -103,6 +127,12 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // 20-Problem Curriculum Navigator Drawer state
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [allProblems, setAllProblems] = useState<ProblemNavItem[]>([]);
+  const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>("All");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
   // Results state
   const [runResult, setRunResult] = useState<{
     status: string;
@@ -114,6 +144,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
     tests_passed?: number;
     tests_total?: number;
     stdout?: string;
+    next_problem?: { id: string; title: string; week_info?: string } | null;
   } | null>(null);
 
   // Terminal drawer state
@@ -129,11 +160,32 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
   const [hintsCount, setHintsCount] = useState<number>(1);
   const [isRequestingHint, setIsRequestingHint] = useState<boolean>(false);
 
+  // Success celebration state
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+
+  // Fetch all 20 problems list for drawer
+  useEffect(() => {
+    async function fetchCurriculumProblems() {
+      try {
+        const res = await fetchApi<{ total: number; problems: ProblemNavItem[] }>("/student/coding");
+        if (res?.problems && Array.isArray(res.problems)) {
+          setAllProblems(res.problems);
+        } else {
+          setAllProblems(getFallbackCurriculumProblems());
+        }
+      } catch (e) {
+        setAllProblems(getFallbackCurriculumProblems());
+      }
+    }
+    fetchCurriculumProblems();
+  }, []);
+
   // Fetch problem data
   const loadProblem = useCallback(async () => {
     setLoading(true);
     setError(null);
     setNotFound(false);
+    setShowSuccessModal(false);
     try {
       const data = await fetchApi<ProblemData>(`/student/coding/${problemId}`);
       setProblem(data);
@@ -149,6 +201,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
           is_submit: true,
           tests_passed: data.last_submission.tests_passed,
           tests_total: data.last_submission.tests_total,
+          next_problem: data.next_problem,
           cases: [
             { name: "Sample case 1", status: "Passed" },
             { name: "Sample case 2", status: "Passed" },
@@ -162,8 +215,9 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         setNotFound(true);
       } else {
         setError(err?.message || "Failed to load problem details");
-        setProblem(getDemoFallbackProblem());
-        setCode(getDemoFallbackProblem().starter_codes["python"]);
+        const fallback = getDemoFallbackProblem();
+        setProblem(fallback);
+        setCode(fallback.starter_codes["python"]);
         setHints([
           "Think of this as a connectivity problem. Each edge connects two nodes. Can you maintain the count of disjoint components starting from n?"
         ]);
@@ -236,8 +290,13 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         is_submit: true,
         tests_passed: res.tests_passed,
         tests_total: res.tests_total,
-        stdout: res.stdout || `# Official Submission Evaluated\nStatus: ${res.status}\nPassed: ${res.tests_passed}/${res.tests_total} tests`
+        stdout: res.stdout || `# Official Submission Evaluated\nStatus: ${res.status}\nPassed: ${res.tests_passed}/${res.tests_total} tests`,
+        next_problem: res.next_problem || problem?.next_problem
       });
+
+      if (res.status === "Accepted") {
+        setShowSuccessModal(true);
+      }
     } catch (err: any) {
       setRunResult({
         status: "Accepted",
@@ -247,6 +306,11 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         tests_passed: 18,
         tests_total: 18,
         stdout: "# Submission verified (Mock)\nAll 18 hidden tests evaluated successfully.\nStatus: Accepted",
+        next_problem: problem?.next_problem || {
+          id: "prob_redundant_connection",
+          title: "Redundant Connection",
+          week_info: "Week 8 · Pattern drill · 4 of 6"
+        },
         cases: [
           { name: "Sample case 1", status: "Passed" },
           { name: "Sample case 2", status: "Passed" },
@@ -254,6 +318,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
           { name: "Large graph (n=2000)", status: "Passed" }
         ]
       });
+      setShowSuccessModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -311,8 +376,27 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
     }
   };
 
-  // Active test case for detail view (only public sample cases)
+  // Advance to next problem
+  const handleGoToNextProblem = () => {
+    const target = runResult?.next_problem || problem?.next_problem;
+    if (target?.id) {
+      setShowSuccessModal(false);
+      router.push(`/student/coding/${target.id}`);
+    }
+  };
+
+  // Filter problems for the drawer
+  const filteredProblems = allProblems.filter((p) => {
+    const matchesWeek = selectedWeekFilter === "All" || p.week_info?.includes(`Week ${selectedWeekFilter}`);
+    const matchesSearch = searchQuery === "" ||
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.topic.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesWeek && matchesSearch;
+  });
+
+  const solvedCount = allProblems.filter((p) => p.is_solved).length;
   const activeCaseData = runResult?.cases?.[selectedCase];
+  const nextTarget = runResult?.next_problem || problem?.next_problem;
 
   return (
     <RoleGuard allowedRoles={["student", "trainer"]}>
@@ -351,13 +435,20 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
               <p className="text-sm text-[#64748B]">
                 {t("coding.not_found_desc") || "The requested coding problem could not be found for your college tenant."}
               </p>
-              <div className="pt-2">
+              <div className="pt-2 flex justify-center gap-2">
+                <button
+                  onClick={() => setIsDrawerOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2BB3A0] hover:bg-[#249B8A] text-white text-xs font-bold rounded-xl shadow cursor-pointer transition-all"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Browse 20 Problems</span>
+                </button>
                 <Link
                   href="/student"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#2B5CD0] hover:bg-[#2049AA] text-white text-xs font-bold rounded-xl shadow transition-all"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2B5CD0] hover:bg-[#2049AA] text-white text-xs font-bold rounded-xl shadow transition-all"
                 >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>{t("coding.back_to_dashboard") || "Back to Dashboard"}</span>
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>{t("coding.back_to_dashboard") || "Dashboard"}</span>
                 </Link>
               </div>
             </div>
@@ -395,11 +486,50 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
             {/* LEFT COLUMN: Problem Statement (4 cols) */}
             <div className="lg:col-span-4 bg-white rounded-xl border border-[#E2E8F0] shadow-sm flex flex-col justify-between overflow-hidden">
               <div className="p-5 overflow-y-auto space-y-4">
+                {/* Curriculum Problem Switcher Bar */}
+                <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+                  <button
+                    onClick={() => setIsDrawerOpen(true)}
+                    data-testid="problem-switcher-button"
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-[#F8FAFC] hover:bg-slate-100 text-[#0F1F3A] text-xs font-bold rounded-lg border border-[#CBD5E1] transition-all cursor-pointer"
+                    title="Browse all 20 curriculum problems"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-[#2B5CD0]" />
+                    <span>Problem {problem.curriculum_index || 18} of {problem.total_problems || 20}</span>
+                    <ChevronDown className="w-3 h-3 text-[#64748B]" />
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {problem.prev_problem && (
+                      <Link
+                        href={`/student/coding/${problem.prev_problem.id}`}
+                        data-testid="prev-problem-button"
+                        className="p-1 rounded hover:bg-slate-100 text-[#64748B] hover:text-[#0F1F3A] transition-colors"
+                        title={`Previous: ${problem.prev_problem.title}`}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Link>
+                    )}
+                    {problem.next_problem && (
+                      <Link
+                        href={`/student/coding/${problem.next_problem.id}`}
+                        data-testid="next-problem-button-header"
+                        className="p-1 rounded hover:bg-slate-100 text-[#64748B] hover:text-[#0F1F3A] transition-colors"
+                        title={`Next: ${problem.next_problem.title}`}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
                 {/* Tag Chips */}
-                <div className="flex flex-wrap gap-2">
-                  <span className="chip-amber">{problem.difficulty}</span>
-                  <span className="chip-blue">{problem.topic}</span>
-                  <span className="chip-purple">Asked: {problem.company_tags}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <span className="chip-amber">{problem.difficulty}</span>
+                    <span className="chip-blue">{problem.topic}</span>
+                    <span className="chip-purple">Asked: {problem.company_tags}</span>
+                  </div>
                 </div>
 
                 {/* Title */}
@@ -430,9 +560,18 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 </div>
               </div>
 
-              {/* Footer Status */}
-              <div className="p-3 bg-[#F8FAFC] border-t border-[#E2E8F0] text-[11px] font-semibold text-[#64748B] text-center">
-                {problem.week_info}
+              {/* Footer Status with 20 Problems Drawer Trigger */}
+              <div className="p-3 bg-[#F8FAFC] border-t border-[#E2E8F0] flex items-center justify-between text-[11px] font-semibold text-[#64748B]">
+                <div>{problem.week_info}</div>
+                <button
+                  onClick={() => setIsDrawerOpen(true)}
+                  data-testid="browse-problems-footer-button"
+                  className="inline-flex items-center gap-1 text-[#2B5CD0] hover:text-[#1E46B0] font-bold text-[11px] px-2 py-0.5 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                >
+                  <Layers className="w-3 h-3" />
+                  <span>All 20 Problems</span>
+                  <ChevronRight className="w-3 h-3" />
+                </button>
               </div>
             </div>
 
@@ -541,6 +680,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                       <span>{t("coding.terminal") || "Terminal"}</span>
                     </button>
                   </div>
+
                   <div className="flex items-center gap-3 text-[11px] font-mono text-[#64748B]">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3 text-[#2B5CD0]" />
@@ -624,7 +764,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                             </div>
                           )}
 
-                          {/* Hidden tests aggregate */}
+                          {/* Hidden tests aggregate & Next Problem Action */}
                           <div className="text-xs font-extrabold text-[#15803D] flex items-center justify-between mt-auto pt-1">
                             <div className="flex items-center gap-1.5">
                               <CheckCircle2 className="w-4 h-4" />
@@ -633,9 +773,22 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                                 {t("coding.hidden_passed") || "hidden tests passed"}
                               </span>
                             </div>
-                            <span className="text-[11px] font-normal text-[#64748B]">
-                              {runResult?.is_submit ? "Official Submission Recorded" : "Sample Run Verified"}
-                            </span>
+
+                            {/* NEXT PROBLEM BUTTON (Shown when accepted) */}
+                            {runResult?.status === "Accepted" && nextTarget ? (
+                              <button
+                                onClick={handleGoToNextProblem}
+                                data-testid="next-problem-button"
+                                className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#15803D] hover:bg-[#166534] text-white text-[11px] font-bold rounded-lg shadow-sm transition-all cursor-pointer animate-pulse"
+                              >
+                                <span>Next Problem: {nextTarget.title}</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <span className="text-[11px] font-normal text-[#64748B]">
+                                {runResult?.is_submit ? "Official Submission Recorded" : "Sample Run Verified"}
+                              </span>
+                            )}
                           </div>
                         </>
                       )}
@@ -852,6 +1005,172 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
 
           </div>
         )}
+
+        {/* 20-PROBLEM CURRICULUM NAVIGATOR SLIDE-OVER DRAWER */}
+        {isDrawerOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity" data-testid="curriculum-drawer">
+            <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+              {/* Drawer Header */}
+              <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between bg-[#F8FAFC]">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[#2B5CD0]" />
+                    <h3 className="font-bold text-sm text-[#0F1F3A]">20 Weekly DSA Problems</h3>
+                  </div>
+                  <p className="text-[11px] text-[#64748B] mt-0.5">
+                    Weeks 1–8 Curriculum · {solvedCount} of 20 Solved
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-200 text-[#64748B] hover:text-[#0F1F3A] transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Search & Week Filter Controls */}
+              <div className="p-3 border-b border-[#E2E8F0] space-y-2 bg-white">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search problems, topics..."
+                    className="w-full pl-9 pr-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#2B5CD0]"
+                  />
+                </div>
+                {/* Week pills */}
+                <div className="flex gap-1 overflow-x-auto pb-1 text-[11px]">
+                  {["All", "1", "2", "3", "4", "5", "6", "7", "8"].map((wk) => (
+                    <button
+                      key={wk}
+                      onClick={() => setSelectedWeekFilter(wk)}
+                      className={`px-2.5 py-0.5 rounded-full font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                        selectedWeekFilter === wk
+                          ? "bg-[#2B5CD0] text-white"
+                          : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"
+                      }`}
+                    >
+                      {wk === "All" ? "All Weeks" : `Week ${wk}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Problems List */}
+              <div className="flex-1 overflow-y-auto divide-y divide-[#E2E8F0] p-2">
+                {filteredProblems.map((p, idx) => {
+                  const isCurrent = p.id === problemId;
+                  return (
+                    <Link
+                      key={p.id}
+                      href={`/student/coding/${p.id}`}
+                      onClick={() => setIsDrawerOpen(false)}
+                      data-testid={`drawer-problem-${p.id}`}
+                      className={`block p-3 rounded-xl transition-all cursor-pointer ${
+                        isCurrent
+                          ? "bg-blue-50/80 border border-[#BFDBFE]"
+                          : "hover:bg-[#F8FAFC]"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5 ${
+                            p.is_solved
+                              ? "bg-[#DCFCE7] text-[#15803D]"
+                              : isCurrent
+                                ? "bg-[#2B5CD0] text-white"
+                                : "bg-slate-100 text-[#64748B]"
+                          }`}>
+                            {p.is_solved ? <CheckCircle2 className="w-3.5 h-3.5" /> : (p.curriculum_index || idx + 1)}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-[#0F1F3A] truncate">
+                              {p.title}
+                            </div>
+                            <div className="text-[10px] text-[#64748B] flex items-center gap-1.5 mt-0.5">
+                              <span>{p.week_info?.split("·")[0]?.trim() || "Week"}</span>
+                              <span>•</span>
+                              <span className="truncate">{p.topic}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className={
+                          p.difficulty === "Easy"
+                            ? "chip-green text-[9px] flex-shrink-0"
+                            : p.difficulty === "Medium"
+                              ? "chip-amber text-[9px] flex-shrink-0"
+                              : "chip-red text-[9px] flex-shrink-0"
+                        }>
+                          {p.difficulty}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-3 bg-[#F8FAFC] border-t border-[#E2E8F0] text-center text-[11px] text-[#64748B]">
+                Curriculum Trainer: Arun Kumar · IREP Placement Cell
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* COMPLETION CELEBRATION MODAL */}
+        {showSuccessModal && nextTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs" data-testid="completion-modal">
+            <div className="max-w-md w-full bg-white rounded-2xl border border-[#BBF7D0] p-6 shadow-2xl space-y-4 text-center mx-4 animate-in zoom-in-95 duration-200">
+              <div className="w-14 h-14 mx-auto rounded-full bg-[#DCFCE7] flex items-center justify-center text-[#15803D]">
+                <Trophy className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-extrabold text-[#0F1F3A]">
+                  🎉 Problem Accepted!
+                </h3>
+                <p className="text-xs text-[#64748B]">
+                  All 18 hidden test cases passed. Excellent work on mastering this pattern!
+                </p>
+              </div>
+
+              {/* Next Problem Card */}
+              <div className="p-3.5 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl text-left space-y-1.5">
+                <div className="text-[10px] font-bold text-[#15803D] uppercase tracking-wider">
+                  Up Next in Curriculum:
+                </div>
+                <div className="font-bold text-xs text-[#0F1F3A]">
+                  {nextTarget.title}
+                </div>
+                <div className="text-[11px] text-[#64748B]">
+                  {nextTarget.week_info || "Next DSA Pattern Drill"}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="flex-1 py-2 text-xs font-semibold text-[#64748B] hover:text-[#0F1F3A] rounded-xl border border-[#CBD5E1] transition-colors cursor-pointer"
+                >
+                  Stay on Problem
+                </button>
+                <button
+                  onClick={handleGoToNextProblem}
+                  data-testid="modal-next-problem-button"
+                  className="flex-1 py-2 bg-[#15803D] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span>Solve Next</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </AppShell>
     </RoleGuard>
   );
@@ -878,6 +1197,18 @@ function getDemoFallbackProblem(): ProblemData {
     starter_code: "class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        return n",
     trainer_notes: "Notice how path compression in find() flattens the tree. For best worst-case complexity, add union-by-rank.",
     trainer_author: "Arun K.",
+    prev_problem: {
+      id: "prob_longest_increasing_subsequence",
+      title: "Longest Increasing Subsequence",
+      week_info: "Week 7 · Advanced drill · 3 of 3"
+    },
+    next_problem: {
+      id: "prob_redundant_connection",
+      title: "Redundant Connection",
+      week_info: "Week 8 · Pattern drill · 4 of 6"
+    },
+    curriculum_index: 18,
+    total_problems: 20,
     ai_reviewer: {
       tag: "Future Skills",
       hints: [
@@ -893,4 +1224,29 @@ function getDemoFallbackProblem(): ProblemData {
       rules_note: "Hints only, no full solutions. AI help used in this problem: 1 hint"
     }
   };
+}
+
+function getFallbackCurriculumProblems(): ProblemNavItem[] {
+  return [
+    { id: "prob_two_sum", title: "Two Sum", difficulty: "Easy", topic: "Arrays & Hash Map", week_info: "Week 1 · Foundation · 1 of 3", curriculum_index: 1 },
+    { id: "prob_container_water", title: "Container With Most Water", difficulty: "Medium", topic: "Two Pointers", week_info: "Week 1 · Pattern drill · 2 of 3", curriculum_index: 2 },
+    { id: "prob_3sum", title: "3Sum", difficulty: "Medium", topic: "Two Pointers", week_info: "Week 1 · Advanced drill · 3 of 3", curriculum_index: 3 },
+    { id: "prob_longest_substring", title: "Longest Substring Without Repeating Characters", difficulty: "Medium", topic: "Sliding Window", week_info: "Week 2 · Pattern drill · 1 of 2", curriculum_index: 4 },
+    { id: "prob_subarray_sum_k", title: "Subarray Sum Equals K", difficulty: "Medium", topic: "Prefix Sum & Hash Map", week_info: "Week 2 · Advanced drill · 2 of 2", curriculum_index: 5 },
+    { id: "prob_valid_parentheses", title: "Valid Parentheses", difficulty: "Easy", topic: "Stack", week_info: "Week 3 · Foundation · 1 of 3", curriculum_index: 6 },
+    { id: "prob_daily_temperatures", title: "Daily Temperatures", difficulty: "Medium", topic: "Monotonic Stack", week_info: "Week 3 · Pattern drill · 2 of 3", curriculum_index: 7 },
+    { id: "prob_min_stack", title: "Min Stack", difficulty: "Medium", topic: "Stack Design", week_info: "Week 3 · Design drill · 3 of 3", curriculum_index: 8 },
+    { id: "prob_reverse_linked_list", title: "Reverse Linked List", difficulty: "Easy", topic: "Linked List", week_info: "Week 4 · Foundation · 1 of 2", curriculum_index: 9 },
+    { id: "prob_linked_list_cycle", title: "Linked List Cycle II", difficulty: "Medium", topic: "Fast & Slow Pointers", week_info: "Week 4 · Pattern drill · 2 of 2", curriculum_index: 10 },
+    { id: "prob_search_rotated", title: "Search in Rotated Sorted Array", difficulty: "Medium", topic: "Binary Search", week_info: "Week 5 · Pattern drill · 1 of 2", curriculum_index: 11 },
+    { id: "prob_find_peak_element", title: "Find Peak Element", difficulty: "Medium", topic: "Binary Search", week_info: "Week 5 · Advanced drill · 2 of 2", curriculum_index: 12 },
+    { id: "prob_max_depth_tree", title: "Maximum Depth of Binary Tree", difficulty: "Easy", topic: "Binary Tree DFS", week_info: "Week 6 · Foundation · 1 of 2", curriculum_index: 13 },
+    { id: "prob_lowest_common_ancestor", title: "Lowest Common Ancestor of a BST", difficulty: "Medium", topic: "BST Traversal", week_info: "Week 6 · Pattern drill · 2 of 2", curriculum_index: 14 },
+    { id: "prob_climbing_stairs", title: "Climbing Stairs", difficulty: "Easy", topic: "Dynamic Programming", week_info: "Week 7 · Foundation · 1 of 3", curriculum_index: 15 },
+    { id: "prob_coin_change", title: "Coin Change", difficulty: "Medium", topic: "Dynamic Programming", week_info: "Week 7 · Pattern drill · 2 of 3", curriculum_index: 16 },
+    { id: "prob_longest_increasing_subsequence", title: "Longest Increasing Subsequence", difficulty: "Medium", topic: "Dynamic Programming", week_info: "Week 7 · Advanced drill · 3 of 3", curriculum_index: 17 },
+    { id: "prob_connected_components", title: "Number of Connected Components in an Undirected Graph", difficulty: "Medium", topic: "Union-Find", week_info: "Week 8 · Pattern drill · 3 of 6 solved", is_solved: true, curriculum_index: 18 },
+    { id: "prob_redundant_connection", title: "Redundant Connection", difficulty: "Medium", topic: "Union-Find", week_info: "Week 8 · Pattern drill · 4 of 6", curriculum_index: 19 },
+    { id: "prob_course_schedule", title: "Course Schedule", difficulty: "Medium", topic: "Graph Topological Sort", week_info: "Week 8 · Advanced drill · 5 of 6", curriculum_index: 20 }
+  ];
 }

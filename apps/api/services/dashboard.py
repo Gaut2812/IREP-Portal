@@ -28,9 +28,12 @@ def _greeting(name: str, lang: str, now: Optional[datetime.datetime] = None) -> 
 
 def _week_sessions(db: Session, student: Student):
     """Sessions of the student's batch for the current ISO week (Mon–Sat); if the
-    week is empty, the most recent week that has sessions."""
+    week is empty, the most recent week that has sessions. Classes run Mon–Sat: on a Sunday the
+    week that matters is the one starting tomorrow (the seed schedules it the same way)."""
     today = datetime.date.today()
     monday = today - datetime.timedelta(days=today.weekday())
+    if today.weekday() == 6:
+        monday += datetime.timedelta(days=7)
     q = select(SessionItem).where(SessionItem.college_id == student.college_id)
     if student.batch_id:
         q = q.where(SessionItem.batch_id == student.batch_id)

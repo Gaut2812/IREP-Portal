@@ -214,15 +214,33 @@ docker compose run --rm api python ops/set_teams_upn.py --trainer-email trainer@
 
 **Until Teams is ready**, set `LIVE_CLASS_ADAPTER=fake` and add `live_classes` to `ALLOW_DEMO_ADAPTERS`. Classes then run in the in-portal classroom (shared notebook, polls, Q&A), without video.
 
-## 10. Nightly backups
+## 10. Nightly encrypted backups
 
-`infra/prod/backup.sh` writes the following into a dated folder under `BACKUP_DIR` (default `/var/backups/irep`):
-- `irep.dump`: the portal database (`pg_dump`, custom format)
-- `keycloak.dump`: the sign-in database
-- `uploads.tar.gz`: everything in file storage, such as certificate proofs, exports, and report and card PDFs
-- `SHA256SUMS`
+### Backup key (do this once, on your own computer, not on the server)
 
-It keeps 7 days (`BACKUP_KEEP_DAYS`), then mirrors the folder to `BACKUP_REMOTE`.
+Backups are encrypted with [age](https://age-encryption.org), which is open source. The server holds only the **public** key, so it can encrypt but never decrypt. Anyone who copies the backups, from the server or from the second location, gets unreadable files.
+
+```bash
+# on your laptop (Ubuntu/Debian: sudo apt-get install age; macOS: brew install age; Windows: winget install FiloSottile.age)
+age-keygen -o irep-backup.key
+#   Public key: age1...   <- copy this line's key
+```
+
+- **The private key (`irep-backup.key`) belongs in your password manager**, as a secure note or an attached file. Keep a second copy somewhere offline, such as an encrypted USB stick in the office safe.
+- **Losing the private key means losing the backups.** Never commit it, email it or leave it on the server.
+- **The public key** (`age1...`) goes in `infra/prod/.env` as `BACKUP_AGE_RECIPIENT`. `backup.sh` refuses to run without it.
+
+### What runs every night
+
+On the server, install age once: `sudo apt-get install -y age`.
+
+`infra/prod/backup.sh` writes the following into a dated folder under `BACKUP_DIR` (default `/var/backups/irep`). Each file is encrypted while it is written, so the plain data never touches the disk:
+- `irep.dump.age`: the portal database (`pg_dump`, custom format)
+- `keycloak.dump.age`: the sign-in database
+- `uploads.tar.gz.age`: everything in file storage, such as certificate proofs, recordings, exports, and report and card PDFs
+- `SHA256SUMS`, plus `RECIPIENT` (the public key used)
+
+It keeps 7 days (`BACKUP_KEEP_DAYS`), then mirrors the folder to `BACKUP_REMOTE`. Only encrypted files leave the server.
 
 **Second location.** Choose one:
 - **Another server over SSH:** set `BACKUP_REMOTE=backup@203.0.113.20:/srv/backups/irep`. Then, as root, create a key and authorise it on that server:
@@ -241,7 +259,7 @@ It keeps 7 days (`BACKUP_KEEP_DAYS`), then mirrors the folder to `BACKUP_REMOTE`
 
 ```bash
 sudo /opt/irep/infra/prod/backup.sh
-ls -lh /var/backups/irep/*/
+ls -lh /var/backups/irep/*/          # only .age files, SHA256SUMS and RECIPIENT
 echo '15 2 * * * root /opt/irep/infra/prod/backup.sh >> /var/log/irep-backup.log 2>&1' | sudo tee /etc/cron.d/irep-backup
 ```
 
@@ -249,19 +267,29 @@ The backup runs at 02:15 server time, after the 01:30 IST readiness job. Ubuntu 
 
 **Check the next morning:** `tail /var/log/irep-backup.log` ends with `done:`, and today's folder is also in the second location.
 
-### Restore from a backup (practise this once before go-live)
+### Restore from a backup (do this drill once before go-live, then every term)
+
+The restore uses the **encrypted** copy and your private key.
+1. Copy the key to the server for the restore only.
+2. `restore.sh` does the rest:
+   - checks the checksums
+   - proves the key opens every file before stopping anything
+   - restores both databases and the uploads
+   - starts everything again
+   - records the drill in `BACKUP_DIR/restore-drills.log`, which the go-live check reads
 
 ```bash
+scp irep-backup.key you@server:/tmp/irep-backup.key        # from your laptop
 cd /opt/irep/infra/prod
-B=/var/backups/irep/2026-11-20_0215          # the folder to restore
-(cd $B && sha256sum -c SHA256SUMS)
-docker compose stop api worker beat web keycloak
-docker compose exec -T postgres pg_restore -U irep -d irep --clean --if-exists --no-owner < $B/irep.dump
-docker compose exec -T postgres pg_restore -U irep -d keycloak --clean --if-exists --no-owner --role=keycloak < $B/keycloak.dump
-docker compose run --rm --no-deps -T -u 0 -v $B:/backup:ro --entrypoint sh api \
-  -c 'rm -rf /data/uploads/* && tar -xzf /backup/uploads.tar.gz -C /data/uploads && chown -R 10001:10001 /data/uploads'
-docker compose up -d
+sudo ./restore.sh /var/backups/irep/2026-11-20_0215 /tmp/irep-backup.key
+sudo shred -u /tmp/irep-backup.key                         # never leave the private key on the server
 ```
+
+To restore from the second location instead:
+1. Copy the dated folder back to the server, with `rsync` or `rclone copy b2:irep-backups/2026-11-20_0215 /var/backups/irep/2026-11-20_0215`.
+2. Run the same command.
+
+**Before go-live,** the drill replaces only demo data. Later, practise on a separate test server instead, by following steps 1–6 there with a copy of `.env`.
 
 **On a new server:** follow steps 1–6 with the **same `.env`**, then run the restore. The JWT secret and database passwords must match.
 

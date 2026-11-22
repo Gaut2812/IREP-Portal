@@ -192,6 +192,19 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm exec playwright test -c playwright.keycloak.config.ts --reporter=line,github
 
+  deploy-scripts:
+    name: Deploy scripts (encrypted backup, restore, go-live check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update -q && sudo apt-get install -y -q age
+      - run: pip install pytest pyyaml
+      - name: backup.sh / restore.sh with real age, Caddyfile and Compose checks
+        run: python -m pytest infra/prod/tests -q -p no:cacheprovider
+
   link-gate:
     name: Link gate (docs/INTERCONNECT.md)
     runs-on: ubuntu-latest

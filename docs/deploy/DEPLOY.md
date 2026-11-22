@@ -295,6 +295,22 @@ To restore from the second location instead:
 
 **Check:** sign in, open a certificate proof and download a report PDF.
 
+## 10b. Go-live check (before the first real college is onboarded)
+
+```bash
+cd /opt/irep/infra/prod && sudo ./golive-check.sh
+```
+
+It prints PASS or FAIL for each check, and exits non-zero until every check passes:
+
+| Check | Fails when | Fix |
+|---|---|---|
+| `keycloak_bootstrap_admin` | the temporary admin from `.env` still exists | In the master realm, create a named admin with two-factor; set `KEYCLOAK_ADMIN_USER`/`PASSWORD` to it; delete the bootstrap user ("Security notes" below) |
+| `secrets` | a secret is empty, `CHANGE_ME`, a well-known default or too short, or the API's production checks fail | Regenerate with `openssl rand -hex 32` (step 5) |
+| `demo_data` | demo accounts (`@demo.edu`) are in the database | Never run `seed/run_seed.py` on this server; start from an empty database |
+| `backups_encrypted` | no age public key, no backup in 36 hours, or any unencrypted file in `BACKUP_DIR` | Step 10 |
+| `restore_recorded` | `restore.sh` has not recorded a restore in the last 180 days | Do the restore drill (step 10) |
+
 ## 11. Updating to a new version
 
 ```bash

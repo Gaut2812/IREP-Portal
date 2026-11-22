@@ -344,6 +344,15 @@ Parents sign in with their mobile number. The portal then sends a 6-digit code, 
 
 While `SMS_PROVIDER=off`, every notice meant for SMS (leave decisions, events, at-risk alerts) goes to the person's email instead. It is recorded as `delivered:email`.
 
+## Sign-in rate limits
+
+There are three layers against password guessing and code guessing:
+1. **Caddy** limits sign-in POSTs per client IP to `SIGNIN_RATE_PER_MIN` (default 120 a minute). This covers the Keycloak sign-in form and the portal's login and parent-code endpoints. Caddy is built with the open-source `caddy-ratelimit` module (`infra/prod/caddy.Dockerfile`). Over the limit, the answer is `429` with `Retry-After`.
+2. **The API** limits failed password sign-ins per IP (`LOGIN_IP_FAILS_PER_WINDOW`, 30 per 10 minutes), and parent codes per IP and per mobile number.
+3. **Keycloak** locks an account after 5 wrong passwords.
+
+The default is generous on purpose: a college lab signs a whole class in from one public IP. Lower it only if you see abuse in the Caddy logs.
+
 ## Virus scanning of uploads (ClamAV)
 
 Every upload is scanned by ClamAV (open source, the `clamav` service) **before** it is saved. This covers certificate proofs, interview recordings and student import files.

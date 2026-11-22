@@ -2,6 +2,7 @@
 # Needs DNS A records for APP_DOMAIN and ID_DOMAIN pointing at this VM, with ports 80 and 443 open.
 {
 	email {$ACME_EMAIL}
+	order rate_limit before basicauth
 }
 
 (security_headers) {
@@ -16,8 +17,27 @@
 {$APP_DOMAIN} {
 	import security_headers
 	encode zstd gzip
-	request_body {
+	# uploads: 25 MB, except interview recordings (up to 500 MB, scanned by ClamAV in the API)
+	@recording path /api/v1/trainer/interviews/*/recording
+	@not_recording not path /api/v1/trainer/interviews/*/recording
+	request_body @recording {
+		max_size 600MB
+	}
+	request_body @not_recording {
 		max_size 25MB
+	}
+	# Per-IP limit on sign-in and parent codes, on top of the API's own limits and Keycloak's
+	# per-account lockout. Generous on purpose: a college lab shares one IP for a whole class.
+	rate_limit {
+		zone signin_per_ip {
+			match {
+				method POST
+				path /api/v1/auth/login /api/v1/auth/parent/otp/request /api/v1/auth/parent/otp/verify
+			}
+			key {remote_host}
+			events {$SIGNIN_RATE_PER_MIN:120}
+			window 1m
+		}
 	}
 	# API (REST + WebSockets under /api/v1/ws/...) and signed media links
 	@api path /api/* /media/* /health
@@ -46,5 +66,17 @@
 	# Keycloak's health and metrics stay internal
 	@kcinternal path /health* /metrics*
 	respond @kcinternal 404
+	# Per-IP limit on the sign-in form (password, OTP, set-password), on top of Keycloak's per-account lockout
+	rate_limit {
+		zone kc_signin_per_ip {
+			match {
+				method POST
+				path /realms/*/login-actions/*
+			}
+			key {remote_host}
+			events {$SIGNIN_RATE_PER_MIN:120}
+			window 1m
+		}
+	}
 	reverse_proxy keycloak:8080
 }

@@ -202,7 +202,11 @@ jobs:
           python-version: "3.12"
       - run: sudo apt-get update -q && sudo apt-get install -y -q age
       - run: pip install pytest pyyaml
-      - name: backup.sh / restore.sh with real age, Caddyfile and Compose checks
+      - name: Build Caddy with the rate-limit module
+        run: docker build -q -f infra/prod/caddy.Dockerfile -t irep-caddy:test infra/prod
+      - name: backup.sh / restore.sh with real age; Caddy per-IP limits live; Compose checks
+        env:
+          CADDY_IT: "1"
         run: python -m pytest infra/prod/tests -q -p no:cacheprovider
 
   link-gate:

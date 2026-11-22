@@ -101,8 +101,11 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
         # one password store: Keycloak owns staff and student credentials
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="Password sign-in moved to single sign-on. Use 'Sign in with IREP account'.")
     now = datetime.datetime.utcnow()
-    user = _find_user(db, req.identifier)
     ip = _client_ip(request)
+    # per-IP limit across all accounts (password spraying), on top of the per-account lockout below
+    _too_many(_ip_count(db, "auth.login_failed", ip, now - datetime.timedelta(minutes=OTP_WINDOW_MINUTES)),
+              settings.LOGIN_IP_FAILS_PER_WINDOW, OTP_WINDOW_MINUTES, "failed sign-ins from this network")
+    user = _find_user(db, req.identifier)
     invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials. Check your ID and password.")
     if not user or _sign_in_group(user.role) != _sign_in_group(req.role) or user.role == "parent":
         record_audit(db, None, "auth.login_failed", "user", user.id if user else None, {"reason": "unknown_or_role", "role": req.role}, college_id=user.college_id if user else "unknown", ip_address=ip)

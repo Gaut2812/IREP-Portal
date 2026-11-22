@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     OTP_IP_REQUESTS_PER_WINDOW: int = int(os.getenv("OTP_IP_REQUESTS_PER_WINDOW", "60"))      # per 10 minutes
     # Every OTP request answers after at least this long, registered number or not (no timing oracle)
     OTP_RESPONSE_FLOOR_MS: int = int(os.getenv("OTP_RESPONSE_FLOOR_MS", "400"))
+    # Failed password sign-ins per client IP per 10 minutes (local auth; Keycloak mode: Caddy + Keycloak lockout)
+    LOGIN_IP_FAILS_PER_WINDOW: int = int(os.getenv("LOGIN_IP_FAILS_PER_WINDOW", "30"))
     OTP_IP_VERIFY_FAILS_PER_WINDOW: int = int(os.getenv("OTP_IP_VERIFY_FAILS_PER_WINDOW", "30"))  # per 10 minutes
     # Files: local disk now, S3-compatible later (services/storage.py)
     STORAGE_ADAPTER: str = os.getenv("STORAGE_ADAPTER", "local")

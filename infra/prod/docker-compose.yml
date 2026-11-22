@@ -156,7 +156,10 @@ services:
     logging: *logging
 
   caddy:
-    image: caddy:2.10-alpine
+    image: irep-caddy:${IREP_VERSION:-local}
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile                  # Caddy + the rate-limit module
     ports:
       - "80:80"
       - "443:443"
@@ -166,6 +169,7 @@ services:
       ID_DOMAIN: ${ID_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
       KC_ADMIN_ALLOW_IPS: ${KC_ADMIN_ALLOW_IPS:-192.0.2.1/32}
+      SIGNIN_RATE_PER_MIN: ${SIGNIN_RATE_PER_MIN:-120}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

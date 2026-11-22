@@ -102,4 +102,12 @@ This was verified against Keycloak 26.0.7 in a browser:
 - a staff user is forced to set up an authenticator
 - every later staff sign-in needs a code, and a wrong code is refused
 
+**The API checks it too.** `ops/configure_keycloak.py` adds an AMR mapper and tags the password step `pwd` and the OTP steps `otp`. Each reference is valid for 8 hours, the SSO idle time.
+- `core/keycloak.py` refuses an `irep_admin` or `super_admin` token whose `amr` lacks `otp`. It answers `401` with `X-IREP-Reason: two_factor_required`; this applies to requests and WebSockets.
+- On that answer, the web app sends the user back through Keycloak with `prompt=login` and shows "sign in again with your authenticator code". This happens once, after the very first sign-in, when the authenticator was only being set up (that token has `amr=["pwd"]`).
+- Verified against Keycloak 26.0.7:
+  - first sign-in: refused
+  - a later sign-in with a code: accepted
+  - a refreshed token: accepted
+
 `AUTH_PROVIDER=local` (development only) has no second factor. Production refuses local auth (`core/production.py`).

@@ -23,6 +23,11 @@ export default function AuthCallbackPage() {
         if (cfg.provider !== "keycloak") throw new Error("not_keycloak");
         const token = await completeKeycloakSignIn(cfg, window.location.search);
         const res = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.status === 401 && res.headers.get("X-IREP-Reason") === "two_factor_required") {
+          // e.g. the first sign-in, when the authenticator app was only being set up
+          window.location.replace("/login?reauth=2fa");
+          return;
+        }
         if (!res.ok) throw new Error(`me_${res.status}`);
         const me = (await res.json()) as UserProfile & { language_pref?: string };
         window.history.replaceState(null, "", "/auth/callback");   // drop the code from history

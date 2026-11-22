@@ -44,7 +44,8 @@
     "staff_hint": "Staff",
     "sso_btn": "Sign in with IREP account",
     "sso_hint": "You will sign in on the IREP account page and come straight back here.",
-    "staff_link": "IREP staff sign-in"
+    "staff_link": "IREP staff sign-in",
+    "reauth_2fa": "For your security, sign in again and enter the 6-digit code from your authenticator app."
   },
   "nav": {
     "dashboard": "Dashboard",

@@ -76,7 +76,7 @@ function endpoint(cfg: AuthConfig, path: string): string {
 }
 
 /** Leave for the Keycloak login page. */
-export async function startKeycloakSignIn(cfg: AuthConfig, uiLocale: string): Promise<void> {
+export async function startKeycloakSignIn(cfg: AuthConfig, uiLocale: string, opts: { forceLogin?: boolean } = {}): Promise<void> {
   const verifier = randomString(48);
   const state = randomString(16);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
@@ -91,6 +91,8 @@ export async function startKeycloakSignIn(cfg: AuthConfig, uiLocale: string): Pr
     code_challenge_method: "S256",
     ui_locales: uiLocale,
   });
+  // prompt=login: ask for the password and the authenticator code again instead of reusing the session
+  if (opts.forceLogin) params.set("prompt", "login");
   window.location.assign(`${endpoint(cfg, "auth")}?${params.toString()}`);
 }
 

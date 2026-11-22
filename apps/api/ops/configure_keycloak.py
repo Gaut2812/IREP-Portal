@@ -29,6 +29,10 @@ from services.keycloak_admin import admin_from_env
 TWO_FA_ROLE = "irep_2fa"
 TWO_FA_PARENTS = {"irep_admin": "IREP staff (screens 45-49)", "super_admin": "IREP super admin (above IREP staff)"}
 FLOW = "irep browser"
+# amr values in tokens: the API refuses staff tokens without "otp" (core/keycloak.py). A reference
+# counts for 8 hours after the sign-in (= the SSO idle timeout), then staff sign in again.
+AMR_MAX_AGE = "28800"
+AMR_REFS = {"auth-username-password-form": "pwd", "auth-otp-form": "otp"}
 STAFF_SUBFLOW = "irep browser staff OTP"
 
 
@@ -132,6 +136,29 @@ def ensure_2fa_flow(kc) -> None:
     _set_requirement(kc, STAFF_SUBFLOW, otp, "REQUIRED")
 
 
+def ensure_amr(kc, client: dict) -> None:
+    """Tokens say how the user signed in (amr: pwd, otp). Idempotent."""
+    mappers = kc.http.get(f"/clients/{client['id']}/protocol-mappers/models").raise_for_status().json()
+    if not any(m.get("protocolMapper") == "oidc-amr-mapper" for m in mappers):
+        kc.http.post(f"/clients/{client['id']}/protocol-mappers/models", json={
+            "name": "amr", "protocol": "openid-connect", "protocolMapper": "oidc-amr-mapper",
+            "config": {"access.token.claim": "true", "id.token.claim": "true", "introspection.token.claim": "true"}}).raise_for_status()
+    for e in _executions(kc, FLOW):
+        ref = AMR_REFS.get(e.get("providerId", ""))
+        if not ref:
+            continue
+        want = {"default.reference.value": ref, "default.reference.maxAge": AMR_MAX_AGE}
+        cid = e.get("authenticationConfig")
+        if cid is None:
+            kc.http.post(f"/authentication/executions/{e['id']}/config",
+                         json={"alias": f"irep-amr-{ref}-{e['id'][:8]}", "config": want}).raise_for_status()
+        else:
+            current = kc.http.get(f"/authentication/config/{cid}").raise_for_status().json()
+            if any(current.get("config", {}).get(k) != v for k, v in want.items()):
+                kc.http.put(f"/authentication/config/{cid}",
+                            json={**current, "config": {**current.get("config", {}), **want}}).raise_for_status()
+
+
 def main() -> int:
     kc = admin_from_env()
     ensure_roles(kc)
@@ -143,6 +170,7 @@ def main() -> int:
         print("client irep-web not found: was infra/keycloak/realm-irep.json imported?")
         return 1
     kc.http.put(f"/clients/{found[0]['id']}", json=client_changes(found[0])).raise_for_status()
+    ensure_amr(kc, found[0])
     smtp = "SMTP set" if settings.SMTP_HOST else "no SMTP_HOST: invites and password resets cannot be emailed"
     print(f"realm {kc.realm}: redirects -> {settings.PUBLIC_BASE_URL}; {smtp}; "
           f"self-registration off; two-factor required for {', '.join(TWO_FA_PARENTS)}")

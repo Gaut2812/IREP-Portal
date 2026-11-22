@@ -50,6 +50,15 @@ test.describe("Super admin (/admin/super)", () => {
     await expect(page.getByTestId("staff-section")).toHaveCount(0);
   });
 
+  test("staff sent back for two-factor see why, in English and Tamil", async ({ page }) => {
+    await page.goto("/login?reauth=2fa");
+    await expect(page.getByTestId("login-reauth-2fa")).toContainText("authenticator app");
+    await expect(page.getByTestId("login-identifier")).toHaveValue("staff@irep.demo");     // IREP staff card selected
+    await page.evaluate(() => localStorage.setItem("irep_lang", "ta"));
+    await page.reload();
+    await expect(page.getByTestId("login-reauth-2fa")).toContainText("அங்கீகரிப்புச் செயலி");
+  });
+
   test("blocks the college admin role", async ({ page }) => {
     await loginAs(page, "college");
     await page.goto("/admin/super");

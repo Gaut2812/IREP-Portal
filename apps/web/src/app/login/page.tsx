@@ -26,9 +26,16 @@ export default function LoginPage() {
   const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const [langTouched, setLangTouched] = useState(false);
   const [authCfg, setAuthCfg] = useState<AuthConfig>({ provider: "local" });
+  const [reauth2fa, setReauth2fa] = useState(false);
 
   useEffect(() => {
     getAuthConfig().then(setAuthCfg);
+    // IREP staff sent back by the API: sign in again with the authenticator code
+    if (new URLSearchParams(window.location.search).get("reauth") === "2fa") {
+      setReauth2fa(true);
+      setSelectedRole("admin");
+      setIdentifier("staff@irep.demo");          // same default as the IREP staff link
+    }
   }, []);
 
   // Keycloak mode: staff and students use single sign-on; parents keep mobile OTP
@@ -80,7 +87,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (sso) {
-        await startKeycloakSignIn(authCfg, language);   // leaves the page
+        await startKeycloakSignIn(authCfg, language, { forceLogin: reauth2fa });   // leaves the page
         return;
       }
       if (selectedRole === "parent") {
@@ -221,6 +228,11 @@ export default function LoginPage() {
             {t("login.staff_link")}
           </button>
 
+          {reauth2fa && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-medium" role="status" data-testid="login-reauth-2fa">
+              {t("login.reauth_2fa")}
+            </div>
+          )}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium" role="alert" data-testid="login-error">
               {error}

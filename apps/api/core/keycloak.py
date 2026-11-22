@@ -19,6 +19,9 @@ import httpx
 from fastapi import HTTPException, status
 from jose import JWTError, jwt
 
+# Roles whose Keycloak token must carry amr "otp" (ops/configure_keycloak.py tags the OTP step)
+TWO_FACTOR_ROLES = ("irep_admin", "super_admin")
+TWO_FACTOR_DETAIL = "Sign in again and enter the code from your authenticator app: IREP staff need two-factor sign-in."
 IREP_ROLES = ("student", "trainer", "parent", "college_admin", "placement_officer", "irep_admin", "super_admin")
 
 
@@ -79,6 +82,12 @@ class KeycloakVerifier:
         if not user_id or not college_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="This account is not linked to a portal user and college")
+        if roles[0] in TWO_FACTOR_ROLES and "otp" not in (c.get("amr") or []):
+            # IREP staff and super admins: the token must come from a sign-in that used the authenticator
+            # app. Keycloak's flow enforces it; this refuses a token that got around the flow
+            # (and the very first sign-in, where the authenticator was only being set up).
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=TWO_FACTOR_DETAIL,
+                                headers={"WWW-Authenticate": "Bearer", "X-IREP-Reason": "two_factor_required"})
         name = c.get("name") or c.get("preferred_username") or ""
         initials = "".join(p[0] for p in name.split()[:2]).upper() or "IR"
         return TokenPayload(sub=user_id, email=c.get("email"), role=roles[0], college_id=college_id,

@@ -61,7 +61,8 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   if (res.status === 401 && !endpoint.startsWith("/auth/") && typeof window !== "undefined" && localStorage.getItem("irep_token")) {
     localStorage.removeItem("irep_token");
     localStorage.removeItem("irep_user");
-    window.location.href = "/login?expired=1";
+    // IREP staff whose token does not show a two-factor sign-in: sign in again with the authenticator code
+    window.location.href = res.headers.get("X-IREP-Reason") === "two_factor_required" ? "/login?reauth=2fa" : "/login?expired=1";
   }
 
   if (!res.ok) {

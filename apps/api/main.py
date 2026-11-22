@@ -61,6 +61,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-IREP-Reason"],       # the web app tells "sign in again with 2FA" from "signed out"
 )
 
 # Register routers under /api/v1

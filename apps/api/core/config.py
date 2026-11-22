@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     MSG91_OTP_TEMPLATE_ID: str = os.getenv("MSG91_OTP_TEMPLATE_ID", "")   # DLT-approved flow for the OTP (var: otp)
     MSG91_URL: str = os.getenv("MSG91_URL", "https://control.msg91.com/api/v5/flow")
     PARENT_OTP_CHANNEL: str = os.getenv("PARENT_OTP_CHANNEL", "email")    # email | sms (needs SMS_PROVIDER=msg91)
+    # Parent OTP abuse limits per client IP (generous: mobile carriers put many parents behind one IP)
+    OTP_IP_REQUESTS_PER_WINDOW: int = int(os.getenv("OTP_IP_REQUESTS_PER_WINDOW", "60"))      # per 10 minutes
+    OTP_IP_VERIFY_FAILS_PER_WINDOW: int = int(os.getenv("OTP_IP_VERIFY_FAILS_PER_WINDOW", "30"))  # per 10 minutes
     # Files: local disk now, S3-compatible later (services/storage.py)
     STORAGE_ADAPTER: str = os.getenv("STORAGE_ADAPTER", "local")
     # Screen 25 AI Study Buddy. "fake" (dev, deterministic hints) or "anthropic" (Claude API; needs the

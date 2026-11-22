@@ -1,8 +1,23 @@
+import logging
+import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from routers import auth, student, trainer, college, parent, live, notifications, admin_jobs, media, projects, interviews, discussions, messages_hub, admin_colleges, audit_consent, college_structure, college_settings, trainer_batches, schedule, attendance, leave_approvals, content_library, events, monthly_cards, support, assessments, labs, study_buddy, certificates, usage, college_messages, surveys
+
+class _RedactSecrets(logging.Filter):
+    """Access logs never show bearer tokens or link signatures (WebSockets pass ?token=, media links ?sig=)."""
+    _q = re.compile(r"((?:token|sig|signature|code|otp)=)[^&\s\"]+", re.I)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(self._q.sub(r"\1[redacted]", a) if isinstance(a, str) else a for a in record.args)
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_RedactSecrets())
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

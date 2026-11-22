@@ -58,6 +58,11 @@ def send_sms(phone: str, template_id: str, variables: dict, client: Optional[htt
         raise GatewayError(f"MSG91 error: {data.get('message')}")
 
 
+def real_email(email: Optional[str]) -> bool:
+    """Placeholder addresses (import without a parent email: <mobile>@parents.invalid) are not mailboxes."""
+    return bool(email) and "@" in email and not email.lower().endswith(".invalid")
+
+
 def sms_on() -> bool:
     return settings.SMS_PROVIDER.lower() == "msg91"
 
@@ -71,7 +76,7 @@ def deliver(user, channel: str, title: str, body: Optional[str]) -> str:
         send_sms(user.phone, settings.MSG91_TEMPLATE_ID, {"message": text[:300]})
         return "delivered"
     if channel in ("email", "sms"):                     # SMS switched off: email instead
-        if not user.email:
+        if not real_email(user.email):
             return "skipped:no_email"
         send_email(user.email, title, f"{text}\n\n{settings.PUBLIC_BASE_URL}")
         return "delivered" if channel == "email" else "delivered:email"
@@ -83,7 +88,7 @@ def send_parent_otp(user, otp: str, minutes: int) -> str:
     if settings.PARENT_OTP_CHANNEL.lower() == "sms" and sms_on():
         send_sms(user.phone, settings.MSG91_OTP_TEMPLATE_ID, {"otp": otp})
         return "sms"
-    if not user.email:
+    if not real_email(user.email):
         return "skipped:no_email"          # same answer to the caller (no account probing); audit shows it
     send_email(user.email, "Your IREP sign-in code",
                f"Your IREP sign-in code is {otp}. It is valid for {minutes} minutes.\n"

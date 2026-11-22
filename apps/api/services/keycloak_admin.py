@@ -10,16 +10,43 @@ import httpx
 
 from core.keycloak import IREP_ROLES
 
+# Keycloak enforces OTP for these at every sign-in (ops/configure_keycloak.py flow)
+TWO_FACTOR_ROLES = ("irep_admin", "super_admin")
+
+
+class _AdminToken(httpx.Auth):
+    """Master-realm admin token; fetched again on a 401 (admin-cli tokens live 60 s, a long sync outlives them).
+    The password is only sent to the token endpoint and never logged."""
+
+    def __init__(self, base: str, user: str, password: str, transport=None):
+        self._transport = transport
+        self._url, self._form = f"{base}/realms/master/protocol/openid-connect/token",             {"grant_type": "password", "client_id": "admin-cli", "username": user, "password": password}
+        self._token = None
+
+    def _fetch(self) -> str:
+        with httpx.Client(transport=self._transport, timeout=10) as c:
+            r = c.post(self._url, data=self._form)
+        if r.status_code != 200:
+            raise RuntimeError(f"Keycloak admin sign-in failed ({r.status_code}): check KEYCLOAK_ADMIN_USER / KEYCLOAK_ADMIN_PASSWORD")
+        return r.json()["access_token"]
+
+    def auth_flow(self, request):
+        if self._token is None:
+            self._token = self._fetch()
+        request.headers["Authorization"] = f"Bearer {self._token}"
+        response = yield request
+        if response.status_code == 401:
+            self._token = self._fetch()
+            request.headers["Authorization"] = f"Bearer {self._token}"
+            yield request
+
 
 class KeycloakAdmin:
-    def __init__(self, base: str, realm: str, user: str, password: str):
+    def __init__(self, base: str, realm: str, user: str, password: str, transport=None):
         self.base, self.realm = base.rstrip("/"), realm
-        tok = httpx.post(f"{self.base}/realms/master/protocol/openid-connect/token",
-                         data={"grant_type": "password", "client_id": "admin-cli", "username": user, "password": password},
-                         timeout=10)
-        tok.raise_for_status()
-        self.http = httpx.Client(base_url=f"{self.base}/admin/realms/{realm}", timeout=10,
-                                 headers={"Authorization": f"Bearer {tok.json()['access_token']}"})
+        auth = _AdminToken(self.base, user, password, transport)
+        auth._token = auth._fetch()                       # fail fast on wrong credentials
+        self.http = httpx.Client(base_url=f"{self.base}/admin/realms/{realm}", timeout=10, auth=auth, transport=transport)
 
     def find_user(self, username: str):
         r = self.http.get("/users", params={"username": username, "exact": "true"})
@@ -48,14 +75,24 @@ class KeycloakAdmin:
             rep = self.http.get(f"/roles/{role}").raise_for_status().json()
             self.http.post(f"/users/{kc_id}/role-mappings/realm", json=[rep]).raise_for_status()
 
-    def invite(self, rep: dict, role: str, send_email: bool) -> str:
-        """Create the user with 'update password' + 'verify email' required
-        actions (no password set by us) and optionally email the link."""
-        kc_id = self.upsert_user({**rep, "requiredActions": ["UPDATE_PASSWORD", "VERIFY_EMAIL"]})
+    def invite(self, rep: dict, role: str, send_email: bool, resend: bool = False) -> str:
+        """New user: 'update password' + 'verify email' (+ 'configure OTP' for IREP staff roles) required
+        actions, no password set by us, and optionally the email with the link.
+
+        Idempotent (outbox retries, re-run scripts): an existing user keeps their password, verified
+        email and OTP; only names, tenancy attributes and the role are re-synced. resend=True sends the
+        link again (and re-adds the required actions) on purpose."""
+        actions = ["UPDATE_PASSWORD", "VERIFY_EMAIL"] + (["CONFIGURE_TOTP"] if role in TWO_FACTOR_ROLES else [])
+        existing = self.find_user(rep["username"])
+        if existing and not resend:
+            keep = {k: v for k, v in rep.items() if k not in ("emailVerified", "requiredActions", "enabled")}
+            kc_id = self.upsert_user(keep)
+            self.set_only_irep_role(kc_id, role)
+            return kc_id
+        kc_id = self.upsert_user({**rep, "requiredActions": actions})
         self.set_only_irep_role(kc_id, role)
         if send_email:
-            self.http.put(f"/users/{kc_id}/execute-actions-email",
-                          json=["UPDATE_PASSWORD", "VERIFY_EMAIL"]).raise_for_status()
+            self.http.put(f"/users/{kc_id}/execute-actions-email", json=actions).raise_for_status()
         return kc_id
 
 

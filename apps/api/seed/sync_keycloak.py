@@ -49,6 +49,11 @@ def main() -> int:
     g.add_argument("--email", action="append")
     ap.add_argument("--password", default=os.getenv("DEMO_PASSWORD", "password123"))
     args = ap.parse_args()
+    if os.getenv("ENVIRONMENT", "development").lower() == "production":
+        # it sets one shared password on every account it touches
+        print("sync_keycloak.py is for demo data only and refuses to run with ENVIRONMENT=production. "
+              "Real accounts are invited (ops/bootstrap_admin.py, college onboarding, student import).")
+        return 2
 
     kc = admin_from_env()
     db = SessionLocal()

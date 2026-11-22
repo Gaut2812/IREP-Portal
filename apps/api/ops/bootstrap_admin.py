@@ -43,6 +43,8 @@ def main() -> int:
     ap.add_argument("--email", required=True)
     ap.add_argument("--name", default="IREP Operations")
     ap.add_argument("--no-email", action="store_true", help="do not send the Keycloak invite email")
+    ap.add_argument("--resend-invite", action="store_true",
+                    help="send the set-password link again (a plain re-run never touches an existing password or OTP)")
     args = ap.parse_args()
 
     db = SessionLocal()
@@ -54,8 +56,12 @@ def main() -> int:
                "attributes": {"irep_user_id": [u.id], "college_id": [u.college_id]}}
     finally:
         db.close()
-    admin_from_env().invite(rep, "irep_admin", send_email=not args.no_email)
-    if args.no_email:
+    kc = admin_from_env()
+    existed = kc.find_user(rep["username"]) is not None
+    kc.invite(rep, "irep_admin", send_email=not args.no_email, resend=args.resend_invite)
+    if existed and not args.resend_invite:
+        print(f"{u.email}: already set up; nothing changed (use --resend-invite to email the link again).")
+    elif args.no_email:
         print(f"{u.email}: created. In the Keycloak admin console (realm irep > Users), use 'Credentials > Reset password'.")
     else:
         print(f"{u.email}: invite emailed. The link sets the password, then sign in at the portal.")

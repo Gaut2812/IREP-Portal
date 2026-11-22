@@ -2,6 +2,7 @@
 expiring, rate-limited), language preference. Every outcome is audited."""
 import datetime
 import hashlib
+import hmac
 import re
 import secrets
 import uuid
@@ -9,13 +10,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
 
 from core.config import settings
 from core.database import get_db
 from core.security import verify_password, get_password_hash, create_access_token, get_current_user, TokenPayload, normalize_role, keycloak_mode
-from models.schema import User, Student, OtpAttempt
+from models.schema import AuditLog, User, Student, OtpAttempt
 from services.audit import record_audit
 from services.notifications import get_notification_adapter
 
@@ -26,7 +27,8 @@ LOCKOUT_MINUTES = 15
 OTP_TTL_MINUTES = 5
 OTP_REQUESTS_PER_WINDOW = 5
 OTP_WINDOW_MINUTES = 10
-OTP_MAX_VERIFY_ATTEMPTS = 5
+OTP_MAX_VERIFY_ATTEMPTS = 5              # per code
+OTP_PHONE_FAILS_PER_HOUR = 15            # per mobile number, across codes
 
 
 class LoginRequest(BaseModel):
@@ -140,7 +142,26 @@ def _normalize_phone(raw: str) -> str:
 
 
 def _phone_hash(phone: str) -> str:
-    return hashlib.sha256(f"{settings.JWT_SECRET_KEY}|phone|{phone}".encode()).hexdigest()
+    """Keyed hash: the mobile number is never stored; without the server key it cannot be brute-forced."""
+    return hmac.new(settings.JWT_SECRET_KEY.encode(), f"phone|{phone}".encode(), hashlib.sha256).hexdigest()
+
+
+def _too_many(n: int, limit: int, minutes: int, what: str) -> None:
+    if n >= limit:
+        raise HTTPException(status_code=429, detail=f"Too many {what}. Try again in {minutes} minutes.",
+                            headers={"Retry-After": str(minutes * 60)})
+
+
+def _ip_count(db: Session, action: str, ip: Optional[str], since: datetime.datetime) -> int:
+    if not ip:
+        return 0
+    return db.execute(select(func.count(AuditLog.id)).where(AuditLog.action == action, AuditLog.ip_address == ip,
+                                                            AuditLog.created_at >= since)).scalar_one()
+
+
+def _phone_fails(db: Session, ph: str, now: datetime.datetime) -> int:
+    return db.execute(select(func.coalesce(func.sum(OtpAttempt.verify_attempts), 0)).where(
+        OtpAttempt.phone_hash == ph, OtpAttempt.created_at >= now - datetime.timedelta(hours=1))).scalar_one()
 
 
 def _parent_by_phone(db: Session, phone: str) -> Optional[User]:
@@ -156,11 +177,18 @@ def request_parent_otp(req: ParentOTPRequest, request: Request, db: Session = De
     recent = db.execute(select(func.count(OtpAttempt.id)).where(OtpAttempt.phone_hash == ph, OtpAttempt.created_at >= now - datetime.timedelta(minutes=OTP_WINDOW_MINUTES))).scalar_one()
     parent = _parent_by_phone(db, phone)
     college_id = parent.college_id if parent else "unknown"
-    if recent >= OTP_REQUESTS_PER_WINDOW:
-        record_audit(db, None, "auth.otp_rate_limited", "phone", ph[:16], None, college_id=college_id, ip_address=_client_ip(request))
+    ip = _client_ip(request)
+    window = now - datetime.timedelta(minutes=OTP_WINDOW_MINUTES)
+    limited = (recent >= OTP_REQUESTS_PER_WINDOW
+               or _ip_count(db, "auth.otp_requested", ip, window) >= settings.OTP_IP_REQUESTS_PER_WINDOW
+               or _phone_fails(db, ph, now) >= OTP_PHONE_FAILS_PER_HOUR)
+    if limited:
+        record_audit(db, None, "auth.otp_rate_limited", "phone", ph[:16], None, college_id=college_id, ip_address=ip)
         db.commit()
-        raise HTTPException(status_code=429, detail=f"Too many OTP requests. Try again in {OTP_WINDOW_MINUTES} minutes.", headers={"Retry-After": str(OTP_WINDOW_MINUTES * 60)})
-    otp = f"{secrets.randbelow(1_000_000):06d}"
+        _too_many(1, 1, OTP_WINDOW_MINUTES, "OTP requests")
+    # a new code replaces every earlier one for this number
+    db.execute(update(OtpAttempt).where(OtpAttempt.phone_hash == ph, OtpAttempt.consumed.is_(False)).values(consumed=True))
+    otp = f"{secrets.randbelow(1_000_000):06d}"                  # CSPRNG
     db.add(OtpAttempt(id=f"otp_{uuid.uuid4().hex[:20]}", college_id=college_id, phone_hash=ph, otp_hash=get_password_hash(otp),
                       expires_at=now + datetime.timedelta(minutes=OTP_TTL_MINUTES), created_at=now, updated_at=now))
     channel = None
@@ -194,18 +222,32 @@ def verify_parent_otp(req: ParentOTPVerify, request: Request, db: Session = Depe
     phone = _normalize_phone(req.phone)
     ph = _phone_hash(phone)
     now = datetime.datetime.utcnow()
+    ip = _client_ip(request)
+    _too_many(_ip_count(db, "auth.otp_failed", ip, now - datetime.timedelta(minutes=OTP_WINDOW_MINUTES)),
+              settings.OTP_IP_VERIFY_FAILS_PER_WINDOW, OTP_WINDOW_MINUTES, "wrong codes from this network")
+    _too_many(_phone_fails(db, ph, now), OTP_PHONE_FAILS_PER_HOUR, 60, "wrong codes for this number")
     attempt = db.execute(select(OtpAttempt).filter_by(phone_hash=ph, consumed=False).order_by(OtpAttempt.created_at.desc())).scalars().first()
     if not attempt or attempt.expires_at < now:
         raise HTTPException(status_code=400, detail="OTP expired or not requested. Request a new OTP.")
-    if attempt.verify_attempts >= OTP_MAX_VERIFY_ATTEMPTS:
+    # Reserve one attempt atomically before checking, so parallel guesses cannot exceed the limit.
+    reserved = db.execute(update(OtpAttempt).where(OtpAttempt.id == attempt.id, OtpAttempt.consumed.is_(False),
+                                                   OtpAttempt.verify_attempts < OTP_MAX_VERIFY_ATTEMPTS)
+                          .values(verify_attempts=OtpAttempt.verify_attempts + 1)).rowcount
+    db.commit()
+    if not reserved:
         raise HTTPException(status_code=429, detail="Too many wrong OTP attempts. Request a new OTP.")
-    if not re.fullmatch(r"\d{6}", req.otp.strip()) or not verify_password(req.otp.strip(), attempt.otp_hash):
-        attempt.verify_attempts += 1
+    db.refresh(attempt)
+    code = req.otp.strip()
+    if not re.fullmatch(r"\d{6}", code) or not verify_password(code, attempt.otp_hash):    # bcrypt: constant time
         left = OTP_MAX_VERIFY_ATTEMPTS - attempt.verify_attempts
-        record_audit(db, None, "auth.otp_failed", "phone", ph[:16], {"left": left}, college_id=attempt.college_id, ip_address=_client_ip(request))
+        record_audit(db, None, "auth.otp_failed", "phone", ph[:16], {"left": left}, college_id=attempt.college_id, ip_address=ip)
         db.commit()
         raise HTTPException(status_code=400, detail=f"Incorrect OTP. {left} attempt{'s' if left != 1 else ''} left.")
-    attempt.consumed = True
+    # single use: only one request can flip consumed for this code
+    if not db.execute(update(OtpAttempt).where(OtpAttempt.id == attempt.id, OtpAttempt.consumed.is_(False))
+                      .values(consumed=True, verify_attempts=OtpAttempt.verify_attempts - 1)).rowcount:
+        db.commit()
+        raise HTTPException(status_code=400, detail="OTP expired or not requested. Request a new OTP.")
     parent = _parent_by_phone(db, phone)
     if not parent:
         db.commit()

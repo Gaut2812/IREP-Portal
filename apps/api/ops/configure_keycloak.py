@@ -41,8 +41,8 @@ def client_changes(client: dict) -> dict:
 
 def main() -> int:
     kc = admin_from_env()
-    realm = kc.http.get("").raise_for_status().json()
-    kc.http.put("", json={**realm, **realm_changes()}).raise_for_status()
+    # partial update: only the fields we own; a re-run never rewrites anything else (e.g. a masked SMTP password)
+    kc.http.put(f"{kc.base}/admin/realms/{kc.realm}", json=realm_changes()).raise_for_status()
     found = kc.http.get("/clients", params={"clientId": "irep-web"}).raise_for_status().json()
     if not found:
         print("client irep-web not found: was infra/keycloak/realm-irep.json imported?")

@@ -237,6 +237,7 @@ def test_configure_keycloak_sends_only_its_own_fields(monkeypatch):
     # roles and the two-factor flow were verified against a real Keycloak 26.0.7 (docs/PERMISSIONS.md)
     monkeypatch.setattr(ck, "ensure_roles", lambda kc: None)
     monkeypatch.setattr(ck, "ensure_2fa_flow", lambda kc: None)
+    monkeypatch.setattr(ck, "ensure_amr", lambda kc, client: None)
     assert ck.main() == 0
     realm_put = next(c for c in fake.calls if c[0] == "PUT" and c[1] == "/admin/realms/irep")
     body = json.loads(realm_put[2])

@@ -28,6 +28,9 @@ export default defineConfig({
       url: "http://localhost:8000/health",
       reuseExistingServer: true,
       timeout: 60000,
+      // every spec signs parents in from 127.0.0.1 and audit rows outlive a run: lift the per-IP OTP
+      // limits for this test server only (they are covered by apps/api/tests/test_security_review.py)
+      env: { OTP_IP_REQUESTS_PER_WINDOW: "100000", OTP_IP_VERIFY_FAILS_PER_WINDOW: "100000" },
     },
     {
       command: "pnpm start",

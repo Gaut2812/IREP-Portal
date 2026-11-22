@@ -61,9 +61,10 @@ There is no public sign-up for any role:
 | **Billing** (S16, not built yet) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ when built (guard with `SUPER`) |
 | Content library, templates (44) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Question bank (staff side) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Audit trail, consent view (48) | ❌ | ❌ | ❌ | ❌ | 👁 | 👁 |
+| Audit trail (48); student and parent names only inside a support session | ❌ | ❌ | ❌ | ❌ | 👁 | 👁 |
+| **Student or parent records**: consent list and history (48), a data-export file | ❌ | ❌ | ❌ | ❌ | 👁 **only inside an active support session** | 👁 **only inside an active support session** |
 | Data requests: raise | ❌ | ❌ | ❌ | ✅ own college | ❌ | ❌ |
-| Data **export** requests: build or reject | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Data **export** requests: build or reject (names hidden without a session) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | **Data deletion requests: approve or reject** | ❌ | ❌ | ❌ | ❌ | ❌ (👁 in the queue) | ✅ |
 | Support desk tickets (49) | ✅ own | ✅ own | ✅ own | ✅ own | ✅ all | ✅ all |
 | **Logged support sessions: open, end, list** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -75,6 +76,15 @@ The rows in **bold** are super-admin only. The guards:
 - `_may_decide` in `routers/audit_consent.py`
 
 The staff-account endpoints also refuse to let a super admin deactivate themselves or demote or deactivate the last active super admin.
+
+## Support sessions: how staff see student data
+
+IREP staff, and the super admin too, read student or parent records only inside an active support session (`services/support_access.py`):
+- The super admin opens a session for one staff member, one college, a reason, and 15–240 minutes.
+- While it is open, that person may read that college's records. Every read is audited as `support.read`, with the session id. A refused attempt is audited as `support.read_denied`.
+- Without a session the answer is `403`. Ending the session, or reaching its time limit, closes access at once.
+- In staff-wide lists, student and parent names are hidden for colleges without a session. This covers the data-request queue and the actor names in the audit trail. Ids and the workflow stay usable.
+- Support desk tickets (49) are readable without a session, because the student or parent sent them to IREP.
 
 ## Audit
 

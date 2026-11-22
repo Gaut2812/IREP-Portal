@@ -35,6 +35,16 @@ PRIYA = _h("usr_priya_01", "student")
 
 
 @pytest.fixture
+def support_session():
+    """The super admin opens a support session for IREP staff on the demo college (and ends it)."""
+    sid = client.post("/api/v1/admin/support-sessions", headers=SUPER, json={
+        "college_id": "col_demo_001", "staff_user_id": "usr_irep_staff_01", "minutes": 30,
+        "reason": "Screen 48 tests read consent records"}).json()["id"]
+    yield sid
+    client.post(f"/api/v1/admin/support-sessions/{sid}/end", headers=SUPER)
+
+
+@pytest.fixture
 def throwaway_student():
     """A student that a deletion request may anonymise for good."""
     tag = uuid.uuid4().hex[:8]
@@ -74,7 +84,7 @@ def _drain():
 # ---- audit trail -----------------------------------------------------------
 
 @pytest.mark.link("L38")
-def test_trail_is_filtered_paged_and_read_only():
+def test_trail_is_filtered_paged_and_read_only(support_session):
     client.post("/api/v1/consent", json={"purpose": "sms_alerts", "status": "granted"}, headers=RAMESH)   # makes a fresh row
     r = client.get("/api/v1/admin/audit?college_id=col_demo_001&action=consent.&page_size=5", headers=STAFF).json()
     assert r["total"] >= 1 and len(r["items"]) <= 5
@@ -116,7 +126,7 @@ def test_only_staff_read_the_trail(headers):
 # ---- consent ---------------------------------------------------------------
 
 @pytest.mark.link("L38")
-def test_withdrawal_is_a_new_row_and_hides_the_child_from_the_parent():
+def test_withdrawal_is_a_new_row_and_hides_the_child_from_the_parent(support_session):
     db = SessionLocal()
     try:
         karthik = db.execute(select(ParentStudent.student_id).where(ParentStudent.parent_user_id == "usr_lakshmi_01")).scalars().first()
@@ -142,7 +152,7 @@ def test_withdrawal_is_a_new_row_and_hides_the_child_from_the_parent():
     assert [h["status"] for h in staff[:2]] == ["granted", "withdrawn"]
 
 
-def test_consent_only_for_own_child_or_self():
+def test_consent_only_for_own_child_or_self(support_session):
     assert client.post("/api/v1/consent", json={"purpose": "parent_data_processing", "status": "granted", "student_id": "std_priya_01"},
                        headers=LAKSHMI).status_code == 404
     assert client.post("/api/v1/consent", json={"purpose": "public_portfolio", "status": "granted", "student_id": "std_cse_x"},

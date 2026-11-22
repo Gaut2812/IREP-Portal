@@ -1059,7 +1059,9 @@
     "reject_reason": "Reason for rejecting",
     "err_reason": "Give a reason (at least 5 characters).",
     "download": "Download export",
-    "super_only_deletion": "Deletion requests are approved or rejected by the super admin."
+    "super_only_deletion": "Deletion requests are approved or rejected by the super admin.",
+    "needs_session": "Student and parent data opens only inside a support session. Ask the super admin to open one for you and this college (Super admin > Support sessions); every view is logged.",
+    "name_hidden": "Name hidden"
   },
   "structure": {
     "title": "Branches and batches",

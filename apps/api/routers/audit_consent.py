@@ -25,6 +25,7 @@ from models.schema import (AuditLog, CodingSubmission, ConsentRecord, DataReques
                            SessionAttendance, Student, TestAttempt, User, Certificate)
 from services import consent as consent_svc
 from services.audit import record_audit
+from services.support_access import colleges_with_session, require_session
 from services.notifications import notify_user
 from services.outbox import emit, handler as outbox_handler
 from services.storage import get_storage
@@ -81,6 +82,11 @@ def audit_trail(
     rows = db.execute(q.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
                       .offset((page - 1) * page_size).limit(page_size)).scalars().all()
     names = dict(db.execute(select(User.id, User.name).where(User.id.in_({r.actor_user_id for r in rows if r.actor_user_id} or {"_"}))).all())
+    # student and parent names only for colleges with an open support session (ids stay)
+    open_for = colleges_with_session(db, current_user, {r.college_id for r in rows})
+    for r in rows:
+        if r.actor_role in ("student", "parent") and r.college_id not in open_for:
+            names.pop(r.actor_user_id, None)
     _support_access(db, current_user, college_id, "audit_trail")
     db.commit()
     return {"total": total, "page": page, "page_size": page_size, "items": [_audit_row(r, names) for r in rows]}
@@ -158,6 +164,7 @@ def consent_overview(college_id: str, purpose: Optional[str] = None, page: int =
                      current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
     if purpose and purpose not in consent_svc.PURPOSES:
         raise HTTPException(status_code=422, detail="Unknown purpose")
+    require_session(db, current_user, college_id, "consent")
     total = db.execute(select(func.count(Student.id)).where(Student.college_id == college_id)).scalar_one()
     students = db.execute(select(Student, User.name).join(User, User.id == Student.user_id).where(Student.college_id == college_id)
                           .order_by(Student.register_no).offset((page - 1) * page_size).limit(page_size)).all()
@@ -167,7 +174,6 @@ def consent_overview(college_id: str, purpose: Optional[str] = None, page: int =
         c = cur.get(s.id, {})
         items.append({"student_id": s.id, "name": name, "register_no": s.register_no, "batch": s.batch_name,
                       "consents": {p: c.get(p) for p in ([purpose] if purpose else consent_svc.PURPOSES)}})
-    _support_access(db, current_user, college_id, "consent")
     db.commit()
     return {"total": total, "page": page, "purposes": list(consent_svc.PURPOSES), "items": items}
 
@@ -177,9 +183,9 @@ def consent_history(student_id: str, current_user: TokenPayload = Depends(STAFF)
     s = db.get(Student, student_id)
     if s is None:
         raise HTTPException(status_code=404, detail="Student not found")
+    require_session(db, current_user, s.college_id, "consent_history", "student", s.id)
     rows = db.execute(select(ConsentRecord).where(ConsentRecord.subject_student_id == s.id)
                       .order_by(ConsentRecord.recorded_at.desc())).scalars().all()
-    _support_access(db, current_user, s.college_id, "consent_history")
     db.commit()
     return {"student_id": s.id, "history": [{"purpose": r.purpose, "status": r.status, "method": r.method,
                                               "by": r.granted_by_user_id, "at": r.recorded_at.isoformat()} for r in rows]}
@@ -260,9 +266,13 @@ def staff_queue(status_filter: Optional[str] = Query(None, alias="status"), curr
         q = q.where(DataRequest.status == status_filter)
     open_first = case((DataRequest.status.in_(("received", "in_progress")), 0), else_=1)
     rows = db.execute(q.order_by(open_first, DataRequest.due_on, DataRequest.created_at)).scalars().all()
-    names = _student_names(db, [r.subject_student_id for r in rows])
+    open_for = colleges_with_session(db, current_user, {r.college_id for r in rows})
+    names = _student_names(db, [r.subject_student_id for r in rows if r.college_id in open_for])
     today = datetime.date.today()
-    return {"items": [_request_out(r, names, today, current_user) for r in rows]}
+    items = [_request_out(r, names, today, current_user) for r in rows]
+    for it in items:
+        it["name_hidden"] = it["college_id"] not in open_for       # open a support session to see who it is
+    return {"items": items}
 
 
 def _open_request(db: Session, request_id: str, user: TokenPayload) -> DataRequest:
@@ -380,6 +390,7 @@ def staff_download(request_id: str, current_user: TokenPayload = Depends(STAFF),
     r = db.get(DataRequest, request_id)
     if r is None:
         raise HTTPException(status_code=404, detail="Request not found")
+    require_session(db, current_user, r.college_id, "data_export", "data_request", r.id)
     return _download(db, r, current_user)
 
 

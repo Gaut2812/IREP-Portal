@@ -20,6 +20,7 @@ export default function ConsentPage() {
   const [data, setData] = useState<{ total: number; purposes: string[]; items: Item[] } | null>(null);
   const [history, setHistory] = useState<{ name: string; rows: History[] } | null>(null);
   const [error, setError] = useState("");
+  const [needsSession, setNeedsSession] = useState(false);
 
   useEffect(() => {
     fetchApi<{ colleges: { id: string; name: string }[] }>("/admin/colleges")
@@ -31,9 +32,11 @@ export default function ConsentPage() {
     if (!collegeId) return;
     try {
       setData(await fetchApi(`/admin/consent?college_id=${encodeURIComponent(collegeId)}&page=${page}&page_size=25`));
-      setError("");
+      setError(""); setNeedsSession(false);
     } catch (e) {
-      setError(e instanceof ApiError ? e.detail : t("admin_audit.load_failed"));
+      // student data: IREP staff need an open support session for this college
+      if (e instanceof ApiError && e.status === 403) { setData(null); setNeedsSession(true); setError(""); }
+      else setError(e instanceof ApiError ? e.detail : t("admin_audit.load_failed"));
     }
   }, [collegeId, page, t]);
 
@@ -62,6 +65,11 @@ export default function ConsentPage() {
             <span className="text-[11px] text-[#64748B]">{t("admin_audit.support_logged")}</span>
           </div>
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+          {needsSession && (
+            <p className="text-xs text-[#92400E] bg-[#FFFBEB] border border-[#FDE68A] rounded-lg p-3" role="status" data-testid="needs-support-session">
+              {t("admin_audit.needs_session")}
+            </p>
+          )}
           {data && (
             <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-x-auto">
               <table className="w-full text-xs" data-testid="consent-table">

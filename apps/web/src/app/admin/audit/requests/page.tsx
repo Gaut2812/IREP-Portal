@@ -13,6 +13,7 @@ interface Req {
   status: "received" | "in_progress" | "completed" | "rejected"; due_on: string; days_left: number | null; overdue: boolean;
   has_export: boolean; decision_note: string | null;
   can_decide?: boolean;
+  name_hidden?: boolean;
 }
 const STATUS: Record<string, string> = {
   received: "bg-[#FEF3C7] text-[#92400E]", in_progress: "bg-[#DBEAFE] text-[#1E40AF]",
@@ -60,7 +61,7 @@ export default function DataRequestsPage() {
     });
   };
   const download = (r: Req) => downloadWithAuth(`${API_BASE}/admin/data-requests/${r.id}/export`, authHeaders(), `irep-export-${r.student_id}.json`)
-    .catch(() => setError(t("admin_audit.download_failed")));
+    .catch(() => setError(r.name_hidden ? t("admin_audit.needs_session") : t("admin_audit.download_failed")));
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
@@ -79,7 +80,7 @@ export default function DataRequestsPage() {
                 <li key={r.id} className="bg-white rounded-xl border border-[#E2E8F0] p-3 text-xs space-y-2" data-testid={`request-${r.id}`}>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div>
-                      <span className="font-bold text-[#0F1F3A]">{t(`admin_audit.kind_${r.kind}`)}</span> · {r.student_name || r.student_id}
+                      <span className="font-bold text-[#0F1F3A]">{t(`admin_audit.kind_${r.kind}`)}</span> · {r.name_hidden ? <span data-testid="request-name-hidden">{t("admin_audit.name_hidden")} ({r.student_id})</span> : (r.student_name || r.student_id)}
                       <span className="text-[#64748B]"> · {r.college_id}</span>
                     </div>
                     <div className="flex items-center gap-2">

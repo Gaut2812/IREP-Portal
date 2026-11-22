@@ -34,7 +34,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Request Parent Otp */
+        /**
+         * Request Parent Otp
+         * @description Same status, body and timing whether or not the number is registered: the code is sent after
+         *     the response (background task, held in memory only), a delivery failure is audited instead of
+         *     answered, and every answer takes at least OTP_RESPONSE_FLOOR_MS.
+         */
         post: operations["request_parent_otp_api_v1_auth_parent_otp_request_post"];
         delete?: never;
         options?: never;

@@ -54,6 +54,7 @@
           "Authentication"
         ],
         "summary": "Request Parent Otp",
+        "description": "Same status, body and timing whether or not the number is registered: the code is sent after\nthe response (background task, held in memory only), a delivery failure is audited instead of\nanswered, and every answer takes at least OTP_RESPONSE_FLOOR_MS.",
         "operationId": "request_parent_otp_api_v1_auth_parent_otp_request_post",
         "requestBody": {
           "content": {

@@ -170,6 +170,7 @@ jobs:
           python seed/run_seed.py
           for i in $(seq 1 60); do curl -sf http://localhost:8081/realms/irep/.well-known/openid-configuration >/dev/null && break; sleep 3; done
           python seed/sync_keycloak.py
+          python ops/configure_keycloak.py     # like production: staff two-factor flow, AMR mapper, no sign-up
       - name: API accepts real Keycloak tokens
         working-directory: apps/api
         env:

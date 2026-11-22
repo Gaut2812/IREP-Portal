@@ -40,3 +40,20 @@ def seed_screen45(db, college_id: str = "col_demo_001") -> None:
                        students_cap=650, lab_hours_per_student=60, ai_calls_per_day=30, storage_gb=200, fee_per_student_inr=4500,
                        status="active", notes="Academic year MoU (B.Tech Sem 2-7)", created_by=STAFF_ID))
     db.flush()
+    m = db.get(MouTerm, "mou_demo_2026")
+    m.lab_overage_inr_per_hour, m.storage_overage_inr_per_gb = 25, 10       # S16 billing: agreed overage rates
+    _seed_billing(db, college_id)
+
+
+def _seed_billing(db, college_id: str) -> None:
+    """S16: the demo college starts with no invoices and one credit of Rs 5,000 (re-run restores this)."""
+    from sqlalchemy import delete, select
+    from models.schema import BillingCredit, Invoice, InvoiceLine
+    ids = list(db.execute(select(Invoice.id).where(Invoice.college_id == college_id)).scalars())
+    db.execute(delete(InvoiceLine).where(InvoiceLine.invoice_id.in_(ids or ["_"])))
+    db.execute(delete(Invoice).where(Invoice.id.in_(ids or ["_"])))
+    db.execute(delete(BillingCredit).where(BillingCredit.college_id == college_id))
+    db.flush()
+    db.add(BillingCredit(id="cred_demo_welcome", college_id=college_id, amount_paise=500_000, used_paise=0,
+                         reason="Pilot welcome credit", created_by=SUPER_ID))
+    db.flush()

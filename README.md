@@ -118,6 +118,7 @@ Sign-in rules:
 | 47 | Usage and quotas (IREP staff; use against the MoU) | `/admin/usage` |
 | 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
 | 49 | Support desk (report a problem from any screen; IREP staff reply) | `/support`, `/admin/support` |
+| 47+ | Billing (S16: monthly invoices from the MoU, usage, credits, GST; super admin issues, colleges download) | `/admin/billing`, `/college/billing` |
 | SA | Super admin: IREP staff accounts, logged support sessions ([permission matrix](docs/PERMISSIONS.md)) | `/admin/super` |
 
 ## Sign-in with Keycloak (optional in development)

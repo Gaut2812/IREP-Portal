@@ -58,7 +58,8 @@ There is no public sign-up for any role:
 | **MoU terms (incl. fees, quotas): create, activate** | ❌ | ❌ | ❌ | ❌ | 👁 | ✅ |
 | **Feature switches per college** | ❌ | ❌ | ❌ | ❌ | 👁 | ✅ |
 | Usage and quotas (47) | ❌ | ❌ | ❌ | 👁 own college | 👁 | 👁 |
-| **Billing** (S16, not built yet) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ when built (guard with `SUPER`) |
+| **Billing: generate, issue, settle, void invoices; add credits** (S16) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Billing: own college's issued invoices, PDFs, credit balance | ❌ | ❌ | ❌ | 👁 own college | ❌ | 👁 all |
 | Content library, templates (44) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Question bank (staff side) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Audit trail (48); student and parent names only inside a support session | ❌ | ❌ | ❌ | ❌ | 👁 | 👁 |

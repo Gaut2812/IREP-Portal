@@ -129,6 +129,7 @@ class Settings(BaseSettings):
     USER_STATE_CACHE_URL: str = os.getenv("USER_STATE_CACHE_URL", "")
     # Virus scan of every upload (services/antivirus.py): clamd in production, fake (EICAR only) in development
     AV_ADAPTER: str = os.getenv("AV_ADAPTER", "fake")
+    BILLING_GST_PCT: float = float(os.getenv("BILLING_GST_PCT", "18"))     # S16 invoices
     AV_CLAMD_HOST: str = os.getenv("AV_CLAMD_HOST", "clamav")
     AV_CLAMD_PORT: int = int(os.getenv("AV_CLAMD_PORT", "3310"))
 

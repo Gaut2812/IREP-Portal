@@ -93,6 +93,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.college_messages"), href: "/college/messages", icon: MessageSquare },
     { label: t("nav.surveys"), href: "/college/surveys", icon: BookOpen },
     { label: t("nav.mou_reports"), href: "/college/reports", icon: BookOpen },
+    { label: t("nav.billing"), href: "/college/billing", icon: BookOpen },
     { label: t("nav.settings"), href: "/college/settings", icon: LayoutDashboard },
   ];
 
@@ -114,7 +115,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.usage_billing"), href: "/admin/usage", icon: Cpu },
     { label: t("nav.audit_consent"), href: "/admin/audit", icon: ShieldCheck },
     { label: t("nav.support_desk"), href: "/admin/support", icon: MessageSquare },
-    ...(user?.super_admin ? [{ label: t("nav.super_admin"), href: "/admin/super", icon: KeyRound }] : []),
+    ...(user?.super_admin ? [{ label: t("nav.super_admin"), href: "/admin/super", icon: KeyRound },
+                             { label: t("nav.billing"), href: "/admin/billing", icon: Cpu }] : []),
   ];
 
   const currentNav = role === "admin" ? adminNav : role === "trainer" ? trainerNav : role === "college" ? collegeNav : role === "parent" ? parentNav : studentNav;

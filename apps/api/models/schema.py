@@ -31,6 +31,9 @@ class MouTerm(TenantModel):
     ai_calls_per_day: Mapped[int] = mapped_column(Integer, default=30)
     storage_gb: Mapped[int] = mapped_column(Integer, default=50)
     fee_per_student_inr: Mapped[int] = mapped_column(Integer, default=0)
+    # S16 billing: overage rates agreed in the MoU (0 = not charged)
+    lab_overage_inr_per_hour: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    storage_overage_inr_per_gb: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     status: Mapped[str] = mapped_column(String(16), default="draft", index=True)   # draft, active, superseded
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -1640,3 +1643,56 @@ class DriveRound(TenantModel):
     duration_min: Mapped[int] = mapped_column(Integer, default=40)
     slot_count: Mapped[int] = mapped_column(Integer, default=0)
     cutoff: Mapped[float] = mapped_column(Float, default=0)               # test: percent; interview: overall score
+
+
+class Invoice(TenantModel):
+    """S16 billing (screen 47): one monthly invoice per college. Amounts in paise (integers)."""
+    __tablename__ = "invoices"
+    __table_args__ = (UniqueConstraint("college_id", "period", "status_key", name="uq_invoice_period"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    period: Mapped[str] = mapped_column(String(7), index=True)                    # YYYY-MM
+    number: Mapped[Optional[str]] = mapped_column(String(32), unique=True, nullable=True)   # IREP/2026-27/0001 on issue
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)    # draft, issued, paid, void
+    # "live" for draft/issued/paid (one per college and period), the invoice id once void (frees the period)
+    status_key: Mapped[str] = mapped_column(String(64), default="live")
+    mou_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    students: Mapped[int] = mapped_column(Integer, default=0)
+    subtotal_paise: Mapped[int] = mapped_column(Integer, default=0)
+    credit_paise: Mapped[int] = mapped_column(Integer, default=0)
+    gst_pct: Mapped[float] = mapped_column(Float, default=18.0)
+    gst_paise: Mapped[int] = mapped_column(Integer, default=0)
+    total_paise: Mapped[int] = mapped_column(Integer, default=0)
+    usage: Mapped[dict] = mapped_column(JSON, default=dict)                        # lab minutes, AI calls, MB vs quota
+    issued_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    due_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    paid_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    payment_ref: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    void_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    pdf_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+
+class InvoiceLine(TenantModel):
+    __tablename__ = "invoice_lines"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    invoice_id: Mapped[str] = mapped_column(String(64), ForeignKey("invoices.id", name="fk_line_invoice"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)               # seats, lab_overage, storage_overage, credit
+    label_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    label_ta: Mapped[str] = mapped_column(String(255), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, default=0)
+    unit_paise: Mapped[int] = mapped_column(Integer, default=0)
+    amount_paise: Mapped[int] = mapped_column(Integer, default=0)
+    credit_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("billing_credits.id", name="fk_line_credit"), nullable=True)
+
+
+class BillingCredit(TenantModel):
+    """A credit for a college (goodwill, prepayment, correction), used by the next invoice(s)."""
+    __tablename__ = "billing_credits"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)
+    used_paise: Mapped[int] = mapped_column(Integer, default=0)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[str] = mapped_column(String(64), nullable=False)

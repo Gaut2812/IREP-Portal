@@ -107,6 +107,12 @@ async def get_current_user(
     """
     payload = _payload_from_token(token) if token else None
     if payload:
+        # A deactivated (or deleted) account is refused at once, not when its token expires.
+        from starlette.concurrency import run_in_threadpool
+        from core.active_users import is_active
+        if not await run_in_threadpool(is_active, payload.sub):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="This account is deactivated",
+                                headers={"WWW-Authenticate": "Bearer"})
         return payload
 
     # A token that is present but invalid or expired is always a 401, even in
@@ -149,3 +155,18 @@ def is_super_admin(user: TokenPayload) -> bool:
 # Only the super admin: staff accounts, MoU terms, feature switches, billing, deletion approvals,
 # support sessions. Every request a super admin makes is also audited (main.py).
 SUPER = require_role(["super_admin"])
+
+
+def websocket_user(token: Optional[str]) -> Optional[TokenPayload]:
+    """The caller of a WebSocket (?token=...): the same checks as a request (local or Keycloak
+    token, then "still active"). None means close the socket with 4401."""
+    if not token:
+        return None
+    try:
+        payload = _payload_from_token(token)
+    except HTTPException:
+        return None
+    if payload is None:
+        return None
+    from core.active_users import is_active
+    return payload if is_active(payload.sub) else None

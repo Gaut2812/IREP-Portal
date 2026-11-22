@@ -121,6 +121,8 @@ class Settings(BaseSettings):
     OUTBOX_POLL_SECONDS: float = float(os.getenv("OUTBOX_POLL_SECONDS", "2"))
     OUTBOX_MAX_ATTEMPTS: int = int(os.getenv("OUTBOX_MAX_ATTEMPTS", "5"))
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")  # Valkey speaks the Redis protocol
+    # Cache for "is this account still active?" (core/active_users.py). Empty: ask the database.
+    USER_STATE_CACHE_URL: str = os.getenv("USER_STATE_CACHE_URL", "")
 
     # AI Reviewer
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)

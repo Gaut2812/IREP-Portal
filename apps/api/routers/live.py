@@ -10,7 +10,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from core.database import get_db, SessionLocal
-from core.security import require_role, TokenPayload, decode_access_token, normalize_role
+from core.security import require_role, TokenPayload, decode_access_token, websocket_user, normalize_role
 from core.tenant import get_student_for_user, get_trainer_for_user, get_trainer_batch_ids
 from models.schema import (
     SessionItem, LiveMeeting, JoinEvent, LivePoll, LivePollVote, QaQuestion, QaUpvote, User, Batch, Recording, Student,
@@ -391,7 +391,7 @@ async def bbb_webhook(request: Request, x_bbb_signature: Optional[str] = Header(
 @router.websocket("/ws/live/{session_id}")
 async def live_socket(websocket: WebSocket, session_id: str, token: Optional[str] = None):
     """Push channel: clients get {type} pings and refetch state."""
-    payload = decode_access_token(token) if token else None
+    payload = websocket_user(token)          # local or Keycloak token, and still active
     if not payload:
         await websocket.close(code=4401)
         return

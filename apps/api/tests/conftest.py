@@ -16,6 +16,35 @@ import pytest
 
 _results: list = []
 
+# Token-only test accounts: some tests sign tokens for users that are not in the demo seed (other
+# colleges, a second trainer). Since a token is accepted only for an existing, active user
+# (core/active_users.py), they get real rows here. Emails use the reserved .invalid domain.
+TOKEN_TEST_USERS = {
+    "usr_trainer_01": ("col_demo_001", "trainer"),
+    "usr_other_trainer": ("col_other_999", "trainer"),
+    "usr_other_99": ("col_other_999", "student"),
+    "usr_other_01": ("col_other_999", "student"),
+    "usr_x": ("col_other_999", "college_admin"),
+    "usr_cse_5_001_x": ("col_demo_001", "student"),
+}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def token_test_users():
+    from core.database import SessionLocal
+    from core.security import get_password_hash
+    from models.schema import User
+    db = SessionLocal()
+    try:
+        for uid, (cid, role) in TOKEN_TEST_USERS.items():
+            if db.get(User, uid) is None:
+                db.add(User(id=uid, college_id=cid, email=f"{uid}@tests.invalid", role=role, name=uid,
+                            avatar_initials="TT", hashed_password=get_password_hash(uid)))
+        db.commit()
+    finally:
+        db.close()
+    yield
+
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "link(*ids): proves the listed interconnect links (L01..L43)")

@@ -12,7 +12,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from core.database import get_db, SessionLocal
-from core.security import require_role, TokenPayload, decode_access_token, normalize_role
+from core.security import require_role, TokenPayload, decode_access_token, websocket_user, normalize_role
 from core.tenant import get_trainer_for_user, get_trainer_batch_ids
 from models.schema import (
     TrainerDirectThread, DirectMessage, User, Student, Batch, ParentStudent,
@@ -320,7 +320,7 @@ def list_broadcasts(current_user: TokenPayload = Depends(require_role(["trainer"
 
 @router.websocket("/ws/threads/{thread_id}")
 async def thread_socket(websocket: WebSocket, thread_id: str, token: Optional[str] = None):
-    payload = decode_access_token(token) if token else None
+    payload = websocket_user(token)          # local or Keycloak token, and still active
     if not payload:
         await websocket.close(code=4401)
         return

@@ -9,7 +9,7 @@ from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session
 
 from core.database import get_db, SessionLocal
-from core.security import require_role, TokenPayload, decode_access_token, normalize_role
+from core.security import require_role, TokenPayload, decode_access_token, websocket_user, normalize_role
 from models.schema import (
     DiscussionGroup, GroupMessage, GroupMember, MessageReaction, MessageReport, User, College, TrainerDirectThread,
     Student, ParentStudent, BatchTrainer, Trainer,
@@ -293,7 +293,7 @@ def run_retention(current_user: TokenPayload = Depends(require_role(["college_ad
 
 @router.websocket("/ws/groups/{group_id}")
 async def group_socket(websocket: WebSocket, group_id: str, token: Optional[str] = None):
-    payload = decode_access_token(token) if token else None
+    payload = websocket_user(token)          # local or Keycloak token, and still active
     if not payload:
         await websocket.close(code=4401)
         return

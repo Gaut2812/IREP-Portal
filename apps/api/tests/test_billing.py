@@ -168,3 +168,45 @@ def test_invoice_lines_in_tamil():
     inv = _demo(client.get(f"/api/v1/admin/billing?period={PERIOD}&lang=ta", headers=SUPER).json())
     assert next(l for l in inv["lines"] if l["kind"] == "seats")["label"].startswith("IREP திட்ட இடங்கள்")
     assert next(l for l in inv["lines"] if l["kind"] == "credit")["label"].startswith("வரவு:")
+
+
+@pytest.mark.skipif(not str(SessionLocal.kw["bind"].url).startswith("postgresql"), reason="row locks need PostgreSQL")
+def test_two_invoices_issued_at_once_spend_a_credit_only_once():
+    """Two issuers race for the same Rs 5,000 credit: together they may use it once, never twice."""
+    import threading
+    from models.schema import BillingCredit
+    other = (datetime.date.fromisoformat(PERIOD + "-01") - datetime.timedelta(days=1)).strftime("%Y-%m")
+    db = SessionLocal()
+    try:
+        billing.generate(db, PERIOD)
+        billing.generate(db, other)
+        db.commit()
+        ids = [db.execute(select(Invoice.id).where(Invoice.college_id == "col_demo_001", Invoice.period == p,
+                                                   Invoice.status == "draft")).scalar_one() for p in (PERIOD, other)]
+    finally:
+        db.close()
+    start, errors = threading.Barrier(2), []
+
+    def issue(invoice_id):
+        s = SessionLocal()
+        try:
+            inv = s.get(Invoice, invoice_id)
+            start.wait()
+            billing.issue(s, inv)
+            s.commit()
+        except Exception as e:             # noqa: BLE001  reported below
+            errors.append(e)
+            s.rollback()
+        finally:
+            s.close()
+    threads = [threading.Thread(target=issue, args=(i,)) for i in ids]
+    [t.start() for t in threads]
+    [t.join(30) for t in threads]
+    assert not errors, errors
+    db = SessionLocal()
+    try:
+        credits = db.execute(select(func.sum(Invoice.credit_paise)).where(Invoice.id.in_(ids))).scalar_one()
+        used = db.execute(select(func.sum(BillingCredit.used_paise)).where(BillingCredit.college_id == "col_demo_001")).scalar_one()
+        assert credits == 500_000 and used == 500_000
+    finally:
+        db.close()

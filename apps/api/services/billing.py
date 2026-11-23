@@ -97,9 +97,13 @@ def _totals(inv: Invoice, lines: List[dict]) -> None:
 def _credit_lines(db: Session, college_id: str, subtotal: int, *, take: bool) -> List[dict]:
     """Credits oldest first, up to the subtotal. take=True marks them used (on issue)."""
     out, left = [], subtotal
-    for c in db.execute(select(BillingCredit).where(BillingCredit.college_id == college_id,
-                                                    BillingCredit.used_paise < BillingCredit.amount_paise)
-                        .order_by(BillingCredit.created_at, BillingCredit.id)).scalars():
+    q = (select(BillingCredit).where(BillingCredit.college_id == college_id, BillingCredit.used_paise < BillingCredit.amount_paise)
+         .order_by(BillingCredit.created_at, BillingCredit.id))
+    if take:
+        # two invoices issued at once must not both spend the same balance: lock the rows (PostgreSQL waits for
+        # the other transaction, then reads its committed used_paise) and drop any stale copy in this session
+        q = q.with_for_update().execution_options(populate_existing=True)
+    for c in db.execute(q).scalars():
         if left <= 0:
             break
         use = min(left, c.amount_paise - c.used_paise)
@@ -165,6 +169,9 @@ def _pdf(db: Session, inv: Invoice, college: College) -> bytes:
 
 def issue(db: Session, inv: Invoice) -> List[str]:
     """Fix the lines, take credits, number, PDF, due date. Returns the college admins' user ids."""
+    # lock this invoice so two people issuing the same draft at once cannot both pass the check below
+    db.execute(select(Invoice.id).where(Invoice.id == inv.id).with_for_update())
+    db.refresh(inv)
     if inv.status != "draft":
         raise HTTPException(status_code=409, detail=f"Only a draft can be issued (this invoice is {inv.status})")
     charges = [{"kind": ln.kind, "label_en": ln.label_en, "label_ta": ln.label_ta, "quantity": ln.quantity,

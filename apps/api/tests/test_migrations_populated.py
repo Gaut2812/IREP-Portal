@@ -51,3 +51,17 @@ def test_upgrade_rebuilds_referenced_tables_without_losing_rows(tmp_path):
         assert "room" in {r[1] for r in conn.exec_driver_sql("PRAGMA table_info(sessions)")}
         assert conn.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1          # enforcement restored
     eng.dispose()
+
+
+def test_a_database_on_the_old_migration_chain_is_refused_with_what_to_do(tmp_path):
+    """master's pre-S1 chain (0001_screen24_coding_foundation ... 0013_screen35_message_hub) was replaced by
+    0001_baseline; upgrading such a database must stop with a clear message, not alembic's 'can't locate revision'."""
+    import pytest
+    eng = create_engine(f"sqlite:///{(tmp_path / 'legacy.db').as_posix()}")
+    with eng.connect() as conn:
+        conn.exec_driver_sql("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)")
+        conn.exec_driver_sql("INSERT INTO alembic_version VALUES ('0013_screen35_message_hub')")
+        conn.commit()
+        with pytest.raises(RuntimeError, match="old migration chain.*0013_screen35_message_hub.*upgrade head"):
+            command.upgrade(_cfg(conn), "head")
+        assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar() == "0013_screen35_message_hub"   # untouched

@@ -9,7 +9,7 @@ A multi-tenant training portal for students, trainers, colleges and parents. The
 ```
 apps/
 ├── api/                  FastAPI backend
-│   ├── alembic/          Database migrations (one revision per screen)
+│   ├── alembic/          Database migrations (0001_baseline, then one revision per change)
 │   ├── core/             Settings, database, JWT security, tenant helpers
 │   ├── models/           SQLAlchemy models (every table carries college_id)
 │   ├── routers/          API endpoints
@@ -58,7 +58,9 @@ The web app runs at `http://localhost:3000`. Set `NEXT_PUBLIC_API_URL` if the AP
 | Student | `priya.r@demo.edu` / `password123` | `/student` |
 | Trainer | `arun.k@demo.edu` / `password123` | `/trainer` |
 | College admin | `admin@demo.edu` / `password123` | `/college` |
-| Parent | Mobile `9876543210` (Ramesh K) or `9876543214` (Lakshmi S), then the OTP | `/parent` |
+| IREP staff | `staff@irep.demo` / `password123` (link "IREP staff sign-in") | `/admin/colleges` |
+| Super admin | `super@irep.demo` / `password123` (same "IREP staff sign-in") | `/admin/super` |
+| Parent | Mobile `9876543210` (Ramesh K) or `9876543214` (Lakshmi S), then the OTP; `9876543216` (Selvi S, parent of the minor Vinoth S, `vinoth.s@demo.edu`) for the DPDP consent flow | `/parent` |
 
 In development the API returns the OTP in its response and the sign-in card shows it as "Demo OTP". In production it is sent only by SMS. The **View as** switcher in the top bar signs in as each demo role.
 
@@ -71,19 +73,66 @@ Sign-in rules:
 | # | Screen | Route |
 | --- | --- | --- |
 | 01 | Sign-in | `/login` |
+| 02 | College settings (users and roles, branding, data requests) | `/college/settings` |
+| 03 | Branches and batches (college admin; CSV student import) | `/college/structure` |
+| 04 | Trainer batches (roster, private notes, roster requests) | `/trainer/batches`, `/trainer/students/{id}` |
+| 05 | Schedule (trainer; propose new, reschedule, cancel, substitute) | `/trainer/schedule` |
+| 06 | Timetable (college; approve with clash warnings, rooms) | `/college/timetable` |
 | 07 | Live classroom | `/live/{sessionId}` |
 | 08 | Live sessions & recordings | `/student/live` |
+| 09 | Attendance (trainer; overrides, check-in code) and student check-in | `/trainer/attendance`, `/student/checkin` |
+| 10 | Attendance (parent; month view, leave requests) | `/parent/attendance` |
+| 11 | My courses (student; lessons feed the skill bars) | `/student/courses`, `/student/courses/[courseId]` |
 | 12 | Student dashboard | `/student` |
 | 13 | Trainer dashboard | `/trainer` |
+| 14 | At-risk students (trainer; parent calls) | `/trainer/at-risk` |
 | 15 | Parent view (mobile first) | `/parent` |
+| 16 | Progress reports (parent; released monthly cards) | `/parent/reports` |
+| 17 | Events (parent; RSVP) | `/parent/events` |
 | 19 | College dashboard | `/college` |
-| 23 | Practice test | `/student/tests/{id}` |
+| 20 | MoU reports (college; aggregates and MoU terms) | `/college/reports` |
+| 21 | Monthly reports (trainer; approve and release cards) | `/trainer/reports` |
+| 22 | Assessments (trainer; publish problems and tests to batches, results, IREP bank) | `/trainer/assessments` |
+| 23 | Practice tests (published to my batch) | `/student/tests`, `/student/tests/{id}` |
 | 24 | Coding lab | `/student/coding/{problemId}` |
+| 25 | AI Study Buddy (student; hints, daily cap, Tamil) | `/student/buddy` |
+| 26 | Certificates (student; external proofs to the trainer) | `/student/certificates` |
+| 27 | Certificates (parent; verified only) | `/parent/certificates` |
+| 28 | Certifications (college; counts only) | `/college/certifications` |
 | 29 | Virtual labs | `/student/labs` |
 | 30 | Sprint board | `/student/projects/{teamId}/board` |
 | 34 | Discussion groups | `/student/discussions` |
 | 35 | Trainer message hub | `/trainer/messages` (parents: `/parent/messages`) |
 | 36 | Mock interviews | `/student/interviews` |
+| 44 | Notification centre (every role; delivery preferences) | `/notifications` |
+| 43 | Approvals (trainer; leave and Cyber Range access) | `/trainer/approvals` |
+| 34+ | Moderation words (college; block or flag) | `/college/moderation` |
+| 37 | Mock interviews (trainer: slots, rubric scoring, notes, recording) | `/trainer/interviews` |
+| 38 | Mock drives (college: test and interview rounds, results, shortlist; a "drive" event on 42) | `/college/drives` |
+| 39 | Placement readiness (college: branch, batch, student drill-down; aggregates and bands) | `/college/readiness` |
+| 40 | Feedback survey (parent; set up by the college) | `/parent/surveys`, `/college/surveys` |
+| 41 | College messages (trainer chats, announcements at scale) | `/college/messages` |
+| 42 | Events (college; invitations, RSVP counts, placement posts) | `/college/events` |
+| 45 | Colleges and MoU terms (IREP staff) | `/admin/colleges` |
+| 46 | Content library and notification templates (IREP staff) | `/admin/content` |
+| 47 | Usage and quotas (IREP staff; use against the MoU) | `/admin/usage` |
+| 48 | Audit and consent (IREP staff) | `/admin/audit`, `/admin/audit/consent`, `/admin/audit/requests` |
+| 49 | Support desk (report a problem from any screen; IREP staff reply) | `/support`, `/admin/support` |
+| 47+ | Billing (S16: monthly invoices from the MoU, usage, credits, GST; super admin issues, colleges download) | `/admin/billing`, `/college/billing` |
+| DPDP | Consent for minors (S16: notices in English and Tamil, a parent approves with a fresh OTP sign-in, self-service data requests) | `/parent/consent`, `/student/privacy` |
+| SA | Super admin: IREP staff accounts, logged support sessions ([permission matrix](docs/PERMISSIONS.md)) | `/admin/super` |
+
+## Sign-in with Keycloak (optional in development)
+
+The default (`AUTH_PROVIDER=local`) is the API's own sign-in described above. To use Keycloak, as the pilot and production do:
+
+```bash
+docker compose -f infra/keycloak/docker-compose.yml up -d     # realm "irep" on http://localhost:8081
+appspienv\Scripts\python appspi\seed\sync_keycloak.py # demo users from the portal database
+set AUTH_PROVIDER=keycloak                                    # then start the API as usual
+```
+
+Students, trainers and college admins then press **Sign in with IREP account** and sign in on the Keycloak page. Parents keep the mobile OTP. The Keycloak admin console is at http://localhost:8081/admin, with the dev-only login `admin` / `admin`.
 
 ## External engines
 
@@ -92,13 +141,20 @@ Each external service sits behind an adapter. The default is a local fake, so th
 | Variable | Fake (default) | Real |
 | --- | --- | --- |
 | `JUDGE0_ADAPTER` | in-process runner | `judge0` (`JUDGE0_URL`) |
-| `LIVE_CLASS_ADAPTER` | in-portal classroom | `bbb` (`BBB_URL`, `BBB_SECRET`) |
+| `LIVE_CLASS_ADAPTER` | in-portal classroom | `teams` (Microsoft Graph: `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`, organizer per trainer in `trainers.teams_upn`); `bbb` is legacy |
 | `LAB_ADAPTER` | simulated lab sessions | `docker` |
 | `TRANSLATE_ADAPTER` | seeded Tamil pairs + glossary, cached | `libretranslate` (`TRANSLATE_URL`) |
 | `REALTIME_ADAPTER` | in-process WebSocket hub | `valkey` |
-| `NOTIFY_ADAPTER` | records SMS/email in memory | `smtp` / `sms` |
+| `NOTIFY_ADAPTER` | records SMS/email in memory | `live`: SMTP email (`SMTP_*`); SMS via MSG91 only when `SMS_PROVIDER=msg91` (off by default: SMS notices go by email) |
+| `STORAGE_ADAPTER` | `local` (files under `STORAGE_DIR`) | `s3` is an interface slot in `services/storage.py`, not implemented yet |
 
 `.env.example` lists every variable. With `ENVIRONMENT=production`, the development fallbacks are disabled: the `X-Demo-Role` header, the returned demo OTP and permissive CORS.
+
+## Production (pilot)
+
+One Ubuntu VM with Docker Compose: Caddy (automatic HTTPS), the web app, the API, a Celery worker and beat, Keycloak, PostgreSQL and Valkey. Follow [docs/deploy/DEPLOY.md](docs/deploy/DEPLOY.md); the files are in [infra/prod/](infra/prod/) (`.env.example` lists every secret, `backup.sh` takes the nightly backup). Your Microsoft 365 admin follows [docs/deploy/TEAMS_SETUP.md](docs/deploy/TEAMS_SETUP.md).
+
+With `ENVIRONMENT=production` the API refuses to start on unsafe settings and lists them all (`core/production.py`). The pilot keeps the Coding Lab, Virtual Labs and Study Buddy on their demo adapters through `ALLOW_DEMO_ADAPTERS=judge0,labs,study_buddy`. Parents sign in with a code sent to their email (`PARENT_OTP_CHANNEL=email`); MSG91 SMS is a paid switch that is off by default.
 
 ## Tests
 

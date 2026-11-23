@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from typing import Optional, List
@@ -10,18 +9,15 @@ import uuid
 from core.database import get_db
 from core.security import get_current_user, TokenPayload, require_role
 from core.tenant import get_student_for_user
+from core.tenant import get_student_for_user
 from core.config import settings
-
 from models.schema import (
-    Student, CodingProblem, TestCase, CodingSubmission,
-    SubmissionResult, CodingHintUsage, PracticeTest,
+    Student, CodingProblem, TestCase, CodingSubmission, SubmissionResult, CodingHintUsage, PracticeTest,
     PracticeQuestion, VirtualLabItem, SprintTask, MockInterview,
     SessionItem, DiscussionGroup, GroupMessage,
     TestAttempt, AttemptAnswer, ProctorEvent, TopicScore,
-    Course, Module, Lesson, LessonProgress,
     StudentProject, StudentSkill, ProjectDemoEvent
 )
-
 from services.judge0_service import get_execution_engine
 from services.ai_reviewer_service import get_ai_reviewer_engine
 from schemas.coding import (
@@ -29,6 +25,8 @@ from schemas.coding import (
     CodingSubmissionPublic, SubmissionResultPublic
 )
 
+from services.assessments import caller_student, get_for_caller, visible_to
+from core.security import normalize_role
 
 router = APIRouter(prefix="/student", tags=["Student Screens"])
 
@@ -200,17 +198,30 @@ def _get_ordered_problems(db: Session, college_id: str):
     order_map = {pid: i for i, pid in enumerate(CURRICULUM_ORDER)}
     return sorted(all_probs, key=lambda p: order_map.get(p.id, 999))
 
+
+def _coding_student_id(current_user: TokenPayload, db: Session) -> Optional[str]:
+    """students.id of the caller, or None for staff (trainer/college) previews.
+
+    Coding submissions and hint usages reference students.id, never users.id.
+    """
+    return db.execute(
+        select(Student.id).filter_by(user_id=current_user.sub, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+
 @router.get("/coding")
 def list_coding_problems(
     current_user: TokenPayload = Depends(require_role(["student", "trainer", "college_admin"])),
     db: Session = Depends(get_db)
 ):
     ordered_probs = _get_ordered_problems(db, current_user.college_id)
-    
+    if normalize_role(current_user.role) == "student":           # screen 22 publishing (L13)
+        me = caller_student(db, current_user)
+        ordered_probs = [p for p in ordered_probs if visible_to(p, me)]
+
     # Query solved problems for this student
     accepted_submissions = db.execute(
         select(CodingSubmission.problem_id).filter_by(
-            student_id=current_user.sub,
+            student_id=_coding_student_id(current_user, db),
             college_id=current_user.college_id,
             status="Accepted"
         )
@@ -241,9 +252,7 @@ def get_coding_problem(
     db: Session = Depends(get_db)
 ):
     # Tenant scoped query
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(
@@ -256,25 +265,27 @@ def get_coding_problem(
     prev_prob = ordered_all[curr_idx - 1] if curr_idx > 0 else None
     next_prob = ordered_all[curr_idx + 1] if 0 <= curr_idx < len(ordered_all) - 1 else None
 
+    student_id = _coding_student_id(current_user, db)
+
     # Query hints used by this student
     hint_records = db.execute(
         select(CodingHintUsage).filter_by(
             problem_id=prob.id,
-            student_id=current_user.sub,
+            student_id=student_id,
             college_id=current_user.college_id
         ).order_by(CodingHintUsage.hint_number)
     ).scalars().all()
-    
+
     revealed_hints = [r.hint_text for r in hint_records]
     if not revealed_hints:
         # Default with the first hint
         revealed_hints = [PROBLEM_HINTS[0]]
-        
+
     # Check if student has previous submissions
     last_submission = db.execute(
         select(CodingSubmission).filter_by(
             problem_id=prob.id,
-            student_id=current_user.sub,
+            student_id=student_id,
             college_id=current_user.college_id
         ).order_by(CodingSubmission.created_at.desc())
     ).scalars().first()
@@ -329,9 +340,7 @@ def run_code_sample(
     current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found for this tenant")
@@ -416,9 +425,7 @@ def review_student_code(
     current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found for this tenant")
@@ -438,9 +445,7 @@ def submit_code(
     current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found for this tenant")
@@ -512,7 +517,7 @@ def submit_code(
     hint_count = db.execute(
         select(CodingHintUsage).filter_by(
             problem_id=prob.id,
-            student_id=current_user.sub,
+            student_id=student_id,
             college_id=current_user.college_id
         )
     ).scalars().all()
@@ -608,23 +613,26 @@ def request_coding_hint(
     current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
     db: Session = Depends(get_db)
 ):
-    prob = db.execute(
-        select(CodingProblem).filter_by(id=problem_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
     
     if not prob:
         raise HTTPException(status_code=404, detail="Problem not found")
         
+    student_id = _coding_student_id(current_user, db)
+
     # Query current hints used
     hint_records = db.execute(
         select(CodingHintUsage).filter_by(
             problem_id=prob.id,
-            student_id=current_user.sub,
+            student_id=student_id,
             college_id=current_user.college_id
         ).order_by(CodingHintUsage.hint_number)
     ).scalars().all()
-    
-    next_hint_idx = len(hint_records)
+
+    # Hint 1 is shown for free on the problem page (see get_coding_problem), so
+    # the first request unlocks hint 2, never hint 1 again.
+    shown = max(len(hint_records), 1)
+    next_hint_idx = shown
     if next_hint_idx >= len(PROBLEM_HINTS):
         # All hints exhausted
         return {
@@ -634,19 +642,23 @@ def request_coding_hint(
             "hints_used": len(PROBLEM_HINTS),
             "max_hints": len(PROBLEM_HINTS)
         }
-        
+
     hint_text = PROBLEM_HINTS[next_hint_idx]
-    new_usage = CodingHintUsage(
-        id=f"hint_{int(datetime.datetime.utcnow().timestamp())}_{next_hint_idx}",
-        college_id=current_user.college_id,
-        problem_id=prob.id,
-        student_id=current_user.sub,
-        hint_number=next_hint_idx + 1,
-        hint_text=hint_text
-    )
-    db.add(new_usage)
-    db.commit()
-    
+    if student_id is not None:
+        # trainers preview hints without consuming a student's hint quota
+        to_record = [] if hint_records else [0]          # record the free hint 1 once
+        to_record.append(next_hint_idx)
+        for idx in to_record:
+            db.add(CodingHintUsage(
+                id=f"hint_{uuid.uuid4().hex[:20]}",
+                college_id=current_user.college_id,
+                problem_id=prob.id,
+                student_id=student_id,
+                hint_number=idx + 1,
+                hint_text=PROBLEM_HINTS[idx],
+            ))
+        db.commit()
+
     return {
         "success": True,
         "hint": hint_text,
@@ -693,17 +705,8 @@ def get_practice_test(
             name="Priya R"
         )
 
-    # Tenant-scoped test lookup
-    test = db.execute(
-        select(PracticeTest).filter_by(id=test_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
-    
-    if not test:
-        test = db.execute(select(PracticeTest).filter_by(id=test_id)).scalar_one_or_none()
-    if not test:
-        test = db.execute(select(PracticeTest).filter_by(college_id=current_user.college_id)).scalars().first()
-    if not test:
-        raise HTTPException(status_code=404, detail="Practice test not found")
+    # Tenant-scoped, and for students published to their batch (screen 22); never another college's test
+    test = get_for_caller(db, PracticeTest, test_id, current_user)
 
     questions = db.execute(
         select(PracticeQuestion)
@@ -789,13 +792,11 @@ def get_practice_test(
 @router.post("/tests/{test_id}/attempts")
 def start_or_resume_attempt(
     test_id: str,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
-    test = db.execute(select(PracticeTest).filter_by(id=test_id)).scalar_one_or_none()
-    if not test:
-        test = db.execute(select(PracticeTest)).first()[0]
+    test = get_for_caller(db, PracticeTest, test_id, current_user)
 
     now = datetime.datetime.utcnow()
 
@@ -853,7 +854,7 @@ def start_or_resume_attempt(
 def batch_save_answers(
     attempt_id: str,
     req: BatchAnswersRequest,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
@@ -923,7 +924,7 @@ def batch_save_answers(
 def log_proctor_event(
     attempt_id: str,
     req: ProctorEventRequest,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
@@ -952,7 +953,7 @@ def log_proctor_event(
 def submit_practice_test(
     attempt_id: str,
     req: Optional[SubmitTestRequest] = None,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
@@ -1123,7 +1124,7 @@ def submit_practice_test(
 @router.get("/tests/attempts/{attempt_id}/result")
 def get_attempt_result(
     attempt_id: str,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
+    current_user: TokenPayload = Depends(require_role(["student", "irep_admin"])),
     db: Session = Depends(get_db)
 ):
     student = _get_student_for_user(current_user, db)
@@ -1200,7 +1201,7 @@ def get_attempt_result(
 from models.schema import LabSession, LabApproval, BatchTrainer, Trainer
 from services.lab_orchestrator import (
     launch as orchestrate_launch, stop_session, cull, lock_reason, approval_for, usage, quota_for, period_of,
-    running_minutes, LabLaunchError, MONTHLY_LAB_MINUTES, IDLE_LIMIT_MIN,
+    running_minutes, LabLaunchError, MONTHLY_LAB_MINUTES, IDLE_LIMIT_MIN, beacon_token, approval_expired,
 )
 
 
@@ -1245,7 +1246,7 @@ def _lab_card(db: Session, student: Student, lab: VirtualLabItem, running: Optio
     if running and running.lab_id == lab.id:
         action = "open"
     elif locked:
-        action = {"approval": "request", "approval_pending": "pending", "approval_denied": "locked"}.get(locked[0], "locked")
+        action = {"approval": "request", "approval_expired": "request", "approval_pending": "pending", "approval_denied": "locked"}.get(locked[0], "locked")
     else:
         action = "launch"
     return {
@@ -1263,6 +1264,9 @@ def _session_payload(s: LabSession, lab: VirtualLabItem, now: datetime.datetime)
         "expires_at": s.expires_at.isoformat(), "minutes_left": max(0, int((s.expires_at - now).total_seconds() // 60)),
         "idle_limit_min": IDLE_LIMIT_MIN, "open_url": f"/lab/{s.id}", "provider": s.provider,
         "started_at": s.started_at.isoformat(), "stop_reason": s.stop_reason,
+        "runtime": lab.runtime or "server", "browser_kit": lab.browser_kit,
+        "beacon_token": beacon_token(s) if (lab.runtime == "browser" and s.status == "running") else None,
+        "can_connect": s.status == "running" and (lab.runtime in ("external",) or (lab.runtime or "server") == "server" and s.provider == "jupyterhub"),
     }
 
 
@@ -1276,9 +1280,10 @@ def get_virtual_labs(
     if cull(db, student.college_id, now):
         db.commit()
     labs = db.execute(select(VirtualLabItem).filter_by(college_id=student.college_id).order_by(VirtualLabItem.id)).scalars().all()
-    order = ["lab_linux", "lab_docker_k8s", "lab_cloud", "lab_ai_notebook", "lab_cyber_range", "lab_fullstack"]
+    order = ["lab_linux", "lab_docker_k8s", "lab_cloud", "lab_ai_notebook", "lab_cyber_range", "lab_fullstack", "lab_sql_browser", "lab_python_browser"]
     labs = sorted(labs, key=lambda l: order.index(l.id) if l.id in order else 99)
-    running = db.execute(select(LabSession).filter_by(student_id=student.id, status="running")).scalars().all()
+    running = db.execute(select(LabSession).where(LabSession.student_id == student.id,
+                                                  LabSession.status.in_(["running", "starting"]))).scalars().all()
     lab_by_id = {l.id: l for l in labs}
     period = period_of(now)
     minutes_used = usage(db, student, "lab_minutes", period) + sum(running_minutes(r, now) for r in running if lab_by_id.get(r.lab_id) and lab_by_id[r.lab_id].meter == "lab_minutes")
@@ -1289,7 +1294,7 @@ def get_virtual_labs(
         "active_sessions": [_session_payload(r, lab_by_id[r.lab_id], now) for r in running if r.lab_id in lab_by_id],
         "usage": {
             "period": period,
-            "lab_minutes_used": int(minutes_used), "lab_minutes_quota": MONTHLY_LAB_MINUTES,
+            "lab_minutes_used": int(minutes_used), "lab_minutes_quota": int(quota_for("lab_minutes", db, student.college_id)),
             "cloud_credits_used": round(credits_used, 1), "cloud_credits_quota": quota_for("cloud_credits"),
             "cloud_credits_left_pct": max(0, round(100 * (1 - credits_used / quota_for("cloud_credits")))),
         },
@@ -1379,7 +1384,7 @@ def request_lab_access(
     if not req.accept_aup:
         raise HTTPException(status_code=422, detail="Accept the acceptable-use agreement to request access")
     existing = approval_for(db, student, lab)
-    if existing and existing.status in ("pending", "approved"):
+    if existing and existing.status in ("pending", "approved") and not approval_expired(existing):
         return {"success": True, "status": existing.status, "approval_id": existing.id}
     ap = LabApproval(id=f"lap_{uuid.uuid4().hex[:16]}", college_id=student.college_id, lab_id=lab.id, student_id=student.id,
                      status="pending", aup_accepted_at=datetime.datetime.now(), reason=req.note)
@@ -1389,7 +1394,7 @@ def request_lab_access(
     ).scalars().all()
     for uid in trainer_users:
         notify_user(db, uid, f"Lab access request: {lab.name}", f"{current_user.name} requested access to {lab.name}.",
-                    title_ta=f"லேப் அனுமதி கோரிக்கை: {lab.name}", kind="approval", link="/trainer/approvals", college_id=student.college_id)
+                    title_ta=f"லேப் அனுமதி கோரிக்கை: {lab.name}", kind="approval", link="/trainer#lab-approvals", college_id=student.college_id)
     record_audit(db, current_user, "lab.access_request", "lab_approval", ap.id, {"lab_id": lab.id, "aup": True})
     db.commit()
     return {"success": True, "status": "pending", "approval_id": ap.id}
@@ -1459,6 +1464,8 @@ def get_recording_url(
     rec = db.execute(select(Recording).filter_by(id=recording_id, college_id=student.college_id)).scalar_one_or_none()
     if not rec or (rec.batch_id and rec.batch_id != student.batch_id):
         raise HTTPException(status_code=404, detail="Recording not found")
+    if rec.status == "over_quota":
+        raise HTTPException(status_code=409, detail="This recording was not kept: your college's recording storage is full. Ask your college.")
     if rec.status != "ready":
         raise HTTPException(status_code=409, detail="Recording is still processing")
     expires = datetime.datetime.now() + datetime.timedelta(minutes=15)
@@ -1754,241 +1761,4 @@ def delete_portfolio_project(
     db.commit()
     return {"success": True, "message": "Project deleted from portfolio", "project_id": project_id}
 
-
-
-# ---------------------------------------------------------------------------
-# SCREEN 11: My Courses (Sprint 6)
-# Route: /student/courses  —  role: student only
-# ---------------------------------------------------------------------------
-
-def _get_student_strict(current_user: TokenPayload, db: Session) -> Student:
-    """Return the Student row for the current user, raising 404 if missing."""
-    student = db.execute(
-        select(Student).filter_by(user_id=current_user.sub, college_id=current_user.college_id)
-    ).scalar_one_or_none()
-    if not student:
-        # Fallback: any student in this tenant (demo / test convenience)
-        student = db.execute(
-            select(Student).filter_by(college_id=current_user.college_id)
-        ).scalars().first()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found for this tenant")
-    return student
-
-
-def _build_lesson_map(student_id: str, db: Session) -> dict:
-    """Return a set of lesson_ids that the student has completed."""
-    rows = db.execute(
-        select(LessonProgress.lesson_id).filter_by(student_id=student_id, completed=True)
-    ).scalars().all()
-    return set(rows)
-
-
-@router.get("/courses")
-def list_courses(
-    track: Optional[str] = Query(None),
-    semester: Optional[int] = Query(None),
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
-    db: Session = Depends(get_db),
-):
-    """Screen 11 – catalogue: all active courses for the tenant with per-student progress."""
-    student = _get_student_strict(current_user, db)
-    completed_lessons = _build_lesson_map(student.id, db)
-
-    q = select(Course).filter_by(college_id=current_user.college_id, is_active=True)
-    if track:
-        q = q.filter(Course.track == track)
-    if semester:
-        q = q.filter(Course.semester_min <= semester)
-
-    courses = db.execute(q).scalars().all()
-
-    result = []
-    for course in courses:
-        # Fetch all lesson ids for this course (via modules)
-        module_ids = db.execute(
-            select(Module.id).filter_by(course_id=course.id, college_id=current_user.college_id)
-        ).scalars().all()
-
-        lesson_ids = []
-        if module_ids:
-            lesson_ids = db.execute(
-                select(Lesson.id).where(Lesson.module_id.in_(module_ids))
-            ).scalars().all()
-
-        total = len(lesson_ids)
-        done = len([lid for lid in lesson_ids if lid in completed_lessons])
-        pct = round((done / total) * 100) if total else 0
-
-        # Find resume lesson: first incomplete lesson
-        resume_lesson_id = None
-        if done < total:
-            for mod_id in module_ids:
-                lessons_in_mod = db.execute(
-                    select(Lesson).filter_by(module_id=mod_id).order_by(Lesson.order_index)
-                ).scalars().all()
-                for les in lessons_in_mod:
-                    if les.id not in completed_lessons:
-                        resume_lesson_id = les.id
-                        break
-                if resume_lesson_id:
-                    break
-
-        result.append({
-            "id": course.id,
-            "title": course.title,
-            "title_ta": course.title_ta,
-            "track": course.track,
-            "thumbnail_color": course.thumbnail_color,
-            "total_lessons": total if total else course.total_lessons,
-            "completed_lessons": done,
-            "progress_pct": pct,
-            "resume_lesson_id": resume_lesson_id,
-            "semester_min": course.semester_min,
-        })
-
-    return {"courses": result}
-
-
-@router.get("/courses/resume")
-def get_resume_lesson(
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
-    db: Session = Depends(get_db),
-):
-    """Return the last unfinished lesson so the front end can deep-link a 'Resume' CTA."""
-    student = _get_student_strict(current_user, db)
-    completed_set = _build_lesson_map(student.id, db)
-
-    courses = db.execute(
-        select(Course).filter_by(college_id=current_user.college_id, is_active=True)
-    ).scalars().all()
-
-    for course in courses:
-        module_ids = db.execute(
-            select(Module.id).filter_by(course_id=course.id, college_id=current_user.college_id)
-            .order_by(Module.order_index)
-        ).scalars().all()
-        for mod_id in module_ids:
-            module = db.execute(select(Module).filter_by(id=mod_id)).scalar_one_or_none()
-            lessons = db.execute(
-                select(Lesson).filter_by(module_id=mod_id).order_by(Lesson.order_index)
-            ).scalars().all()
-            for les in lessons:
-                if les.id not in completed_set:
-                    return {
-                        "course_id": course.id,
-                        "lesson_id": les.id,
-                        "lesson_title": les.title,
-                        "module_title": module.title if module else "",
-                    }
-
-    return None
-
-
-@router.get("/courses/{course_id}")
-def get_course_detail(
-    course_id: str,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
-    db: Session = Depends(get_db),
-):
-    """Screen 11 detail: module/lesson tree with per-student completion flags."""
-    student = _get_student_strict(current_user, db)
-    completed_set = _build_lesson_map(student.id, db)
-
-    course = db.execute(
-        select(Course).filter_by(id=course_id, college_id=current_user.college_id)
-    ).scalar_one_or_none()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    modules_rows = db.execute(
-        select(Module).filter_by(course_id=course_id, college_id=current_user.college_id)
-        .order_by(Module.order_index)
-    ).scalars().all()
-
-    modules_out = []
-    for mod in modules_rows:
-        lessons_rows = db.execute(
-            select(Lesson).filter_by(module_id=mod.id).order_by(Lesson.order_index)
-        ).scalars().all()
-        modules_out.append({
-            "id": mod.id,
-            "title": mod.title,
-            "order_index": mod.order_index,
-            "lessons": [
-                {
-                    "id": les.id,
-                    "title": les.title,
-                    "type": les.type,
-                    "duration_min": les.duration_min,
-                    "content_url": les.content_url,
-                    "completed": les.id in completed_set,
-                }
-                for les in lessons_rows
-            ],
-        })
-
-    return {
-        "course": {
-            "id": course.id,
-            "title": course.title,
-            "title_ta": course.title_ta,
-            "track": course.track,
-            "thumbnail_color": course.thumbnail_color,
-            "semester_min": course.semester_min,
-        },
-        "modules": modules_out,
-    }
-
-
-@router.post("/courses/{course_id}/lessons/{lesson_id}/progress", status_code=200)
-def mark_lesson_progress(
-    course_id: str,
-    lesson_id: str,
-    current_user: TokenPayload = Depends(require_role(["student", "super_admin"])),
-    db: Session = Depends(get_db),
-):
-    """Idempotent upsert: mark a lesson as completed for the current student.
-    Re-calling the endpoint updates completed_at but never inserts a duplicate row.
-    college_id is taken from the verified token — the client cannot supply it.
-    """
-    student = _get_student_strict(current_user, db)
-
-    # Verify the lesson actually belongs to this tenant's course
-    lesson = db.execute(
-        select(Lesson)
-        .join(Module, Lesson.module_id == Module.id)
-        .join(Course, Module.course_id == Course.id)
-        .filter(
-            Lesson.id == lesson_id,
-            Course.id == course_id,
-            Course.college_id == current_user.college_id,
-        )
-    ).scalar_one_or_none()
-
-    if not lesson:
-        raise HTTPException(status_code=404, detail="Lesson not found in this course")
-
-    now = datetime.datetime.utcnow()
-
-    existing = db.execute(
-        select(LessonProgress).filter_by(student_id=student.id, lesson_id=lesson_id)
-    ).scalar_one_or_none()
-
-    if existing:
-        existing.completed = True
-        existing.completed_at = now
-    else:
-        progress = LessonProgress(
-            id=f"lp_{uuid.uuid4().hex[:12]}",
-            college_id=current_user.college_id,
-            student_id=student.id,
-            lesson_id=lesson_id,
-            completed=True,
-            completed_at=now,
-        )
-        db.add(progress)
-
-    db.commit()
-    return {"success": True, "lesson_id": lesson_id, "completed_at": now.isoformat()}
 

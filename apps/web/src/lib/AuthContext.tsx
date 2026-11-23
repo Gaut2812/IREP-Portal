@@ -3,8 +3,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE } from "@/lib/api";
+import { clearKeycloakSession, keycloakLogoutUrl } from "@/lib/oidc";
 
-export type Role = "student" | "trainer" | "college" | "parent";
+/** "admin" is IREP staff (API role irep_admin; screens 45-49). */
+export type Role = "student" | "trainer" | "college" | "parent" | "admin";
 
 export interface UserProfile {
   id: string;
@@ -14,6 +16,8 @@ export interface UserProfile {
   avatar: string;
   college_id: string;
   language_pref?: string;
+  /** API role super_admin: IREP staff plus staff accounts, MoU terms, feature switches, deletions, support sessions */
+  super_admin?: boolean;
 }
 
 interface AuthContextType {
@@ -28,7 +32,8 @@ interface AuthContextType {
 
 /** The API uses `college_admin`; the web app uses the short `college`. */
 export function toWebRole(apiRole: string): Role {
-  if (apiRole === "college_admin" || apiRole === "college") return "college";
+  if (apiRole === "college_admin" || apiRole === "placement_officer" || apiRole === "college") return "college";
+  if (apiRole === "irep_admin" || apiRole === "super_admin" || apiRole === "admin") return "admin";
   if (apiRole === "trainer" || apiRole === "parent" || apiRole === "student") return apiRole;
   return "student";
 }
@@ -38,6 +43,7 @@ const demoProfiles: Record<Role, UserProfile> = {
   trainer: { id: "usr_arun_01", email: "arun.k@demo.edu", role: "trainer", name: "Arun Kumar", avatar: "AK", college_id: "col_demo_001" },
   college: { id: "usr_kavitha_01", email: "admin@demo.edu", role: "college", name: "Dr. Kavitha", avatar: "DC", college_id: "col_demo_001" },
   parent: { id: "usr_ramesh_01", email: "ramesh.k@example.com", role: "parent", name: "Mr. Ramesh K", avatar: "RK", college_id: "col_demo_001" },
+  admin: { id: "usr_irep_staff_01", email: "staff@irep.demo", role: "admin", name: "IREP Operations", avatar: "IO", college_id: "irep_platform" },
 };
 
 /** Seeded demo credentials used by the "View as" switcher and the Playwright helper. */
@@ -46,6 +52,7 @@ export const DEMO_CREDENTIALS: Record<Role, { identifier: string; password: stri
   trainer: { identifier: "arun.k@demo.edu", password: "password123" },
   college: { identifier: "admin@demo.edu", password: "password123" },
   parent: { identifier: "ramesh.k@example.com", password: "password123", phone: "9876543210" },
+  admin: { identifier: "staff@irep.demo", password: "password123" },
 };
 
 const MOCK_TOKENS = new Set(["mock_jwt_token_demo", "mock_token"]);
@@ -77,7 +84,7 @@ export async function demoLogin(role: Role): Promise<{ token: string; user: User
     if (!res.ok) throw new Error("Demo login failed");
     data = await res.json();
   }
-  const user: UserProfile = { ...data.user, role: toWebRole(data.user.role) };
+  const user: UserProfile = { ...data.user, role: toWebRole(data.user.role), super_admin: data.user.role === "super_admin" };
   return { token: data.access_token, user };
 }
 
@@ -92,7 +99,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(demoProfiles.student);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -112,11 +119,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        savedUser = { ...parsed, role: toWebRole(parsed.role) };
+        savedUser = { ...parsed, role: toWebRole(parsed.role), super_admin: parsed.super_admin === true || parsed.role === "super_admin" };
         setUser(savedUser);
         setToken(savedToken);
       } catch {
-        setUser(demoProfiles.student);
+        setUser(null);
       }
     }
     setIsLoaded(true);
@@ -132,13 +139,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [persist]);
 
   const login = (newToken: string, newUser: UserProfile) => {
-    const normalised = { ...newUser, role: toWebRole(newUser.role) };
+    const normalised = { ...newUser, role: toWebRole(newUser.role), super_admin: newUser.super_admin === true || (newUser.role as string) === "super_admin" };
     persist(newToken, normalised);
 
     if (normalised.role === "student") router.push("/student");
     else if (normalised.role === "trainer") router.push("/trainer");
     else if (normalised.role === "college") router.push("/college");
     else if (normalised.role === "parent") router.push("/parent");
+    else if (normalised.role === "admin") router.push("/admin/colleges");
   };
 
   const logout = () => {
@@ -146,6 +154,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
     localStorage.removeItem("irep_user");
     localStorage.removeItem("irep_token");
+    // Keycloak sign-in: end the SSO session too, or the next sign-in is silent
+    const sso = keycloakLogoutUrl();
+    clearKeycloakSession();
+    if (sso) {
+      window.location.assign(sso);
+      return;
+    }
     router.push("/login");
   };
 

@@ -53,7 +53,8 @@ def _lab(d, lab_id):
 
 def test_catalog_matches_pdf5_state():
     d = client.get("/api/v1/student/labs", headers=PRIYA).json()
-    assert [l["name"] for l in d["labs"]] == ["Linux Sandbox", "Docker & Kubernetes Lab", "Cloud Sandbox", "AI Notebook Lab", "Cyber Range", "Full-Stack Workspace"]
+    assert [l["name"] for l in d["labs"]] == ["Linux Sandbox", "Docker & Kubernetes Lab", "Cloud Sandbox", "AI Notebook Lab", "Cyber Range", "Full-Stack Workspace",
+                                                 "SQL Playground", "Python Playground"]   # PDF 5 order, then the browser labs
     assert [c["label"] for c in _lab(d, "lab_cloud")["chips"]] == ["Sem 5+", "Credits: 68%"]
     assert _lab(d, "lab_docker_k8s")["footer"] == "Last used: yesterday"
     assert [c["label"] for c in _lab(d, "lab_ai_notebook")["chips"]] == ["AI & DS", "Ready"]
@@ -83,6 +84,7 @@ def test_one_running_lab_then_stop_records_usage():
         db.close()
 
 
+@pytest.mark.link("L08")
 def test_cyber_range_approval_gate():
     r = client.post("/api/v1/student/labs/lab_cyber_range/launch", headers=PRIYA)
     assert r.status_code == 403 and r.json()["detail"]["reason"] == "approval"
@@ -124,17 +126,19 @@ def test_semester_and_track_locks():
 
 
 def test_exhausted_quota_blocks_with_clear_message():
+    from services.quotas import lab_minutes_per_student
     db = SessionLocal()
     try:
+        quota = lab_minutes_per_student(db, "col_demo_001")              # from the active MoU (L36)
         db.add(UsageLedger(id="ul_test_quota", college_id="col_demo_001", student_id="std_priya_01", kind="lab_minutes",
-                           amount=600, period=datetime.datetime.now().strftime("%Y-%m"), ref_type="test"))
+                           amount=quota, period=datetime.datetime.now().strftime("%Y-%m"), ref_type="test"))
         db.commit()
     finally:
         db.close()
     client.post("/api/v1/student/lab-sessions/ls_demo_priya_notebook/stop", headers=PRIYA)
     r = client.post("/api/v1/student/labs/lab_linux/launch", headers=PRIYA)
     assert r.status_code == 403 and r.json()["detail"]["reason"] == "quota"
-    assert "1200 lab minutes" in r.json()["detail"]["message"]
+    assert f"{quota} lab minutes" in r.json()["detail"]["message"]
     d = client.get("/api/v1/student/labs", headers=PRIYA).json()
     assert _lab(d, "lab_linux")["locked"]["reason"] == "quota"
     # cloud credits are metered separately and still allowed

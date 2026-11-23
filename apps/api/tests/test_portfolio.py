@@ -137,6 +137,7 @@ def test_tenant_scoping_isolation(student_auth_headers, other_tenant_auth_header
     )
     assert res_del.status_code == 404
 
+@pytest.mark.link("L15")
 def test_get_parent_portfolio(parent_auth_headers):
     response = client.get("/api/v1/parent/portfolio", headers=parent_auth_headers)
     assert response.status_code == 200

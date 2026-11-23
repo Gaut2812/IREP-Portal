@@ -81,8 +81,22 @@ class BBBAdapter(LiveClassAdapter):
                                   "role": "MODERATOR" if role in ("trainer", "college_admin") else "VIEWER", "redirect": "true"})
 
 
+class TeamsAdapter(LiveClassAdapter):
+    """Microsoft Teams via Graph calendar events (services/teams.py).
+    The event is created by the outbox worker; the join URL lives on LiveMeeting."""
+    name = "teams"
+
+    def create_meeting(self, session: SessionItem) -> str:
+        return f"irep-{session.id}"          # also the Graph transactionId
+
+    def join_url(self, meeting_id, user_id, full_name, role):
+        return None                           # router returns LiveMeeting.join_url
+
+
 def get_live_adapter() -> LiveClassAdapter:
     name = (getattr(settings, "LIVE_CLASS_ADAPTER", None) or "fake").lower()
+    if name == "teams":
+        return TeamsAdapter()
     if name == "bbb" and settings.BBB_SECRET:
         return BBBAdapter(settings.BBB_URL, settings.BBB_SECRET)
     return FakeLiveClassAdapter()
@@ -146,9 +160,10 @@ def session_window(session: SessionItem, meeting: Optional[LiveMeeting]) -> Tupl
 
 def user_presence(db: Session, session: SessionItem, user_id: str, now: datetime.datetime,
                   meeting: Optional[LiveMeeting] = None) -> dict:
-    events = db.execute(
-        select(JoinEvent.event, JoinEvent.at).where(JoinEvent.session_id == session.id, JoinEvent.user_id == user_id)
-    ).all()
+    q = select(JoinEvent.event, JoinEvent.at).where(JoinEvent.session_id == session.id, JoinEvent.user_id == user_id)
+    if meeting is not None and meeting.provider == "teams":
+        q = q.where(JoinEvent.source == "teams")     # a "Join in Teams" click is not attendance
+    events = db.execute(q).all()
     start, end = session_window(session, meeting)
     until = min(now, meeting.ended_at) if meeting and meeting.ended_at else now
     intervals = presence_intervals([(e, a) for e, a in events], until)
@@ -170,25 +185,31 @@ def finalize_session(db: Session, session: SessionItem, meeting: Optional[LiveMe
     """Meeting ended: compute presence for every student in the batch and upsert
     attendance (Present at >= 75% of scheduled time). Manual overrides win."""
     students = db.execute(select(Student).filter_by(batch_id=session.batch_id, college_id=session.college_id)).scalars().all()
-    present = absent = 0
+    present = absent = excused = 0
+    from services.leave import covered_by_leave
     for st in students:
         p = user_presence(db, session, st.user_id, now, meeting)
         status = "Present" if p["marked_present"] else "Absent"
+        if status == "Absent" and covered_by_leave(db, st.id, session.scheduled_start.date()):
+            status = "Excused"                      # approved leave (screen 43)
         row = db.execute(select(SessionAttendance).filter_by(session_id=session.id, student_id=st.id)).scalar_one_or_none()
         if row and row.source == "manual":
             continue
+        source = "leave" if status == "Excused" else "auto"
         if row:
-            row.status, row.minutes_present, row.source, row.marked_at = status, p["minutes_present"], "auto", now
+            row.status, row.minutes_present, row.source, row.marked_at = status, p["minutes_present"], source, now
         else:
             db.add(SessionAttendance(id=("att_" + session.id + "_" + st.id)[:64], college_id=session.college_id, session_id=session.id,
-                                     student_id=st.id, minutes_present=p["minutes_present"], status=status, source="auto", marked_at=now))
+                                     student_id=st.id, minutes_present=p["minutes_present"], status=status, source=source, marked_at=now))
         if status == "Present":
             present += 1
+        elif status == "Excused":
+            excused += 1
         else:
             absent += 1
     if meeting:
         meeting.finalized = True
-    return {"present": present, "absent": absent}
+    return {"present": present, "absent": absent, "excused": excused}
 
 
 def record_join_event(db: Session, session: SessionItem, user_id: str, event: str, at: datetime.datetime, source: str = "portal") -> JoinEvent:
@@ -203,7 +224,11 @@ def ensure_meeting(db: Session, session: SessionItem) -> LiveMeeting:
     if not m:
         adapter = get_live_adapter()
         m = LiveMeeting(id=f"lm_{session.id}"[:64], college_id=session.college_id, session_id=session.id,
-                        provider=adapter.name, external_meeting_id=adapter.create_meeting(session), flow_steps=[])
+                        provider=adapter.name, external_meeting_id=adapter.create_meeting(session), flow_steps=[],
+                        unmatched_attendees=[])
         db.add(m)
         db.flush()
+        if adapter.name == "teams":
+            from services.teams import queue_create
+            queue_create(db, session, m)       # Graph call happens in the outbox worker
     return m

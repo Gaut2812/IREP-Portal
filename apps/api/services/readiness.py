@@ -2,18 +2,18 @@
 
 score = Σ weight_i × component_i, where the components are the six skill
 scores plus attendance. Weights and band thresholds live in `readiness_config`
-per college so a college can tune them without a deploy. The nightly Celery
-beat job of the build plan is `run_readiness_job`, exposed through an admin
-endpoint until the worker exists.
+per college so a college can tune them without a deploy. The nightly job is
+`run_nightly` (Celery beat `irep.readiness.nightly`, 01:30 IST; also
+POST /admin/jobs/readiness).
 """
 import datetime
 import uuid
 from typing import Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from models.schema import ReadinessConfig, ReadinessSnapshot, SkillScore, Student
+from models.schema import ReadinessConfig, ReadinessSnapshot, SessionAttendance, SkillScore, Student
 
 DEFAULT_WEIGHTS: Dict[str, float] = {
     "dsa": 0.25,
@@ -88,21 +88,53 @@ def student_skills(db: Session, student: Student) -> Dict[str, int]:
     return {r.skill_key: r.percentage for r in rows}
 
 
+DELTA_DAYS = 30
+
+
+def recompute_attendance(db: Session, student: Student) -> Optional[int]:
+    """L34 attendance input: Present / (Present + Absent + Partial) over the register.
+    Excused (approved leave, screen 43) is left out; trainer overrides count as finally
+    marked. Returns None (and keeps the stored value) when nothing is marked yet."""
+    rows = dict(db.execute(select(SessionAttendance.status, func.count(SessionAttendance.id))
+                           .where(SessionAttendance.student_id == student.id, SessionAttendance.college_id == student.college_id)
+                           .group_by(SessionAttendance.status)).all())
+    marked = rows.get("Present", 0) + rows.get("Absent", 0) + rows.get("Partial", 0)
+    if not marked:
+        return None
+    pct = int(round(100 * rows.get("Present", 0) / marked))
+    student.attendance_pct = pct
+    return pct
+
+
+def _month_ago_score(db: Session, student: Student, day: datetime.date) -> Optional[int]:
+    """The score about a month ago: latest snapshot on or before day - 30, else the oldest earlier one."""
+    base = select(ReadinessSnapshot.score).where(ReadinessSnapshot.student_id == student.id,
+                                                 ReadinessSnapshot.college_id == student.college_id)
+    row = db.execute(base.where(ReadinessSnapshot.snapshot_date <= day - datetime.timedelta(days=DELTA_DAYS))
+                     .order_by(ReadinessSnapshot.snapshot_date.desc())).first()
+    if row is None:
+        row = db.execute(base.where(ReadinessSnapshot.snapshot_date < day).order_by(ReadinessSnapshot.snapshot_date)).first()
+    return row[0] if row else None
+
+
 def compute_snapshot(db: Session, student: Student, snapshot_date: Optional[datetime.date] = None,
                      persist: bool = True) -> ReadinessSnapshot:
-    """Compute today's snapshot for one student from skill_scores + attendance."""
+    """Today's snapshot for one student from skill_scores + attendance.
+    One snapshot per student per day: a re-run the same day replaces it.
+    The delta is against about a month ago ("+6 this month" on 12 and 15)."""
     cfg = get_config(db, student.college_id)
     weights = cfg.weights or DEFAULT_WEIGHTS
+    day = snapshot_date or datetime.date.today()
     skills = student_skills(db, student)
     breakdown = compute_breakdown(skills, student.attendance_pct, weights)
     score = int(round(sum(r["contribution"] for r in breakdown)))
-    previous = latest_snapshot(db, student)
-    delta = score - previous.score if previous else 0
+    before = _month_ago_score(db, student, day)
+    delta = score - before if before is not None else 0
     snap = ReadinessSnapshot(
         id=f"rs_{uuid.uuid4().hex[:20]}",
         college_id=student.college_id,
         student_id=student.id,
-        snapshot_date=snapshot_date or datetime.date.today(),
+        snapshot_date=day,
         score=score,
         band=band_for(score, cfg),
         delta=delta,
@@ -110,6 +142,9 @@ def compute_snapshot(db: Session, student: Student, snapshot_date: Optional[date
         config_version=cfg.version,
     )
     if persist:
+        db.execute(delete(ReadinessSnapshot).where(ReadinessSnapshot.student_id == student.id,
+                                                   ReadinessSnapshot.college_id == student.college_id,
+                                                   ReadinessSnapshot.snapshot_date == day))
         db.add(snap)
         student.readiness_score = score
         student.readiness_band = snap.band
@@ -118,9 +153,33 @@ def compute_snapshot(db: Session, student: Student, snapshot_date: Optional[date
 
 
 def run_readiness_job(db: Session, college_id: str) -> int:
-    """Nightly job: recompute one snapshot per student. Returns the count."""
+    """Recompute one snapshot per student (no attendance recompute). Returns the count."""
     students = db.execute(select(Student).filter_by(college_id=college_id)).scalars().all()
     for st in students:
         compute_snapshot(db, st)
     db.commit()
     return len(students)
+
+
+def run_nightly(db: Session, college_id: str, today: Optional[datetime.date] = None) -> dict:
+    """Readiness v1 (L34), nightly per college: attendance from the register, then the
+    score, band and monthly delta, then the at-risk rules on the new numbers; trainers
+    hear about new flags (`at_risk.flagged`). Does not commit."""
+    from services.at_risk import notify_batch_trainers, run_rules
+    from services.audit import record_audit
+
+    students = db.execute(select(Student).filter_by(college_id=college_id)).scalars().all()
+    attendance = 0
+    for st in students:
+        if recompute_attendance(db, st) is not None:
+            attendance += 1
+        compute_snapshot(db, st, today)
+    db.flush()
+    new_flags: List = []
+    run_rules(db, college_id, created_out=new_flags)
+    for f in new_flags:
+        record_audit(db, None, "at_risk.flagged", "at_risk_flag", f.id,
+                     {"student_id": f.student_id, "reason": f.reason_key}, college_id=college_id)
+    trainer_alerts = notify_batch_trainers(db, new_flags)
+    return {"students": len(students), "attendance_recomputed": attendance, "flags_created": len(new_flags),
+            "trainer_alerts": trainer_alerts}

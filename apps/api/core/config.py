@@ -40,11 +40,99 @@ class Settings(BaseSettings):
     BBB_URL: str = os.getenv("BBB_URL", "http://localhost:8080/bigbluebutton")
     BBB_SECRET: str = os.getenv("BBB_SECRET", "bbb_demo_secret_2026")
     LIVE_CLASS_ADAPTER: str = os.getenv("LIVE_CLASS_ADAPTER", "fake")
-    LAB_ADAPTER: str = os.getenv("LAB_ADAPTER", "fake")
+    # Microsoft Teams via Graph (LIVE_CLASS_ADAPTER=teams): app-only client credentials.
+    # The tenant admin must grant Calendars.ReadWrite, OnlineMeetings.Read.All and
+    # OnlineMeetingArtifact.Read.All and set an application access policy (Master Plan).
+    GRAPH_TENANT_ID: str = os.getenv("GRAPH_TENANT_ID", "")
+    GRAPH_CLIENT_ID: str = os.getenv("GRAPH_CLIENT_ID", "")
+    GRAPH_CLIENT_SECRET: str = os.getenv("GRAPH_CLIENT_SECRET", "")
+    GRAPH_BASE_URL: str = os.getenv("GRAPH_BASE_URL", "https://graph.microsoft.com/v1.0")
+    GRAPH_LOGIN_URL: str = os.getenv("GRAPH_LOGIN_URL", "https://login.microsoftonline.com")
+    TEAMS_DEFAULT_ORGANIZER: str = os.getenv("TEAMS_DEFAULT_ORGANIZER", "")   # used when a trainer has no teams_upn
+    TEAMS_REPORT_DELAY_SECONDS: int = int(os.getenv("TEAMS_REPORT_DELAY_SECONDS", "600"))
+    LAB_ADAPTER: str = os.getenv("LAB_ADAPTER", "fake")           # fake (dev), docker (dev), jupyterhub (pilot, production)
+    JUPYTERHUB_URL: str = os.getenv("JUPYTERHUB_URL", "http://localhost:8001")             # as the API reaches the hub
+    JUPYTERHUB_PUBLIC_URL: str = os.getenv("JUPYTERHUB_PUBLIC_URL", "")                    # as students' browsers reach it
+    JUPYTERHUB_API_TOKEN: str = os.getenv("JUPYTERHUB_API_TOKEN", "")                      # the hub's "irep-labs" service token
+    # Cyber Range (S12): its own hub on its own isolated node (infra/cyber-range); never the shared lab hub
+    CYBER_RANGE_HUB_URL: str = os.getenv("CYBER_RANGE_HUB_URL", "")
+    CYBER_RANGE_PUBLIC_URL: str = os.getenv("CYBER_RANGE_PUBLIC_URL", "")
+    CYBER_RANGE_API_TOKEN: str = os.getenv("CYBER_RANGE_API_TOKEN", "")
+    LAB_APPROVAL_DAYS: int = int(os.getenv("LAB_APPROVAL_DAYS", "30"))                      # Cyber Range access lasts this long
+    LAB_METER_URL: str = os.getenv("LAB_METER_URL", "")                                    # cAdvisor on the lab node (S13); empty = off
+    SPECTATE_ALLOWED_HOSTS: str = os.getenv("SPECTATE_ALLOWED_HOSTS", "")                   # extra hosts for class spectate links (comma-separated)
     TRANSLATE_ADAPTER: str = os.getenv("TRANSLATE_ADAPTER", "fake")
+
+    # ---- Pilot deployment (docs/deploy/DEPLOY.md) ----
+    # Demo adapters production may keep for features outside the pilot: any of judge0, labs, study_buddy
+    ALLOW_DEMO_ADAPTERS: str = os.getenv("ALLOW_DEMO_ADAPTERS", "")
+    # Outbound email and SMS. NOTIFY_ADAPTER=fake records deliveries only (dev); live sends them.
+    NOTIFY_ADAPTER: str = os.getenv("NOTIFY_ADAPTER", "fake")
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "")                       # e.g. "IREP Portal <no-reply@your-domain>"
+    SMTP_STARTTLS: bool = os.getenv("SMTP_STARTTLS", "true").lower() == "true"
+    # SMS is a switch, off by default: notices meant for SMS go to email instead
+    SMS_PROVIDER: str = os.getenv("SMS_PROVIDER", "off")              # off | fast2sms | msg91
+    # Fast2SMS bulkV2 (https://www.fast2sms.com/dev/bulkV2): API key in the "authorization" header
+    FAST2SMS_API_KEY: str = os.getenv("FAST2SMS_API_KEY", "")
+    FAST2SMS_URL: str = os.getenv("FAST2SMS_URL", "https://www.fast2sms.com/dev/bulkV2")
+    FAST2SMS_ROUTE: str = os.getenv("FAST2SMS_ROUTE", "q")            # q = Quick SMS (free text) for notices
+    FAST2SMS_OTP_ROUTE: str = os.getenv("FAST2SMS_OTP_ROUTE", "q")    # q (code inside our text) | otp (Fast2SMS OTP route)
+    MSG91_AUTH_KEY: str = os.getenv("MSG91_AUTH_KEY", "")
+    MSG91_TEMPLATE_ID: str = os.getenv("MSG91_TEMPLATE_ID", "")       # DLT-approved flow for notices (var: message)
+    MSG91_OTP_TEMPLATE_ID: str = os.getenv("MSG91_OTP_TEMPLATE_ID", "")   # DLT-approved flow for the OTP (var: otp)
+    MSG91_URL: str = os.getenv("MSG91_URL", "https://control.msg91.com/api/v5/flow")
+    PARENT_OTP_CHANNEL: str = os.getenv("PARENT_OTP_CHANNEL", "email")    # email | sms (needs SMS_PROVIDER=fast2sms or msg91)
+    # Parent OTP abuse limits per client IP (generous: mobile carriers put many parents behind one IP)
+    OTP_IP_REQUESTS_PER_WINDOW: int = int(os.getenv("OTP_IP_REQUESTS_PER_WINDOW", "60"))      # per 10 minutes
+    # Every OTP request answers after at least this long, registered number or not (no timing oracle)
+    OTP_RESPONSE_FLOOR_MS: int = int(os.getenv("OTP_RESPONSE_FLOOR_MS", "400"))
+    # Failed password sign-ins per client IP per 10 minutes (local auth; Keycloak mode: Caddy + Keycloak lockout)
+    LOGIN_IP_FAILS_PER_WINDOW: int = int(os.getenv("LOGIN_IP_FAILS_PER_WINDOW", "30"))
+    OTP_IP_VERIFY_FAILS_PER_WINDOW: int = int(os.getenv("OTP_IP_VERIFY_FAILS_PER_WINDOW", "30"))  # per 10 minutes
+    # Files: local disk now, S3-compatible later (services/storage.py)
+    STORAGE_ADAPTER: str = os.getenv("STORAGE_ADAPTER", "local")
+    # Screen 25 AI Study Buddy. "fake" (dev, deterministic hints) or "anthropic" (Claude API; needs the
+    # `anthropic` package and ANTHROPIC_API_KEY). Minors' data: no names or ids are sent; emails and phones are redacted.
+    STUDY_BUDDY_ADAPTER: str = os.getenv("STUDY_BUDDY_ADAPTER", "fake")
+    STUDY_BUDDY_MODEL: str = os.getenv("STUDY_BUDDY_MODEL", "claude-opus-5-5")
     TRANSLATE_URL: str = os.getenv("TRANSLATE_URL", "http://localhost:5000")
     GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "dev_github_webhook_secret")
     
+    # Identity. "local": the API's own JWT (dev default). "keycloak": staff and
+    # students sign in through Keycloak; parents keep the API's OTP until the
+    # Keycloak SMS OTP (MSG91) lands at pilot. Production requires "keycloak".
+    AUTH_PROVIDER: str = os.getenv("AUTH_PROVIDER", "local")
+    KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "http://localhost:8081")      # as the browser sees it (token issuer)
+    KEYCLOAK_REALM: str = os.getenv("KEYCLOAK_REALM", "irep")
+    KEYCLOAK_AUDIENCE: str = os.getenv("KEYCLOAK_AUDIENCE", "irep-api")
+    # Optional in-network signing-keys URL (Docker: http://keycloak:8080/realms/irep/protocol/openid-connect/certs);
+    # tokens are still checked against KEYCLOAK_ISSUER, the public URL.
+    KEYCLOAK_JWKS_URL: str = os.getenv("KEYCLOAK_JWKS_URL", "")
+
+    @property
+    def KEYCLOAK_ISSUER(self) -> str:
+        return f"{self.KEYCLOAK_URL.rstrip('/')}/realms/{self.KEYCLOAK_REALM}"
+
+    # Outbox dispatch: "thread" drains it inside the API process (dev, no broker);
+    # "celery" leaves it to apps/workers (pilot/production); "off" disables both.
+    OUTBOX_RUNNER: str = os.getenv(
+        "OUTBOX_RUNNER", "celery" if os.getenv("ENVIRONMENT", "development").lower() == "production" else "thread"
+    )
+    OUTBOX_POLL_SECONDS: float = float(os.getenv("OUTBOX_POLL_SECONDS", "2"))
+    OUTBOX_MAX_ATTEMPTS: int = int(os.getenv("OUTBOX_MAX_ATTEMPTS", "5"))
+    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")  # Valkey speaks the Redis protocol
+    # Cache for "is this account still active?" (core/active_users.py). Empty: ask the database.
+    USER_STATE_CACHE_URL: str = os.getenv("USER_STATE_CACHE_URL", "")
+    # Virus scan of every upload (services/antivirus.py): clamd in production, fake (EICAR only) in development
+    AV_ADAPTER: str = os.getenv("AV_ADAPTER", "fake")
+    BILLING_GST_PCT: float = float(os.getenv("BILLING_GST_PCT", "18"))     # S16 invoices
+    AV_CLAMD_HOST: str = os.getenv("AV_CLAMD_HOST", "clamav")
+    AV_CLAMD_PORT: int = int(os.getenv("AV_CLAMD_PORT", "3310"))
+
     # AI Reviewer
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     GEMINI_TIMEOUT_SECONDS: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "5.0"))

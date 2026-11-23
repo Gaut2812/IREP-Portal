@@ -56,7 +56,7 @@ test.describe("Screen 35: Trainer Message Hub (/trainer/messages)", () => {
     await expect(page.getByTestId("thread-th_ramesh")).toHaveCount(0);
   });
 
-  test("parent sees the trainer thread at /parent/messages and replies", async ({ page }) => {
+  test("parent sees the trainer thread at /parent/messages and replies", { tag: "@L19" }, async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 760 });
     await loginAs(page, "parent");
     await page.goto("/parent/messages");

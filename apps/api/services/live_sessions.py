@@ -39,7 +39,9 @@ def _now() -> datetime.datetime:
 
 
 def session_status(s: SessionItem, attendance: Optional[SessionAttendance], now: datetime.datetime) -> str:
-    """Attended / Missed / Live / Upcoming / Scheduled."""
+    """Attended / Missed / Live / Upcoming / Scheduled / Cancelled."""
+    if s.status == "Cancelled":                      # approved on screen 06
+        return "Cancelled"
     if s.scheduled_end <= now:
         if attendance is None:
             return "Completed"
@@ -52,6 +54,8 @@ def session_status(s: SessionItem, attendance: Optional[SessionAttendance], now:
 
 
 def join_enabled(s: SessionItem, now: datetime.datetime) -> bool:
+    if s.status == "Cancelled":
+        return False
     return s.scheduled_start - datetime.timedelta(minutes=JOIN_WINDOW_MIN) <= now < s.scheduled_end
 
 
@@ -76,7 +80,11 @@ def rebase_week_sessions(db: Session, college_id: str = "col_demo_001", now: Opt
     past sessions get attendance rows, future sessions have none."""
     now = now or _now()
     monday = (now - datetime.timedelta(days=now.weekday())).date()
-    if now.weekday() == 6:   # Sunday: show the coming week
+    # Once the week's last demo class has ended (Saturday afternoon) or on
+    # Sunday, show the coming week, so the demo always has classes ahead.
+    sid, wd, (hh, mm), minutes, *_ = WEEK_PLAN[-1]
+    last_end = datetime.datetime.combine(monday + datetime.timedelta(days=wd), datetime.time(hh, mm)) + datetime.timedelta(minutes=minutes)
+    if now.weekday() == 6 or now >= last_end:
         monday = monday + datetime.timedelta(days=7)
     changed = 0
     for sid, wd, (hh, mm), minutes, title, stype, lab in WEEK_PLAN:
@@ -183,6 +191,11 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
     # current week (Mon-Sat containing the first upcoming session, else the latest)
     monday = (now - datetime.timedelta(days=now.weekday())).date()
     week = [s for s in sessions if monday <= s.scheduled_start.date() <= monday + datetime.timedelta(days=6)]
+    ahead = [s for s in sessions if s.scheduled_end > now and s.status != "Cancelled"]
+    if ahead and not any(s.scheduled_end > now and s.status != "Cancelled" for s in week):
+        nxt = min(ahead, key=lambda s: s.scheduled_start).scheduled_start.date()
+        monday = nxt - datetime.timedelta(days=nxt.weekday())          # this week is over: show the next class's week
+        week = [s for s in sessions if monday <= s.scheduled_start.date() <= monday + datetime.timedelta(days=6)]
     if not week and sessions:
         last = sessions[-1].scheduled_start.date()
         monday = last - datetime.timedelta(days=last.weekday())

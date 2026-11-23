@@ -28,9 +28,12 @@ def _greeting(name: str, lang: str, now: Optional[datetime.datetime] = None) -> 
 
 def _week_sessions(db: Session, student: Student):
     """Sessions of the student's batch for the current ISO week (Mon–Sat); if the
-    week is empty, the most recent week that has sessions."""
+    week is empty, the most recent week that has sessions. Classes run Mon–Sat: on a Sunday the
+    week that matters is the one starting tomorrow (the seed schedules it the same way)."""
     today = datetime.date.today()
     monday = today - datetime.timedelta(days=today.weekday())
+    if today.weekday() == 6:
+        monday += datetime.timedelta(days=7)
     q = select(SessionItem).where(SessionItem.college_id == student.college_id)
     if student.batch_id:
         q = q.where(SessionItem.batch_id == student.batch_id)
@@ -85,7 +88,7 @@ def build_student_dashboard(db: Session, student: Student, current_user: TokenPa
     # Upcoming: personal events + batch events + college-wide, from today, next 5
     now = datetime.datetime.now()
     ev_q = select(Event).where(
-        Event.college_id == college_id,
+        Event.college_id == college_id, Event.status == "published",
         Event.starts_at >= now - datetime.timedelta(hours=12),
         (Event.student_id == student.id) | (Event.student_id.is_(None)),
         (Event.batch_id == student.batch_id) | (Event.batch_id.is_(None)),

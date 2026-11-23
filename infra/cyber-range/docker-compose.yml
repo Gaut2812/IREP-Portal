@@ -1,0 +1,55 @@
+# IREP Cyber Range (labs track S12). NEEDS A PERSON'S REVIEW before any deployment.
+# Runs on its OWN node or cloud account: never the lab node, the API host or the database host,
+# and never on Oracle's free tier (its AUP bans scanning). Students reach it only through the portal:
+# trainer approval + signed AUP (screens 29 and 43), then a token scoped to one workstation.
+#
+#   cp .env.example .env && docker compose build && docker compose up -d
+#
+# Portal settings: CYBER_RANGE_HUB_URL, CYBER_RANGE_PUBLIC_URL, CYBER_RANGE_API_TOKEN (= RANGE_SERVICE_TOKEN).
+name: irep-cyber-range
+
+services:
+  gateway:                     # the range's own JupyterHub: spawns one workstation per session onto range-net
+    build: ./hub
+    image: irep/range-hub:1
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - range-hub:/srv/jupyterhub/data
+    ports:
+      - "${RANGE_BIND:-127.0.0.1}:8000:8000"     # behind TLS; allow only the portal and students
+    networks:
+      range-front: {}
+      range-net: {}
+
+  juice-shop:                  # target: OWASP Juice Shop (pin by digest during review)
+    image: bkimminich/juice-shop:v17.1.1
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp"]
+    networks:
+      range-net:
+        aliases: [juice-shop]
+
+  dvwa:                        # target: Damn Vulnerable Web Application (pin by digest during review)
+    image: vulnerables/web-dvwa:latest
+    restart: unless-stopped
+    networks:
+      range-net:
+        aliases: [dvwa]
+
+  workstation:                 # the student's attack box image (built here; started by the gateway's spawner)
+    build: ./workstation
+    image: irep/range-workstation:1
+    profiles: ["images"]
+
+networks:
+  range-net:
+    name: irep-cyber-range
+    internal: true             # targets and workstations: no route out at all (no internet, metadata or portal)
+  range-front:
+    internal: false            # the gateway only, so the published port works; nothing else joins it
+
+volumes:
+  range-hub: {}

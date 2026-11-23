@@ -85,7 +85,7 @@ def build_college_overview(db: Session, college_id: str, semester: Optional[int]
 
     # Upcoming events visible to the college
     events = db.execute(
-        select(Event).where(Event.college_id == college_id, Event.starts_at >= datetime.datetime.combine(today, datetime.time.min) - datetime.timedelta(days=30),
+        select(Event).where(Event.college_id == college_id, Event.status == "published", Event.starts_at >= datetime.datetime.combine(today, datetime.time.min) - datetime.timedelta(days=30),
                             Event.audience.in_(["all", "college", "parents", "students"]), Event.student_id.is_(None))
         .order_by(Event.starts_at).limit(6)
     ).scalars().all()
@@ -96,7 +96,18 @@ def build_college_overview(db: Session, college_id: str, semester: Optional[int]
 
     semesters = db.execute(select(func.distinct(Student.semester)).where(Student.college_id == college_id).order_by(Student.semester)).scalars().all()
 
+    # Labs track S14: lab hours this month in the college view (aggregates, from the 47 meter)
+    from services.quotas import college_usage
+    from models.schema import UsageLedger
+    lab = college_usage(db, college_id)["usage"]["lab_minutes"]
+    period = today.strftime("%Y-%m")
+    lab_users = db.execute(select(func.count(func.distinct(UsageLedger.student_id))).where(
+        UsageLedger.college_id == college_id, UsageLedger.kind == "lab_minutes", UsageLedger.period == period)).scalar_one()
+    labs = {"hours_this_month": round(lab["used"] / 60, 1), "quota_hours": round((lab["quota"] or 0) / 60), "pct": lab["pct"],
+            "students_using": lab_users}
+
     return {
+        "labs": labs,
         "college": {"name": "Demo Engineering College", "title": "Program Overview"},
         "filters": {"semester": semester, "semesters": list(semesters)},
         "kpis": {

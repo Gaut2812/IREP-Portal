@@ -361,16 +361,15 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         method: "POST",
         body: JSON.stringify({ current_count: hintsCount })
       });
-      if (res.hint && !hints.includes(res.hint)) {
-        setHints([...hints, res.hint]);
-        setHintsCount(res.hints_used || hints.length + 1);
+      // functional updates: the click can land before the initial load settles
+      if (res.hint) {
+        setHints((prev) => (prev.includes(res.hint) ? prev : [...prev, res.hint]));
+        if (res.hints_used) setHintsCount(res.hints_used);
       }
     } catch (err) {
       const extra = "Remember that if an edge connects two already connected nodes, the component count does not decrease.";
-      if (!hints.includes(extra)) {
-        setHints([...hints, extra]);
-        setHintsCount(hintsCount + 1);
-      }
+      setHints((prev) => (prev.includes(extra) ? prev : [...prev, extra]));
+      setHintsCount((c) => c + 1);
     } finally {
       setIsRequestingHint(false);
     }

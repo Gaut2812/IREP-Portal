@@ -9,6 +9,10 @@ import { fetchApi } from "@/lib/api";
 import { Heart, MessageSquare, AlertCircle, RefreshCw, CheckCircle2, WifiOff, ExternalLink, Calendar, Award, Users } from "lucide-react";
 
 interface Overview {
+  /** Screen 48: without parent-data consent the API returns only ward id/name and the consent text */
+  consent_required?: boolean;
+  consent_state?: "missing" | "withdrawn";
+  consent?: { purpose: string; title: string; body: string };
   ward: { id: string; name: string; semester: number; branch: string; track: string; details: string; batch: string; college: string };
   kpis: {
     readiness_score: number; readiness_delta: number; readiness_band: string; readiness_band_label: string;
@@ -23,6 +27,10 @@ interface Overview {
   upcoming: { id: string; title: string; kind: string; when: string; date: string; location: string | null; description: string | null; rsvp_enabled: boolean; rsvp_status: string | null; guests: number }[];
   trainers: { trainer_id: string; user_id: string; name: string; designation: string }[];
   reply_promise_hours: number;
+  /** L31: open flags the trainer raised with the parent */
+  support_alerts?: { id: string; issue: string; next_step: string; since: string }[];
+  /** L30: announcements from the college and trainers */
+  announcements?: { id: string; title: string; body: string; from: string; at: string | null }[];
 }
 interface Child { id: string; name: string; semester: number; branch: string; batch_name: string }
 
@@ -59,6 +67,20 @@ export default function ParentViewPage() {
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
+  const [consentBusy, setConsentBusy] = useState(false);
+  const grantConsent = async () => {
+    if (!data?.consent) return;
+    setConsentBusy(true);
+    try {
+      await fetchApi("/consent", { method: "POST", body: JSON.stringify({ purpose: data.consent.purpose, status: "granted", student_id: data.ward.id }) });
+      await load();
+    } catch (err: any) {
+      setError(err?.detail || err?.message || "error");
+    } finally {
+      setConsentBusy(false);
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -71,7 +93,11 @@ export default function ParentViewPage() {
       const res = await fetchApi<Overview>(`/parent/children/${id}/overview?lang=${language}`);
       setData(res);
       setCachedAt(null);
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: new Date().toISOString(), lang: language, id, data: res })); } catch { /* ignore */ }
+      try {
+        // never keep an offline copy of a child's data without consent
+        if (res.consent_required) localStorage.removeItem(CACHE_KEY);
+        else localStorage.setItem(CACHE_KEY, JSON.stringify({ at: new Date().toISOString(), lang: language, id, data: res }));
+      } catch { /* ignore */ }
     } catch (err: any) {
       // Offline or API down: show the last cached summary if there is one
       try {
@@ -167,8 +193,39 @@ export default function ParentViewPage() {
             <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 text-center text-xs text-[#64748B]">{t("parent_view.no_child")}</div>
           )}
 
-          {!loading && !error && data && k && (
+          {!loading && !error && data?.consent_required && data.consent && (
+            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-5 space-y-3" data-testid="consent-card">
+              <h2 className="text-base font-bold text-[#0F1F3A]">{data.consent.title}</h2>
+              <p className="text-xs text-[#475569] leading-relaxed">{data.consent.body}</p>
+              <p className="text-[11px] text-[#64748B]">{data.ward.name}</p>
+              <button type="button" disabled={consentBusy} onClick={grantConsent} data-testid="consent-agree"
+                className="w-full py-2.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-xl disabled:opacity-50">
+                {t("parent_view.consent_agree")}
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && data && !data.consent_required && k && (
             <>
+              {(data.support_alerts || []).map((al) => (
+                <Link key={al.id} href="/parent/messages" className="block bg-[#FFF7ED] border border-[#FED7AA] rounded-2xl p-4" data-testid="support-alert">
+                  <div className="text-xs font-black text-[#9A3412]">{t("parent_view.support_alert")}</div>
+                  <div className="text-sm text-[#7C2D12] mt-1">{al.issue} · {t("parent_view.next_step")}: {al.next_step}</div>
+                  <div className="text-[11px] text-[#9A3412] mt-1 font-semibold">{t("parent_view.support_reply")}</div>
+                </Link>
+              ))}
+              {(data.announcements || []).length > 0 && (
+                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 space-y-2" data-testid="announcements">
+                  <div className="text-xs font-black text-[#0F1F3A]">{t("parent_view.announcements")}</div>
+                  {(data.announcements || []).map((an) => (
+                    <div key={an.id} className="text-xs border-t border-[#F1F5F9] pt-2 first:border-0 first:pt-0" data-testid="announcement">
+                      <div className="font-bold text-[#0F1F3A]">{an.title}</div>
+                      <div className="text-[#475569]">{an.body}</div>
+                      <div className="text-[10px] text-[#94A3B8]">{an.from === "college" ? t("parent_view.from_college") : t("parent_view.from_trainer")}{an.at ? ` · ${an.at}` : ""}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Readiness card */}
               <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-4 rounded-2xl" data-testid="readiness-card">
                 <div className="flex items-center justify-between">
@@ -214,8 +271,8 @@ export default function ParentViewPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left">
                         <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
-                          <th className="pb-2 font-semibold">{t("parent_view.area")}</th><th className="pb-2 font-semibold">{data.monthly_card.prev_month}</th>
-                          <th className="pb-2 font-semibold">{data.monthly_card.month}</th><th className="pb-2 font-semibold text-right">{t("parent_view.status")}</th>
+                          <th className="pb-2 font-semibold">{t("parent_view.area")}</th><th className="pb-2 px-1 font-semibold"><span className="sm:hidden">{data.monthly_card.prev_month.slice(0, 3)}</span><span className="hidden sm:inline">{data.monthly_card.prev_month}</span></th>
+                          <th className="pb-2 px-1 font-semibold"><span className="sm:hidden">{data.monthly_card.month.slice(0, 3)}</span><span className="hidden sm:inline">{data.monthly_card.month}</span></th><th className="pb-2 font-semibold text-right">{t("parent_view.status")}</th>
                         </tr></thead>
                         <tbody className="divide-y divide-[#E2E8F0]">
                           {data.monthly_card.rows.map((r) => (

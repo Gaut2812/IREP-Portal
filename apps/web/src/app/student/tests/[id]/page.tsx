@@ -78,7 +78,7 @@ export default function PracticeTestPage() {
   const router = useRouter();
   const testId = (params?.id as string) || "test_service_aptitude";
 
-  const { user, switchRoleDemo } = useAuth();
+  const { user, logout } = useAuth();
   const { t } = useLanguage();
 
   // State Management
@@ -348,7 +348,7 @@ export default function PracticeTestPage() {
           </p>
           <div className="pt-2">
             <button
-              onClick={() => switchRoleDemo("student")}
+              onClick={logout}
               className="px-6 py-2.5 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-xs rounded-xl shadow transition-all cursor-pointer"
             >
               {t("practice_test.switch_to_student")}

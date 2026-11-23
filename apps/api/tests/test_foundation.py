@@ -68,6 +68,7 @@ def test_role_guard_rejects_wrong_role():
     ("trainer", "arun.k@demo.edu"),
     ("college", "admin@demo.edu"),
 ])
+@pytest.mark.link("L01")
 def test_demo_login_each_role(role, identifier):
     res = client.post("/api/v1/auth/login", json={"role": role, "identifier": identifier, "password": "password123"})
     assert res.status_code == 200
@@ -149,7 +150,8 @@ def test_cohort_matches_mockup_figures():
     try:
         assert db.execute(select(func.count(Student.id)).filter_by(college_id="col_demo_001")).scalar_one() == 612
         per_branch = dict(db.execute(
-            select(Branch.name, func.count(Student.id)).join(Student, Student.branch_id == Branch.id).group_by(Branch.name)
+            select(Branch.name, func.count(Student.id)).join(Student, Student.branch_id == Branch.id)
+            .where(Branch.college_id == "col_demo_001").group_by(Branch.name)
         ).all())
         assert per_branch == {"CSE": 228, "IT": 164, "AI & DS": 142, "Cybersecurity": 78}
         arun = db.execute(
@@ -190,6 +192,7 @@ def test_notification_centre_roundtrip():
     assert client.post(f"/api/v1/notifications/{nid}/read", headers=_token("usr_arun_01", "trainer")).status_code == 404
 
 
+@pytest.mark.link("L38")
 def test_audit_log_is_written():
     db = SessionLocal()
     try:

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from core.security import TokenPayload
 from models.schema import AuditLog
+from services.outbox import emit
 
 
 def record_audit(
@@ -36,4 +37,7 @@ def record_audit(
         created_at=datetime.datetime.utcnow(),
     )
     db.add(entry)
+    # every audited state change is also an outbox event, in the same transaction
+    emit(db, f"audit.{action}"[:64], {"audit_id": entry.id, "detail": detail or {}},
+         college_id=entry.college_id, entity_type=entity_type, entity_id=entity_id)
     return entry

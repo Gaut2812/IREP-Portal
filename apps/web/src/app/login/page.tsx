@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, Role } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi, ApiError } from "@/lib/api";
+import { AuthConfig, getAuthConfig, startKeycloakSignIn } from "@/lib/oidc";
 import { GraduationCap, Users, UserCheck, Building2, Languages, ArrowRight, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
@@ -18,17 +19,35 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("9876543210");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [otpChannel, setOtpChannel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const [langTouched, setLangTouched] = useState(false);
+  const [authCfg, setAuthCfg] = useState<AuthConfig>({ provider: "local" });
+  const [reauth2fa, setReauth2fa] = useState(false);
+
+  useEffect(() => {
+    getAuthConfig().then(setAuthCfg);
+    // IREP staff sent back by the API: sign in again with the authenticator code
+    if (new URLSearchParams(window.location.search).get("reauth") === "2fa") {
+      setReauth2fa(true);
+      setSelectedRole("admin");
+      setIdentifier("staff@irep.demo");          // same default as the IREP staff link
+    }
+  }, []);
+
+  // Keycloak mode: staff and students use single sign-on; parents keep mobile OTP
+  const sso = authCfg.provider === "keycloak" && selectedRole !== "parent";
 
   const roleConfigs = [
     { id: "student" as Role, title: t("login.roles.student"), icon: GraduationCap, defaultEmail: "priya.r@demo.edu" },
     { id: "parent" as Role, title: t("login.roles.parent"), icon: Users, defaultEmail: "ramesh.k@example.com" },
     { id: "trainer" as Role, title: t("login.roles.trainer"), icon: UserCheck, defaultEmail: "arun.k@demo.edu" },
-    { id: "college" as Role, title: t("login.roles.college"), icon: Building2, defaultEmail: "admin@demo.edu" }
+    { id: "college" as Role, title: t("login.roles.college"), icon: Building2, defaultEmail: "admin@demo.edu" },
+    // IREP staff (screens 45-49): reached from the small link under the grid, not a card
+    { id: "admin" as Role, title: t("login.roles.admin"), icon: ShieldCheck, defaultEmail: "staff@irep.demo" },
   ];
 
   const handleRoleSelect = (role: Role) => {
@@ -46,7 +65,7 @@ export default function LoginPage() {
     if (selectedRole === "parent") {
       if (phone.replace(/\D/g, "").length < 10) errs.phone = t("login.err_phone");
       if (otpSent && !/^\d{6}$/.test(otp.trim())) errs.otp = t("login.err_otp");
-    } else {
+    } else if (!sso) {
       if (!identifier.trim()) errs.identifier = t("login.err_identifier");
       if (!password) errs.password = t("login.err_password");
     }
@@ -67,10 +86,15 @@ export default function LoginPage() {
     if (!validate()) return;
     setLoading(true);
     try {
+      if (sso) {
+        await startKeycloakSignIn(authCfg, language, { forceLogin: reauth2fa });   // leaves the page
+        return;
+      }
       if (selectedRole === "parent") {
         if (!otpSent) {
-          const data = await fetchApi<{ demo_otp?: string; message: string }>("/auth/parent/otp/request", { method: "POST", body: JSON.stringify({ phone }) });
+          const data = await fetchApi<{ demo_otp?: string; message: string; channel?: string }>("/auth/parent/otp/request", { method: "POST", body: JSON.stringify({ phone }) });
           setOtpSent(true);
+          setOtpChannel(data.channel || null);
           setDemoOtp(data.demo_otp || null);
           return;
         }
@@ -164,7 +188,7 @@ export default function LoginPage() {
 
           {/* 2 by 2 Role Grid */}
           <div className="grid grid-cols-2 gap-2.5">
-            {roleConfigs.map((r) => {
+            {roleConfigs.filter((r) => r.id !== "admin").map((r) => {
               const Icon = r.icon;
               const isSelected = selectedRole === r.id;
               return (
@@ -194,6 +218,21 @@ export default function LoginPage() {
             })}
           </div>
 
+          <button
+            type="button"
+            data-testid="role-admin"
+            aria-pressed={selectedRole === "admin"}
+            onClick={() => handleRoleSelect("admin")}
+            className={`w-full text-[11px] font-semibold underline-offset-2 hover:underline ${selectedRole === "admin" ? "text-[#2B5CD0]" : "text-[#64748B]"}`}
+          >
+            {t("login.staff_link")}
+          </button>
+
+          {reauth2fa && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-medium" role="status" data-testid="login-reauth-2fa">
+              {t("login.reauth_2fa")}
+            </div>
+          )}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium" role="alert" data-testid="login-error">
               {error}
@@ -225,7 +264,7 @@ export default function LoginPage() {
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="block text-xs font-bold text-[#0F1F3A]">{t("login.otp_label")}</label>
-                      {demoOtp ? <span className="text-[10px] text-[#2BB3A0] font-bold" data-testid="demo-otp">{t("login.demo_otp").replace("{otp}", demoOtp)}</span> : <span className="text-[10px] text-[#64748B]">{t("login.otp_sent")}</span>}
+                      {demoOtp ? <span className="text-[10px] text-[#2BB3A0] font-bold" data-testid="demo-otp">{t("login.demo_otp").replace("{otp}", demoOtp)}</span> : <span className="text-[10px] text-[#64748B]" data-testid="otp-sent">{t(otpChannel === "email" ? "login.otp_sent_email" : "login.otp_sent")}</span>}
                     </div>
                     <input
                       type="text"
@@ -243,6 +282,9 @@ export default function LoginPage() {
                   </div>
                 )}
               </div>
+            ) : sso ? (
+              /* Keycloak single sign-on */
+              <p className="text-xs text-[#64748B] leading-relaxed" data-testid="login-sso-hint">{t("login.sso_hint")}</p>
             ) : (
               /* Student / Trainer / College Username + Password view */
               <div className="space-y-3">
@@ -291,7 +333,7 @@ export default function LoginPage() {
               <span>
                 {selectedRole === "parent"
                   ? (otpSent ? t("login.verify_otp_btn") : t("login.get_otp_btn"))
-                  : t("login.sign_in_btn")}
+                  : (sso ? t("login.sso_btn") : t("login.sign_in_btn"))}
               </span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>

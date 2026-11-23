@@ -10,7 +10,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from core.database import get_db, SessionLocal
-from core.security import require_role, TokenPayload, decode_access_token, normalize_role
+from core.security import require_role, TokenPayload, decode_access_token, websocket_user, normalize_role
 from core.tenant import get_student_for_user, get_trainer_for_user, get_trainer_batch_ids
 from models.schema import (
     SessionItem, LiveMeeting, JoinEvent, LivePoll, LivePollVote, QaQuestion, QaUpvote, User, Batch, Recording, Student,
@@ -21,6 +21,7 @@ from services.live_class import (
 from services.live_sessions import join_enabled
 from services.realtime import hub, publish_sync
 from services.audit import record_audit
+from services.teams import confirm_unmatched, queue_attendance_pull
 
 router = APIRouter(tags=["Live Classroom"])
 
@@ -115,7 +116,7 @@ def build_state(db: Session, s: SessionItem, user: TokenPayload, now: Optional[d
     poll = db.execute(select(LivePoll).filter_by(session_id=s.id).order_by(LivePoll.created_at.desc())).scalars().first()
     poll_payload = None
     if poll:
-        counts = dict(db.execute(select(LivePollVote.option_key, func.count(LivePollVote.id)).filter_by(poll_id=poll.id).group_by(LivePollVote.option_key)).all())
+        counts = dict(db.execute(select(LivePollVote.option_key, func.count(LivePollVote.id)).where(LivePollVote.poll_id == poll.id).group_by(LivePollVote.option_key)).all())
         total = sum(counts.values())
         mine = db.execute(select(LivePollVote.option_key).filter_by(poll_id=poll.id, user_id=user.sub)).scalar_one_or_none()
         poll_payload = {
@@ -156,6 +157,8 @@ def build_state(db: Session, s: SessionItem, user: TokenPayload, now: Optional[d
         "participants": participants[:5], "more_participants": max(0, len(participants) - 5), "participant_count": len(participants),
         "poll": poll_payload, "qa": qa,
         "attendance": presence, "attendance_on_track": on_track,
+        # S13: the trainer's read-only lab view for this class (hidden once the class has ended)
+        "spectate": {"url": s.spectate_url, "label": s.spectate_label} if s.spectate_url and state != "ended" else None,
     }
 
 
@@ -179,6 +182,13 @@ def join_session(session_id: str, current_user: TokenPayload = Depends(require_r
             record_audit(db, current_user, "live.start", "session", s.id)
     elif not m.started_at and not join_enabled(s, now):
         raise HTTPException(status_code=409, detail="The room opens 10 minutes before the session starts")
+    if m.provider == "teams":
+        # attendance comes from the Teams report; the click is kept for support only
+        record_join_event(db, s, current_user.sub, "joined", now, source="click")
+        db.commit()
+        if not m.join_url:
+            raise HTTPException(status_code=409, detail="The Teams meeting is still being set up. Try again in a minute.")
+        return {"success": True, "session_id": s.id, "join_url": m.join_url, "provider": "teams", "meeting_state": _meeting_state(m)}
     record_join_event(db, s, current_user.sub, "joined", now)
     db.commit()
     _publish(s.id, "participants")
@@ -203,6 +213,16 @@ def end_session(session_id: str, current_user: TokenPayload = Depends(require_ro
     if not m.started_at:
         raise HTTPException(status_code=409, detail="The session has not started")
     now = _now()
+    if m.provider == "teams":
+        # Teams publishes the attendance report a few minutes after the meeting:
+        # the outbox pulls it and applies the 75% rule then.
+        if not m.ended_at:
+            m.ended_at = now
+        queue_attendance_pull(db, s)
+        record_audit(db, current_user, "live.end", "session", s.id, {"attendance": "pending_teams_report"})
+        db.commit()
+        _publish(s.id, "ended")
+        return {"success": True, "attendance": {"pending": True}}
     if not m.ended_at:
         m.ended_at = now
         get_live_adapter().end_meeting(m.external_meeting_id)
@@ -210,6 +230,38 @@ def end_session(session_id: str, current_user: TokenPayload = Depends(require_ro
     record_audit(db, current_user, "live.end", "session", s.id, summary)
     db.commit()
     _publish(s.id, "ended")
+    return {"success": True, "attendance": summary}
+
+
+# ---- Teams attendance: names the report could not match (trainer confirms) ----
+class ConfirmAttendeeIn(BaseModel):
+    index: int
+    student_id: str
+
+
+@router.get("/trainer/sessions/{session_id}/teams-unmatched")
+def teams_unmatched(session_id: str, current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    s = _session_for_user(session_id, current_user, db)
+    m = db.execute(select(LiveMeeting).where(LiveMeeting.session_id == s.id)).scalar_one_or_none()
+    rows = (m.unmatched_attendees or []) if m else []
+    return {"session_id": s.id, "pulled_at": m.attendance_pulled_at.isoformat() if m and m.attendance_pulled_at else None,
+            "unmatched": [{"index": i, "name": r["name"], "email": r.get("email"), "minutes": r.get("minutes", 0)} for i, r in enumerate(rows)]}
+
+
+@router.post("/trainer/sessions/{session_id}/teams-unmatched/confirm")
+def teams_confirm(session_id: str, req: ConfirmAttendeeIn, current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    s = _session_for_user(session_id, current_user, db)
+    m = db.execute(select(LiveMeeting).where(LiveMeeting.session_id == s.id)).scalar_one_or_none()
+    student = db.execute(select(Student).where(Student.id == req.student_id, Student.college_id == current_user.college_id,
+                                               Student.batch_id == s.batch_id)).scalar_one_or_none()
+    if m is None or student is None:
+        raise HTTPException(status_code=404, detail="Session or student not found in this batch")
+    try:
+        summary = confirm_unmatched(db, s, m, req.index, student)
+    except IndexError:
+        raise HTTPException(status_code=404, detail="That attendee is no longer waiting for confirmation")
+    record_audit(db, current_user, "attendance.teams_confirmed", "session", s.id, {"student_id": student.id})
+    db.commit()
     return {"success": True, "attendance": summary}
 
 
@@ -320,10 +372,13 @@ async def bbb_webhook(request: Request, x_bbb_signature: Optional[str] = Header(
         elif event == "rap-publish-ended":
             rid = f"rec_{s.id}"[:64]
             if not db.execute(select(Recording).filter_by(id=rid)).first():
+                from services.quotas import can_store_recording
+                size_mb = max(0, int(payload.get("size_mb") or 0))
+                fits = can_store_recording(db, s.college_id, size_mb)         # L36: the MoU's storage_gb
                 db.add(Recording(id=rid, college_id=s.college_id, session_id=s.id, batch_id=s.batch_id, title=s.title,
                                  storage_key=payload.get("storage_key") or f"recordings/{s.id}.mp4",
                                  duration_min=int(payload.get("duration_min") or s.duration_min), chapters=[],
-                                 recorded_on=at.date(), status="ready"))
+                                 recorded_on=at.date(), status="ready" if fits else "over_quota", size_mb=size_mb))
         else:
             return {"success": True, "ignored": event}
         db.commit()
@@ -336,7 +391,7 @@ async def bbb_webhook(request: Request, x_bbb_signature: Optional[str] = Header(
 @router.websocket("/ws/live/{session_id}")
 async def live_socket(websocket: WebSocket, session_id: str, token: Optional[str] = None):
     """Push channel: clients get {type} pings and refetch state."""
-    payload = decode_access_token(token) if token else None
+    payload = websocket_user(token)          # local or Keycloak token, and still active
     if not payload:
         await websocket.close(code=4401)
         return

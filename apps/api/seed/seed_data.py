@@ -10,10 +10,7 @@ from models.schema import (
     PracticeTest, PracticeQuestion, VirtualLabItem, SprintTask,
     MockInterview, DiscussionGroup, GroupMessage, TrainerDirectThread,
     DirectMessage, ParentMonthlyRecord, TestAttempt, AttemptAnswer,
-
-    ProctorEvent, TopicScore,
-    Course, Module, Lesson, LessonProgress,
-    StudentProject, StudentSkill, ProjectDemoEvent,
+    ProctorEvent, TopicScore, StudentProject, StudentSkill, ProjectDemoEvent,
     PullRequest, PullRequestFile, PullRequestComment
 )
 
@@ -478,12 +475,52 @@ def seed_reviews_data(db, college_id="col_demo_001"):
 
     db.commit()
 
+def find_foreign_key_violations(conn, limit_per_fk: int = 3):
+    """Orphan rows for every ForeignKey in the models (portable anti-join)."""
+    from sqlalchemy import and_, select as _select
+    import models.schema  # noqa: F401  (registers every table)
+    bad = []
+    for table in Base.metadata.sorted_tables:
+        for fk in table.foreign_key_constraints:
+            parent = fk.referred_table
+            child_cols = [e.parent for e in fk.elements]
+            parent_cols = [e.column for e in fk.elements]
+            q = (_select(*child_cols)
+                 .select_from(table.outerjoin(parent, and_(*[c == p for c, p in zip(child_cols, parent_cols)])))
+                 .where(and_(*[c.isnot(None) for c in child_cols]), parent_cols[0].is_(None))
+                 .limit(limit_per_fk))
+            for row in conn.execute(q):
+                bad.append((table.name, fk.name or ",".join(c.name for c in child_cols), tuple(row)))
+    return bad
+
+
 def init_db_and_seed():
     print("Creating tables...", flush=True)
     from core.db_init import ensure_schema
     ensure_schema(engine)
         
     db = SessionLocal()
+    # The models declare ForeignKeys but no relationship(), so the unit of work
+    # does not order parent rows before child rows inside a flush, and a
+    # first-time seed into an empty database trips row-by-row FK checks.
+    # Switch row-level checks off for this session only and verify every
+    # foreign key before each commit instead, so an orphan row still fails.
+    from sqlalchemy import event
+
+    @event.listens_for(db, "after_begin")
+    def _relax_fks(session, transaction, connection):
+        if engine.dialect.name == "sqlite":
+            # pysqlite has not opened its transaction yet, so this PRAGMA applies
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        elif engine.dialect.name == "postgresql":
+            # transaction-scoped; needs a superuser (the demo database container)
+            connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+
+    @event.listens_for(db, "before_commit")
+    def _verify_fks(session):
+        bad = find_foreign_key_violations(session.connection())
+        if bad:
+            raise RuntimeError(f"Seed left {len(bad)} foreign-key violations, e.g. {bad[:3]}")
     try:
         # Check if already seeded
         result = db.execute(select(College).filter_by(id="col_demo_001")).scalar_one_or_none()
@@ -498,6 +535,22 @@ def init_db_and_seed():
                         db.add(tc)
                 db.commit()
                 print("18 TestCases verified and committed.", flush=True)
+            # Repair: older Coding Lab builds stored users.id in student_id for
+            # hints and some submissions. Re-key those rows to students.id.
+            from sqlalchemy import text as _sql
+            for _tbl in ("coding_hint_usages", "coding_submissions"):
+                db.execute(_sql(
+                    f"UPDATE {_tbl} SET student_id = (SELECT s.id FROM students s WHERE s.user_id = {_tbl}.student_id) "
+                    f"WHERE student_id IN (SELECT user_id FROM students)"
+                ))
+            db.commit()
+
+            # Restore demo state: hints unlocked by tests or demos start over
+            from models.schema import CodingHintUsage
+            from sqlalchemy import delete as _delete
+            db.execute(_delete(CodingHintUsage).where(CodingHintUsage.student_id == "std_priya_01"))
+            db.commit()
+
             # Ensure weekly DSA problems are seeded
             from seed.seed_weekly_dsa import seed_weekly_problems
             seeded_w = seed_weekly_problems(db, college_id="col_demo_001")
@@ -579,6 +632,46 @@ def init_db_and_seed():
 
             from seed.seed_screen01 import seed_screen01
             seed_screen01(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen45 import seed_screen45
+            seed_screen45(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen48 import seed_screen48
+            seed_screen48(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen46 import seed_screen46
+            seed_screen46(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen42 import seed_screen42
+            seed_screen42(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen49 import seed_screen49
+            seed_screen49(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen22 import seed_screen22
+            seed_screen22(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen38 import seed_screen38
+            seed_screen38(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_s16_dpdp import seed_s16_dpdp
+            seed_s16_dpdp(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_lab_exercises import seed_lab_exercises
+            seed_lab_exercises(db, college_id="col_demo_001")
+            db.commit()
+
+            from seed.seed_screen41 import seed_screen41
+            seed_screen41(db, college_id="col_demo_001")
             db.commit()
 
             # keep at-risk flags consistent with the latest attendance history
@@ -1122,99 +1215,8 @@ def init_db_and_seed():
             ParentMonthlyRecord(id="pmr_04", college_id="col_demo_001", student_id="std_priya_01", month_name="October", area="Communication", prev_month_val="3/5", curr_month_val="3/5", status_text="Needs practice", status_color="amber")
         ]
         db.add_all(parent_cards)
-
-        # 13. Courses, Modules, Lessons, Progress (Screen 11)
-        courses_data = [
-            Course(
-                id="crs_dsa_patterns", college_id="col_demo_001",
-                title="DSA Patterns & Problem Solving",
-                title_ta="DSA வடிவங்கள் & சிக்கல் தீர்வு",
-                track="DSA", semester_min=3,
-                thumbnail_color="blue", total_lessons=12, is_active=True
-            ),
-            Course(
-                id="crs_ai_ml", college_id="col_demo_001",
-                title="AI & Machine Learning Fundamentals",
-                title_ta="செயற்கை நுண்ணறிவு & இயந்திர கற்றல் அடிப்படைகள்",
-                track="AI & DS", semester_min=4,
-                thumbnail_color="teal", total_lessons=10, is_active=True
-            ),
-            Course(
-                id="crs_cloud_devops", college_id="col_demo_001",
-                title="Cloud & DevOps Essentials",
-                title_ta="கிளவுட் & DevOps அடிப்படைகள்",
-                track="Cloud & DevOps", semester_min=5,
-                thumbnail_color="purple", total_lessons=8, is_active=True
-            ),
-        ]
-        db.add_all(courses_data)
-
-        modules_data = [
-            # DSA course modules
-            Module(id="mod_dsa_01", college_id="col_demo_001", course_id="crs_dsa_patterns", order_index=1, title="Arrays & Sliding Window"),
-            Module(id="mod_dsa_02", college_id="col_demo_001", course_id="crs_dsa_patterns", order_index=2, title="Trees & Graphs"),
-            Module(id="mod_dsa_03", college_id="col_demo_001", course_id="crs_dsa_patterns", order_index=3, title="Union-Find & Advanced"),
-            # AI course modules
-            Module(id="mod_ai_01", college_id="col_demo_001", course_id="crs_ai_ml", order_index=1, title="Python for ML"),
-            Module(id="mod_ai_02", college_id="col_demo_001", course_id="crs_ai_ml", order_index=2, title="Supervised Learning"),
-            # Cloud course modules
-            Module(id="mod_cloud_01", college_id="col_demo_001", course_id="crs_cloud_devops", order_index=1, title="AWS Core Services"),
-            Module(id="mod_cloud_02", college_id="col_demo_001", course_id="crs_cloud_devops", order_index=2, title="CI/CD Pipelines"),
-        ]
-        db.add_all(modules_data)
-
-        lessons_data = [
-            # DSA – mod_dsa_01
-            Lesson(id="les_dsa_01_01", college_id="col_demo_001", module_id="mod_dsa_01", order_index=1, title="Sliding window intro", type="video", duration_min=18),
-            Lesson(id="les_dsa_01_02", college_id="col_demo_001", module_id="mod_dsa_01", order_index=2, title="Two-pointer technique", type="video", duration_min=22),
-            Lesson(id="les_dsa_01_03", college_id="col_demo_001", module_id="mod_dsa_01", order_index=3, title="Practice sheet", type="notes"),
-            Lesson(id="les_dsa_01_04", college_id="col_demo_001", module_id="mod_dsa_01", order_index=4, title="Assignment 1", type="assignment"),
-            # DSA – mod_dsa_02
-            Lesson(id="les_dsa_02_01", college_id="col_demo_001", module_id="mod_dsa_02", order_index=1, title="BFS & DFS walkthrough", type="video", duration_min=25),
-            Lesson(id="les_dsa_02_02", college_id="col_demo_001", module_id="mod_dsa_02", order_index=2, title="Tree traversal slides", type="slides"),
-            Lesson(id="les_dsa_02_03", college_id="col_demo_001", module_id="mod_dsa_02", order_index=3, title="Graph problems lab", type="assignment"),
-            # DSA – mod_dsa_03
-            Lesson(id="les_dsa_03_01", college_id="col_demo_001", module_id="mod_dsa_03", order_index=1, title="Union-Find theory", type="video", duration_min=20),
-            Lesson(id="les_dsa_03_02", college_id="col_demo_001", module_id="mod_dsa_03", order_index=2, title="Path compression notes", type="notes"),
-            Lesson(id="les_dsa_03_03", college_id="col_demo_001", module_id="mod_dsa_03", order_index=3, title="Connected components – slides", type="slides"),
-            Lesson(id="les_dsa_03_04", college_id="col_demo_001", module_id="mod_dsa_03", order_index=4, title="Final assignment", type="assignment"),
-            Lesson(id="les_dsa_03_05", college_id="col_demo_001", module_id="mod_dsa_03", order_index=5, title="Quiz – week 8", type="assignment"),
-            # AI – mod_ai_01
-            Lesson(id="les_ai_01_01", college_id="col_demo_001", module_id="mod_ai_01", order_index=1, title="NumPy & Pandas essentials", type="video", duration_min=30),
-            Lesson(id="les_ai_01_02", college_id="col_demo_001", module_id="mod_ai_01", order_index=2, title="Data wrangling notebook", type="notes"),
-            Lesson(id="les_ai_01_03", college_id="col_demo_001", module_id="mod_ai_01", order_index=3, title="EDA mini-project", type="assignment"),
-            Lesson(id="les_ai_01_04", college_id="col_demo_001", module_id="mod_ai_01", order_index=4, title="Matplotlib & Seaborn slides", type="slides"),
-            # AI – mod_ai_02
-            Lesson(id="les_ai_02_01", college_id="col_demo_001", module_id="mod_ai_02", order_index=1, title="Linear regression video", type="video", duration_min=28),
-            Lesson(id="les_ai_02_02", college_id="col_demo_001", module_id="mod_ai_02", order_index=2, title="Model evaluation lab", type="assignment"),
-            Lesson(id="les_ai_02_03", college_id="col_demo_001", module_id="mod_ai_02", order_index=3, title="Classification notes", type="notes"),
-            Lesson(id="les_ai_02_04", college_id="col_demo_001", module_id="mod_ai_02", order_index=4, title="Crop price predictor project kick-off", type="assignment"),
-            # Cloud – mod_cloud_01
-            Lesson(id="les_cloud_01_01", college_id="col_demo_001", module_id="mod_cloud_01", order_index=1, title="IAM & VPC fundamentals", type="video", duration_min=20),
-            Lesson(id="les_cloud_01_02", college_id="col_demo_001", module_id="mod_cloud_01", order_index=2, title="EC2 & S3 hands-on slides", type="slides"),
-            Lesson(id="les_cloud_01_03", college_id="col_demo_001", module_id="mod_cloud_01", order_index=3, title="Cloud Practitioner prep notes", type="notes"),
-            Lesson(id="les_cloud_01_04", college_id="col_demo_001", module_id="mod_cloud_01", order_index=4, title="Deploy a static site – assignment", type="assignment"),
-            # Cloud – mod_cloud_02
-            Lesson(id="les_cloud_02_01", college_id="col_demo_001", module_id="mod_cloud_02", order_index=1, title="GitHub Actions basics", type="video", duration_min=18),
-            Lesson(id="les_cloud_02_02", college_id="col_demo_001", module_id="mod_cloud_02", order_index=2, title="Docker & containers", type="video", duration_min=22),
-            Lesson(id="les_cloud_02_03", college_id="col_demo_001", module_id="mod_cloud_02", order_index=3, title="CI/CD pipeline assignment", type="assignment"),
-            Lesson(id="les_cloud_02_04", college_id="col_demo_001", module_id="mod_cloud_02", order_index=4, title="Kubernetes intro notes", type="notes"),
-        ]
-        db.add_all(lessons_data)
-
-        # Seed some completed lessons for Priya (std_priya_01) so progress bars are non-zero
-        progress_seed = [
-            LessonProgress(id="lp_01", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_01_01", completed=True, completed_at=datetime.datetime(2026, 10, 1)),
-            LessonProgress(id="lp_02", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_01_02", completed=True, completed_at=datetime.datetime(2026, 10, 2)),
-            LessonProgress(id="lp_03", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_01_03", completed=True, completed_at=datetime.datetime(2026, 10, 3)),
-            LessonProgress(id="lp_04", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_01_04", completed=True, completed_at=datetime.datetime(2026, 10, 4)),
-            LessonProgress(id="lp_05", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_dsa_02_01", completed=True, completed_at=datetime.datetime(2026, 10, 5)),
-            LessonProgress(id="lp_06", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_ai_01_01", completed=True, completed_at=datetime.datetime(2026, 10, 6)),
-            LessonProgress(id="lp_07", college_id="col_demo_001", student_id="std_priya_01", lesson_id="les_ai_01_02", completed=True, completed_at=datetime.datetime(2026, 10, 7)),
-        ]
-        db.add_all(progress_seed)
         
-        # 14. Seed Weekly DSA Problems (Weeks 1-8)
+        # 13. Seed Weekly DSA Problems (Weeks 1-8)
         from seed.seed_weekly_dsa import seed_weekly_problems
         seed_weekly_problems(db, college_id="col_demo_001")
 
@@ -1254,10 +1256,47 @@ def init_db_and_seed():
         seed_screen35(db, college_id="col_demo_001")
         from seed.seed_screen01 import seed_screen01
         seed_screen01(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen45 import seed_screen45
+        seed_screen45(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen48 import seed_screen48
+        seed_screen48(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen46 import seed_screen46
+        seed_screen46(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen42 import seed_screen42
+        seed_screen42(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen49 import seed_screen49
+        seed_screen49(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen22 import seed_screen22
+        seed_screen22(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen38 import seed_screen38
+        seed_screen38(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_s16_dpdp import seed_s16_dpdp
+        seed_s16_dpdp(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_lab_exercises import seed_lab_exercises
+        seed_lab_exercises(db, college_id="col_demo_001")
+        db.flush()
+        from seed.seed_screen41 import seed_screen41
+        seed_screen41(db, college_id="col_demo_001")
+        db.flush()
+
+        # same as the re-seed path: open at-risk flags for the seeded history
+        from services.at_risk import run_rules
+        run_rules(db, "col_demo_001")
 
         db.commit()
     finally:
         db.close()
+        # drop pooled connections that had FK checks switched off
+        engine.dispose()
 
 if __name__ == "__main__":
     init_db_and_seed()

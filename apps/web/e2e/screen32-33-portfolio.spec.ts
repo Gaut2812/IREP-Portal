@@ -55,11 +55,21 @@ test.describe("Screen 32: Student Portfolio (/student/portfolio)", () => {
 });
 
 test.describe("Screen 33: Parent Projects & Portfolio (/parent/portfolio)", () => {
+  let parentToken = "";
   test.beforeEach(async ({ page }) => {
-    await loginAs(page, "parent");
+    parentToken = (await loginAs(page, "parent")).token;
   });
 
   test("should render parent portfolio with ward banner, sprint milestone, plain explanations, and interactive RSVP", async ({ page }) => {
+    // Start from a known RSVP state: an earlier run (or spec) may have left "attending", which disables
+    // the "Yes" button. Wait on that real state instead of letting click() time out.
+    const API = process.env.PLAYWRIGHT_API_URL || "http://localhost:8000/api/v1";
+    const auth = { Authorization: `Bearer ${parentToken}` };
+    const portfolio = await (await page.request.get(`${API}/parent/portfolio`, { headers: auth })).json();
+    const reset = await page.request.post(`${API}/parent/portfolio/rsvp`, {
+      headers: auth, data: { event_id: portfolio.demo_day_invitation.id, status: "declined", guest_count: 1 },
+    });
+    expect(reset.ok()).toBeTruthy();
     await page.goto("/parent/portfolio");
 
     // 1. Header & Ward Banner
@@ -81,7 +91,7 @@ test.describe("Screen 33: Parent Projects & Portfolio (/parent/portfolio)", () =
     await expect(page.getByText("Auditorium A & Live Stream")).toBeVisible();
 
     const rsvpBtn = page.getByRole("button", { name: "Yes, I will attend" });
-    await expect(rsvpBtn).toBeVisible();
+    await expect(rsvpBtn).toBeEnabled();
     await rsvpBtn.click();
 
     // Verify confirmation feedback shows

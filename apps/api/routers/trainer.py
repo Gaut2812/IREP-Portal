@@ -19,7 +19,7 @@ import uuid
 from core.tenant import get_trainer_for_user, get_trainer_batch_ids, get_user_name
 from models.schema import AtRiskFlag, FlagAction, Student as StudentModel, User as UserModel
 from services.trainer_dashboard import build_trainer_dashboard
-from services.at_risk import notify_parent_once, ACTION_LABEL
+from services.at_risk import ACTION_LABEL, reason_text, request_parent_call
 from services.audit import record_audit
 
 
@@ -68,15 +68,45 @@ def list_at_risk_flags(
         select(StudentModel, UserModel.name).join(UserModel, UserModel.id == StudentModel.user_id)
         .where(StudentModel.id.in_([f.student_id for f in flags] or ["__none__"]))
     ).all()}
-    return {"flags": [
-        {
+    lg = lang if lang in ("en", "ta") else "en"
+
+    def row(f):
+        st = students.get(f.student_id, (None, "Student"))[0]
+        return {
             "id": f.id, "student_id": f.student_id, "name": students.get(f.student_id, (None, "Student"))[1],
-            "score": students[f.student_id][0].readiness_score if f.student_id in students else None,
-            "reason_key": f.reason_key, "issue": f.reason_text, "severity": f.severity, "status": f.status,
-            "suggested_action": f.suggested_action, "action_label": ACTION_LABEL[f.suggested_action][lang if lang in ("en", "ta") else "en"],
+            "score": st.readiness_score if st else None, "band": st.readiness_band if st else None,
+            "attendance_pct": st.attendance_pct if st else None, "batch": st.batch_name if st else None,
+            "reason_key": f.reason_key, "issue": reason_text(f.reason_key, f.reason_text, lg), "severity": f.severity, "status": f.status,
+            "suggested_action": f.suggested_action, "action_label": ACTION_LABEL[f.suggested_action][lg],
             "parent_notified": f.parent_notified, "flagged_on": f.flagged_on.isoformat() if f.flagged_on else None,
-        } for f in flags
-    ], "total": len(flags)}
+        }
+    rows = [row(f) for f in flags]
+    from services.study_buddy import calls_by_student
+    ai = calls_by_student(db, {f.student_id for f in flags}, days=7)          # L21
+    for r in rows:
+        r["ai_calls_7d"] = ai.get(r["student_id"], 0)
+    summary = {"open": sum(1 for f in flags if f.status != "resolved"),
+               "high": sum(1 for f in flags if f.status != "resolved" and f.severity == "high"),
+               "parents_alerted": sum(1 for f in flags if f.parent_notified)}
+    return {"flags": rows, "total": len(flags), "summary": summary}
+
+
+@router.get("/flags/{flag_id}")
+def get_flag(
+    flag_id: str,
+    lang: str = "en",
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
+    db: Session = Depends(get_db),
+):
+    """Screen 14: one flag with its history of actions (own batches only; else 404)."""
+    flag = _flag_for_trainer(flag_id, current_user, db)
+    lg = lang if lang in ("en", "ta") else "en"
+    actions = db.execute(select(FlagAction).where(FlagAction.flag_id == flag.id).order_by(FlagAction.created_at)).scalars().all()
+    return {"id": flag.id, "status": flag.status, "issue": reason_text(flag.reason_key, flag.reason_text, lg),
+            "suggested_action": flag.suggested_action, "action_label": ACTION_LABEL[flag.suggested_action][lg],
+            "parent_notified": flag.parent_notified, "resolution_note": flag.resolution_note,
+            "actions": [{"type": a.action_type, "note": a.note, "by": a.actor_name,
+                         "at": a.created_at.isoformat() if a.created_at else None} for a in actions]}
 
 
 @router.post("/flags/{flag_id}/actions")
@@ -98,14 +128,16 @@ def add_flag_action(
     db.add(action)
     if flag.status == "open":
         flag.status = "in_progress"
-    notified = False
+    call = None
     if req.action_type == "parent_call":
-        notified = notify_parent_once(db, flag, student_name)
+        call = request_parent_call(db, flag, current_user.sub)      # L31: alert, thread message, overview
+        record_audit(db, current_user, "at_risk.parent_call", "at_risk_flag", flag.id,
+                     {"student_id": flag.student_id, "outcome": call})
     record_audit(db, current_user, "at_risk.action", "at_risk_flag", flag.id,
-                 {"action_type": req.action_type, "student_id": flag.student_id, "parent_notified": notified})
+                 {"action_type": req.action_type, "student_id": flag.student_id, "parent_call": call})
     db.commit()
     return {"success": True, "flag_id": flag.id, "status": flag.status, "action_id": action.id,
-            "parent_notified": flag.parent_notified, "notified_now": notified}
+            "parent_notified": flag.parent_notified, "notified_now": call == "sent", "parent_call": call, "student": student_name}
 
 
 @router.post("/flags/{flag_id}/resolve")

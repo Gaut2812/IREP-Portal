@@ -1,54 +1,224 @@
-name: Backend CI & Judge0 Verification
+name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master, "feat/**"]
+  workflow_dispatch:
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test-backend:
+  api:
+    name: API tests (SQLite, fresh database)
     runs-on: ubuntu-latest
-
-    services:
-      judge0:
-        image: judge0/judge0:latest
-        ports:
-          - 2358:2358
-        env:
-          JUDGE0_AUTH_TOKEN: test_judge0_token_2026
-          ENABLE_NETWORK: "false"
-      postgres:
-        image: postgres:15
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_DB: irep_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password123
-
+    env:
+      ENVIRONMENT: development   # demo OTP is returned only in development
+      JUDGE0_ADAPTER: fake
+      DATABASE_URL: sqlite:///irep_ci.db
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-          cache: "pip"
-
-      - name: Install dependencies
+          cache: pip
+          cache-dependency-path: |
+            apps/api/requirements.txt
+            apps/workers/requirements.txt
+      - run: pip install -r ../workers/requirements.txt -c constraints.txt
+      - name: Build the database from migrations and seed it
         run: |
-          cd apps/api
-          pip install -r requirements.txt
-
-      - name: Run Screen 24 Tests (Foundation, Execution, and Coding)
+          python -m alembic upgrade head
+          python -m alembic check
+          python seed/run_seed.py
+      - name: Run the full API suite
         env:
-          ENVIRONMENT: testing
-          JUDGE0_URL: http://localhost:2358
-          JUDGE0_ADAPTER: fake
-          JUDGE0_AUTH_TOKEN: test_judge0_token_2026
-          DATABASE_URL: sqlite:///irep_test.db
-        run: |
-          cd apps/api
-          python -m pytest tests/test_screen24_db_foundation.py tests/test_screen24_execution.py tests/test_screen24_coding.py -v
+          LINK_REPORT: ${{ github.workspace }}/api-links.json
+        run: python -m pytest tests -q
+      - name: Worker tests (Celery task and broker-less runner)
+        run: python -m pytest ../workers/tests -q -p no:cacheprovider
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: api-links
+          path: api-links.json
 
+  migrations-postgres:
+    name: PostgreSQL 16 (migrations, seed, API suite)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: irep_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/irep_ci
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - run: pip install -r requirements.txt -c constraints.txt
+      - name: Upgrade, compare with models, downgrade, upgrade again
+        run: |
+          python -m alembic upgrade head
+          python -m alembic check
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+      - name: Seed and run the full API suite on PostgreSQL
+        env:
+          ENVIRONMENT: development   # demo OTP is returned only in development
+          JUDGE0_ADAPTER: fake
+        run: |
+          python seed/run_seed.py
+          python -m pytest tests -q
+
+  web:
+    name: Web typecheck, build and E2E
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: development   # demo OTP is returned only in development
+      JUDGE0_ADAPTER: fake
+      DATABASE_URL: sqlite:///irep_ci.db
+      API_PYTHON: python
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - run: pip install -r apps/api/requirements.txt -c apps/api/constraints.txt
+      - name: Seed the API database
+        working-directory: apps/api
+        run: |
+          python -m alembic upgrade head
+          python seed/run_seed.py
+      - uses: pnpm/action-setup@v5
+        with:
+          package_json_file: apps/web/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+      - name: packages/api-client matches openapi.json
+        run: |
+          npx --yes openapi-typescript@7.13.0 apps/api/openapi.json -o packages/api-client/src/schema.d.ts
+          git diff --exit-code packages/api-client || (echo "Regenerate: cd packages/api-client && npm run generate" && exit 1)
+      - name: Typecheck
+        working-directory: apps/web
+        run: pnpm exec tsc --noEmit
+      - name: Build
+        working-directory: apps/web
+        run: pnpm build
+      - name: Install Chromium
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Playwright
+        working-directory: apps/web
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/e2e-links.json
+        run: pnpm exec playwright test --reporter=line,json,github   # github: failures become public check annotations
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: e2e-links
+          path: e2e-links.json
+
+  keycloak:
+    name: Keycloak sign-in (live server, browser)
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: development
+      JUDGE0_ADAPTER: fake
+      DATABASE_URL: sqlite:///irep_ci.db
+      API_PYTHON: python
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start Keycloak with the dev realm
+        run: docker compose -f infra/keycloak/docker-compose.yml up -d
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - run: pip install -r apps/api/requirements.txt -c apps/api/constraints.txt
+      - name: Database and demo users
+        working-directory: apps/api
+        run: |
+          python -m alembic upgrade head
+          python seed/run_seed.py
+          for i in $(seq 1 60); do curl -sf http://localhost:8081/realms/irep/.well-known/openid-configuration >/dev/null && break; sleep 3; done
+          python seed/sync_keycloak.py
+          python ops/configure_keycloak.py     # like production: staff two-factor flow, AMR mapper, no sign-up
+      - name: API accepts real Keycloak tokens
+        working-directory: apps/api
+        env:
+          KEYCLOAK_IT: "1"
+        run: python -m pytest tests/test_keycloak_live.py -q
+      - uses: pnpm/action-setup@v5
+        with:
+          package_json_file: apps/web/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Browser sign-in through Keycloak
+        working-directory: apps/web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test -c playwright.keycloak.config.ts --reporter=line,github
+
+  deploy-scripts:
+    name: Deploy scripts (encrypted backup, restore, go-live check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update -q && sudo apt-get install -y -q age
+      - run: pip install pytest pyyaml
+      - name: Build Caddy with the rate-limit module
+        run: docker build -q -f infra/prod/caddy.Dockerfile -t irep-caddy:test infra/prod
+      - name: backup.sh / restore.sh with real age; Caddy per-IP limits live; Compose checks
+        env:
+          CADDY_IT: "1"
+        run: python -m pytest infra/prod/tests -q -p no:cacheprovider
+
+  link-gate:
+    name: Link gate (docs/INTERCONNECT.md)
+    runs-on: ubuntu-latest
+    needs: [api, web]
+    if: always()
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          path: reports
+          merge-multiple: true
+      - name: Every active link has a passing test
+        run: python3 scripts/link_gate.py --pytest reports/api-links.json --playwright reports/e2e-links.json

@@ -99,6 +99,13 @@ def test_reminder_is_idempotent_and_notifies():
     db = SessionLocal()
     try:
         db.execute(delete(SessionReminder).where(SessionReminder.user_id == "usr_priya_01", SessionReminder.session_id == "sess_sat_track_project"))
+        # the demo week is Mon-Sat of the current week: on a Saturday after 10:00 this
+        # session has started, so make sure it is in the future for this test
+        sat = db.get(SessionItem, "sess_sat_track_project")
+        original = (sat.scheduled_start, sat.scheduled_end)
+        if sat.scheduled_start <= datetime.datetime.now() + datetime.timedelta(minutes=30):
+            sat.scheduled_start = datetime.datetime.now().replace(second=0, microsecond=0) + datetime.timedelta(hours=1)
+            sat.scheduled_end = sat.scheduled_start + datetime.timedelta(minutes=180)
         db.commit()
         before = db.execute(select(func.count(Notification.id)).filter_by(user_id="usr_priya_01", kind="reminder")).scalar_one()
     finally:
@@ -115,6 +122,13 @@ def test_reminder_is_idempotent_and_notifies():
         db.close()
     d = client.get("/api/v1/student/live", headers=PRIYA).json()
     assert next(r for r in d["week_sessions"] if r["id"] == "sess_sat_track_project")["reminder_set"] is True
+    db = SessionLocal()
+    try:
+        sat = db.get(SessionItem, "sess_sat_track_project")
+        sat.scheduled_start, sat.scheduled_end = original
+        db.commit()
+    finally:
+        db.close()
 
 
 def test_signed_recording_url():
@@ -143,3 +157,19 @@ def test_other_batch_and_tenant_cannot_access():
     assert client.post("/api/v1/student/sessions/sess_thu_rag/remind", headers=other).status_code == 404
     assert client.get("/api/v1/student/live", headers=_token("usr_priya_01", "student", college_id="col_other_999")).status_code == 404
     assert client.get("/api/v1/student/live", headers=_token("usr_ramesh_01", "parent")).status_code == 403
+
+
+def test_demo_week_rolls_forward_once_its_last_class_has_ended():
+    """Saturday afternoon (after the 10:00-13:00 class) behaves like Sunday: the
+    demo shows the coming week, so there is always a next class."""
+    from services.live_sessions import rebase_week_sessions
+    sat = datetime.date(2026, 11, 21)                      # a Saturday
+    db = SessionLocal()
+    try:
+        rebase_week_sessions(db, "col_demo_001", now=datetime.datetime.combine(sat, datetime.time(9, 0)))
+        assert db.get(SessionItem, "sess_mon_unionfind").scheduled_start.date() == datetime.date(2026, 11, 16)
+        rebase_week_sessions(db, "col_demo_001", now=datetime.datetime.combine(sat, datetime.time(14, 0)))
+        assert db.get(SessionItem, "sess_mon_unionfind").scheduled_start.date() == datetime.date(2026, 11, 23)
+        db.rollback()                                      # leave the demo calendar as the seed set it
+    finally:
+        db.close()

@@ -6,14 +6,16 @@ import { useAuth } from "@/lib/AuthContext";
 
 export default function RootPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoaded } = useAuth();
 
   useEffect(() => {
-    if (user?.role === "trainer") router.replace("/trainer");
+    if (!isLoaded) return;
+    if (!user) router.replace("/login");
+    else if (user.role === "trainer") router.replace("/trainer");
     else if (user?.role === "college") router.replace("/college");
     else if (user?.role === "parent") router.replace("/parent");
     else router.replace("/student");
-  }, [user, router]);
+  }, [user, isLoaded, router]);
 
   return (
     <div className="h-screen w-screen flex items-center justify-center bg-[#F1F5F9]">

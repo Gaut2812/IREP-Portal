@@ -1,26 +1,20 @@
 """MoU report files (Screen 19/20).
 
 WeasyPrint is the production renderer (Tamil glyphs need Noto Sans Tamil).
-Until it is installed, `render_simple_pdf` writes a small, valid PDF with the
+Until it is installed, `render_pdf` builds a small, valid PDF with the
 report title, generated date and data-as-of date so downloads work end to end.
 """
 import datetime
-import os
-from pathlib import Path
 
-from core.config import BASE_DIR
-
-STATIC_DIR = Path(BASE_DIR) / "static"
-REPORTS_DIR = STATIC_DIR / "reports"
+from services.storage import get_storage
 
 
 def _pdf_escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
-def render_simple_pdf(path: Path, title: str, lines: list) -> int:
-    """Write a one-page PDF (Helvetica, ASCII) and return its size in bytes."""
-    path.parent.mkdir(parents=True, exist_ok=True)
+def render_pdf(title: str, lines: list) -> bytes:
+    """A one-page PDF (Helvetica, ASCII)."""
     content_lines = ["BT", "/F1 18 Tf", "50 760 Td", f"({_pdf_escape(title)}) Tj", "/F1 11 Tf"]
     y = 730
     for line in lines:
@@ -45,21 +39,20 @@ def render_simple_pdf(path: Path, title: str, lines: list) -> int:
     for off in offsets:
         out += f"{off:010d} 00000 n \n".encode()
     out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
-    path.write_bytes(bytes(out))
-    return len(out)
+    return bytes(out)
 
 
 def ensure_report_file(report_id: str, title: str, generated_at: datetime.datetime, data_as_of: datetime.date,
                        summary_lines: list) -> tuple:
-    """Create the PDF for a report run if missing. Returns (relative_path, size_kb)."""
-    rel = f"reports/{report_id}.pdf"
-    path = STATIC_DIR / rel
-    if not path.exists():
+    """Create the PDF for a report run in storage if missing. Returns (storage_key, size_kb)."""
+    key = f"reports/{report_id}.pdf"
+    storage = get_storage()
+    if not storage.exists(key):
         lines = [
             f"Generated: {generated_at.strftime('%d %b %Y %H:%M')}",
             f"Data as of: {data_as_of.strftime('%d %b %Y')}",
             "Industry-Ready Engineer Program - Demo Engineering College",
             "",
         ] + summary_lines
-        render_simple_pdf(path, title, lines)
-    return rel, max(1, os.path.getsize(path) // 1024)
+        storage.put(key, render_pdf(title, lines), "application/pdf")
+    return key, max(1, storage.size(key) // 1024)

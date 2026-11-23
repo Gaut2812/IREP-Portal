@@ -1,0 +1,89 @@
+# IREP server labs on ONE lab node (pilot: class-hours E2E node). NEEDS A PERSON'S REVIEW.
+# Never run this on the database or API host: DockerSpawner needs the Docker socket, which
+# is root-equivalent on this machine.
+#
+#   cp .env.example .env            # set IREP_LABS_SERVICE_TOKEN (openssl rand -hex 32); never commit .env
+#   docker compose build            # hub + profile images
+#   docker compose up -d
+#
+# The portal then uses LAB_ADAPTER=jupyterhub, JUPYTERHUB_URL=http://<lab-node>:8000,
+# JUPYTERHUB_PUBLIC_URL=https://labs.<your-domain> and JUPYTERHUB_API_TOKEN=<the same token>.
+name: irep-labs
+
+services:
+  jupyterhub:
+    build: ./hub
+    image: irep/lab-hub:1
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LAB_NETWORK: irep-labs-users
+      LAB_SYSBOX: ${LAB_SYSBOX:-0}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock      # spawner; see the warning above
+      - hub-data:/srv/jupyterhub/data
+    ports:
+      - "8000:8000"                                    # put TLS (Caddy or the cloud LB) in front; allow only the portal and students
+    networks:
+      - irep-labs-hub
+      - irep-labs-users
+
+  # Pull-through cache for docker.io: the ONLY way lab containers reach outside (Docker & K8s profile).
+  # It sits on the internal lab network and on an egress network; nothing else does.
+  registry-cache:
+    image: registry:2.8.3
+    restart: unless-stopped
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - registry-cache:/var/lib/registry
+    networks:
+      irep-labs-users:
+        aliases: [registry-cache]
+      irep-labs-egress: {}
+
+  # Metering (S13): cAdvisor reads container CPU and memory; the portal polls it (LAB_METER_URL).
+  # Read-only mounts, not privileged. Expose its port only to the portal (firewall), never publicly.
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    command: ["--docker_only=true", "--housekeeping_interval=30s", "--store_container_labels=false", "--whitelisted_container_labels=irep.session"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "${METER_BIND:-127.0.0.1}:8081:8080"
+    networks:
+      - irep-labs-hub
+
+  # profile images, built here so the spawner finds them locally (or push to your registry)
+  lab-linux:
+    build: ./images/linux
+    image: irep/lab-linux:1
+    profiles: ["images"]
+  lab-ai-cpu:
+    build: ./images/ai-cpu
+    image: irep/lab-ai-cpu:1
+    profiles: ["images"]
+  lab-fullstack:
+    build: ./images/fullstack
+    image: irep/lab-fullstack:1
+    profiles: ["images"]
+  lab-docker-k8s:                  # only usable where Sysbox is installed and LAB_SYSBOX=1
+    build: ./images/docker-k8s
+    image: irep/lab-docker-k8s:1
+    profiles: ["images"]
+
+networks:
+  irep-labs-hub: {}
+  irep-labs-users:
+    name: irep-labs-users
+    internal: true          # lab containers get no route out: no internet, no cloud metadata, no portal subnet
+  irep-labs-egress: {}       # registry-cache only
+
+volumes:
+  hub-data: {}
+  registry-cache: {}

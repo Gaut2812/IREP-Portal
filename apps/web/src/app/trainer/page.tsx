@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
+import { LabApprovalsCard } from "@/components/LabApprovalsCard";
 import {
   Code2, ExternalLink, Filter, AlertCircle, RefreshCw, CheckCircle2, X
 } from "lucide-react";
@@ -145,6 +146,8 @@ export default function TrainerDashboardPage() {
 
           {!loading && !error && data && (
             <>
+              <LabApprovalsCard />
+
               {/* Row 1 KPI cards (PDF 8) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="trainer-kpis">
                 <div className={card}>

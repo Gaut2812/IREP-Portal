@@ -49,7 +49,7 @@ test.describe("Screen 01: Sign-in (/login)", () => {
     await expect(page.getByText("Enter your password")).toBeVisible();
   });
 
-  test("parent signs in with mobile number and OTP", async ({ page }) => {
+  test("parent signs in with mobile number and OTP", { tag: "@L01" }, async ({ page }) => {
     await page.goto("/login");
     await page.getByTestId("role-parent").click();
     await page.getByTestId("login-phone").fill("9876543214");

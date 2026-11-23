@@ -1,0 +1,5 @@
+{
+  "registry-mirrors": ["http://registry-cache:5000"],
+  "log-driver": "local",
+  "storage-driver": "overlay2"
+}

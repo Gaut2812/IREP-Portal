@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.database import get_db, SessionLocal
-from core.security import require_role, TokenPayload, decode_access_token, normalize_role
+from core.security import require_role, TokenPayload, decode_access_token, websocket_user, normalize_role
 from core.tenant import get_student_for_user
 from models.schema import Team, TeamMember, Sprint, SprintTask, ChangeRequest, Standup, BuildRun, PullRequest
 from services.sprint_board import team_for_user, active_sprint, build_board, move_task, verify_github
@@ -189,7 +189,7 @@ async def github_webhook(request: Request,
 
 @router.websocket("/ws/board/{team_id}")
 async def board_socket(websocket: WebSocket, team_id: str, token: Optional[str] = None):
-    payload = decode_access_token(token) if token else None
+    payload = websocket_user(token)          # local or Keycloak token, and still active
     if not payload:
         await websocket.close(code=4401)
         return

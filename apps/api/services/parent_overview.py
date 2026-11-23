@@ -43,6 +43,24 @@ def build_parent_overview(db: Session, student: Student, child_name: str, curren
                           today: Optional[datetime.date] = None) -> dict:
     today = today or datetime.date.today()
     college_id = student.college_id
+    # Screen 48 / DPDP: nothing about the child is shown to a parent before
+    # the parent-data consent is granted (or after it is withdrawn).
+    from services.consent import current as consent_state
+    state = consent_state(db, student.id, "parent_data_processing")
+    if state != "granted":
+        return {
+            "consent_required": True,
+            "consent_state": state or "missing",
+            "ward": {"id": student.id, "name": child_name},
+            "consent": {
+                "purpose": "parent_data_processing",
+                "title": "உங்கள் பிள்ளையின் தரவைப் பார்க்க ஒப்புதல் தேவை" if lang == "ta" else "Your consent is needed to see your child's progress",
+                "body": ("வருகை, மதிப்பெண்கள், திட்டங்கள் மற்றும் பயிற்சியாளர் செய்திகளை உங்களுக்குக் காட்ட IREP உங்கள் பிள்ளையின் தரவைச் செயலாக்குகிறது. "
+                         "நீங்கள் எப்போது வேண்டுமானாலும் ஒப்புதலைத் திரும்பப் பெறலாம்.") if lang == "ta" else
+                        ("IREP processes your child's attendance, scores, projects and trainer messages to show them to you. "
+                         "You can withdraw this consent at any time."),
+            },
+        }
     card = latest_released_card(db, student)
 
     certs = db.execute(select(Certificate).filter_by(student_id=student.id, college_id=college_id)).scalars().all()
@@ -62,7 +80,7 @@ def build_parent_overview(db: Session, student: Student, child_name: str, curren
     now = datetime.datetime.combine(today, datetime.time.min)
     events = db.execute(
         select(Event).where(
-            Event.college_id == college_id, Event.starts_at >= now - datetime.timedelta(hours=12),
+            Event.college_id == college_id, Event.status == "published", Event.starts_at >= now - datetime.timedelta(hours=12),
             Event.audience.in_(["parents", "all"]), Event.student_id.is_(None),
             (Event.batch_id.is_(None)) | (Event.batch_id == student.batch_id),
         ).order_by(Event.starts_at).limit(5)
@@ -85,7 +103,26 @@ def build_parent_overview(db: Session, student: Student, child_name: str, curren
             "rsvp_enabled": e.rsvp_enabled, "rsvp_status": r.status if r else None, "guests": r.guests if r else 0,
         }
 
+    # L31: open flags the trainer has raised with the parent show as support alerts
+    from models.schema import AtRiskFlag
+    from services.at_risk import ACTION_LABEL, reason_text
+    lg = "ta" if lang == "ta" else "en"
+    alerts = [{"id": f.id, "issue": reason_text(f.reason_key, f.reason_text, lg), "next_step": ACTION_LABEL[f.suggested_action][lg],
+               "since": (f.parent_notified_at or datetime.datetime.combine(f.flagged_on, datetime.time.min)).date().isoformat()}
+              for f in db.execute(select(AtRiskFlag).where(
+                  AtRiskFlag.student_id == student.id, AtRiskFlag.college_id == college_id, AtRiskFlag.status != "resolved",
+                  AtRiskFlag.parent_notified.is_(True)).order_by(AtRiskFlag.parent_notified_at.desc())).scalars()]
+
+    from services.broadcasts import for_parent      # L30: announcements from the college and trainers
+    announcements = [{"id": b.id, "title": b.title_ta if lang == "ta" and b.title_ta else b.title,
+                      "body": b.body_ta if lang == "ta" and b.body_ta else b.body, "from": b.author_role,
+                      "at": b.created_at.date().isoformat() if b.created_at else None}
+                     for b in for_parent(db, college_id, student.batch_id)]
+
     return {
+        "consent_required": False,
+        "support_alerts": alerts,
+        "announcements": announcements,
         "ward": {
             "id": student.id, "name": child_name, "semester": student.semester, "branch": student.branch, "track": student.track,
             "details": f"Sem {student.semester} · {student.branch}", "batch": student.batch_name, "college": "Demo Engineering College",

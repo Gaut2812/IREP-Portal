@@ -4,7 +4,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,12 +13,13 @@ from core.database import get_db
 from core.security import get_current_user, require_role, TokenPayload
 from models.schema import ReportRun
 from services.college_overview import build_college_overview
-from services.reports import ensure_report_file, STATIC_DIR
+from services.reports import ensure_report_file
+from services.storage import get_storage
 from services.audit import record_audit
 
 router = APIRouter(prefix="/college", tags=["College Screens"])
 
-COLLEGE_ROLES = ["college_admin", "placement_officer", "super_admin"]
+COLLEGE_ROLES = ["college_admin", "placement_officer", "irep_admin"]
 
 
 class GenerateReportRequest(BaseModel):
@@ -89,6 +90,18 @@ def generate_report(
         f"Certifications earned: {overview['kpis']['certifications']['value']}",
         f"Internships secured: {overview['kpis']['internships']['value']}",
     ] + [f"{b['band']}: {b['percentage']}%" for b in overview["readiness_distribution"]]
+    from models.schema import MouTerm   # Screen 20: MoU terms in the report (usage figures follow with 47, L23)
+    mou = db.execute(select(MouTerm).where(MouTerm.college_id == current_user.college_id, MouTerm.status == "active")).scalars().first()
+    if mou:
+        enrolled = overview["kpis"]["students_enrolled"]["value"]
+        lines += ["", f"MoU: {mou.starts_on.isoformat()} to {mou.ends_on.isoformat()}",
+                  f"Students enrolled against the cap: {enrolled} of {mou.students_cap}",
+                  f"Lab hours per student: {mou.lab_hours_per_student} · AI calls per day: {mou.ai_calls_per_day}"]
+    from services.quotas import college_usage            # L23: usage figures from 47, this month
+    u = college_usage(db, current_user.college_id)
+    lines += ["", f"Usage this month ({u['period']}):"] + [
+        f"{label}: {u['usage'][k]['used']} of {u['usage'][k]['quota']}" + (f" ({u['usage'][k]['pct']}%)" if u['usage'][k]['pct'] is not None else "")
+        for k, label in (("lab_minutes", "Lab minutes"), ("ai_calls", "AI Study Buddy calls"), ("recording_mb", "Recording storage MB"))]
     rel, size_kb = ensure_report_file(rid, f"{en} - {period}", now, now.date(), lines)
     run = ReportRun(id=rid, college_id=current_user.college_id, title_en=f"{en} · {period}", title_ta=f"{ta} · {period}",
                     report_type=req.report_type, period_label=period, generated_at=now, data_as_of=now.date(),
@@ -108,9 +121,10 @@ def download_report(
     run = db.execute(select(ReportRun).filter_by(id=report_id, college_id=current_user.college_id)).scalar_one_or_none()
     if not run or not run.file_path:
         raise HTTPException(status_code=404, detail="Report not found")
-    path = STATIC_DIR / run.file_path
-    if not path.exists():
+    storage = get_storage()
+    if not storage.exists(run.file_path):
         raise HTTPException(status_code=404, detail="Report file missing")
     record_audit(db, current_user, "report.download", "report_run", run.id)
     db.commit()
-    return FileResponse(str(path), media_type="application/pdf", filename=f"{run.id}.pdf")
+    return Response(content=storage.get(run.file_path), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{run.id}.pdf"'})

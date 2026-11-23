@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, Date, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import TenantModel
 
@@ -12,12 +12,37 @@ class College(TenantModel):
     code: Mapped[str] = mapped_column(String(64), unique=True)
     logo_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     chat_retention_days: Mapped[int] = mapped_column(Integer, default=365)
+    # Screen 45 (IREP staff): onboarding state and feature switches
+    city: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="active")   # onboarding, active, suspended
+    features: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class MouTerm(TenantModel):
+    """One version of a college's MoU (screen 45). At most one is active."""
+    __tablename__ = "mou_terms"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    starts_on: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    ends_on: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    students_cap: Mapped[int] = mapped_column(Integer, nullable=False)
+    lab_hours_per_student: Mapped[int] = mapped_column(Integer, default=40)
+    ai_calls_per_day: Mapped[int] = mapped_column(Integer, default=30)
+    storage_gb: Mapped[int] = mapped_column(Integer, default=50)
+    fee_per_student_inr: Mapped[int] = mapped_column(Integer, default=0)
+    # S16 billing: overage rates agreed in the MoU (0 = not charged)
+    lab_overage_inr_per_hour: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    storage_overage_inr_per_gb: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)   # draft, active, superseded
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
 class User(TenantModel):
     __tablename__ = "users"
     
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), index=True, unique=True, nullable=False)   # one account per email (sign-in looks it up)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), index=True, nullable=False) # student, trainer, college_admin, parent, super_admin
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -46,6 +71,8 @@ class Student(TenantModel):
     # S0 cohort structure
     branch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("branches.id"), nullable=True, index=True)
     batch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("batches.id"), nullable=True, index=True)
+    # S16 DPDP: under 18 -> optional purposes need verifiable parental consent (services/consent.py)
+    date_of_birth: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
     track: Mapped[str] = mapped_column(String(64), default="AI & Data Science")
     academic_year: Mapped[str] = mapped_column(String(16), default="2026-27")
 
@@ -56,6 +83,7 @@ class Trainer(TenantModel):
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
     designation: Mapped[str] = mapped_column(String(128), default="Senior Technical Trainer")
     specialization: Mapped[str] = mapped_column(String(128), default="AI & Cloud Systems")
+    teams_upn: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)   # licensed Teams organizer account
 
 class ParentStudent(TenantModel):
     __tablename__ = "parent_student"
@@ -84,6 +112,12 @@ class SessionItem(TenantModel):
     lab_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     batch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("batches.id"), nullable=True, index=True)
     week_no: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Screens 05/06: room booking and substitutes
+    room: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    substitute_trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id"), nullable=True)
+    # Labs track S13: a read-only spectate link the trainer posts for this class (e.g. a JupyterHub share)
+    spectate_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    spectate_label: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
 class SessionAttendance(TenantModel):
     __tablename__ = "session_attendance"
@@ -119,6 +153,12 @@ class CodingProblem(TenantModel):
     starter_code: Mapped[str] = mapped_column(Text, default="")
     trainer_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     trainer_author: Mapped[str] = mapped_column(String(128), default="Arun K.")
+    # Screen 22 (L13): published to batches (None = every batch); the platform tenant holds the IREP bank (L37)
+    status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)  # draft, published
+    batch_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    due_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # bank item it was imported from
 
     # Relationships
     test_cases: Mapped[List["TestCase"]] = relationship(
@@ -215,6 +255,12 @@ class PracticeTest(TenantModel):
     duration_min: Mapped[int] = mapped_column(Integer, default=30)
     total_questions: Mapped[int] = mapped_column(Integer, default=30)
     sections_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Screen 22 (L13): published to batches (None = every batch); the platform tenant holds the IREP bank (L37)
+    status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)  # draft, published
+    batch_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    due_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # bank item it was imported from
 
 class PracticeQuestion(TenantModel):
     __tablename__ = "practice_questions"
@@ -305,6 +351,11 @@ class VirtualLabItem(TenantModel):
     meter: Mapped[str] = mapped_column(String(16), default="lab_minutes")          # lab_minutes | cloud_credits
     icon: Mapped[str] = mapped_column(String(16), default="terminal")
     image: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)       # container image for the docker adapter
+    # Labs track (S9+): one launcher for server labs, browser labs with signed beacons, external sandboxes
+    runtime: Mapped[str] = mapped_column(String(16), default="server", server_default="server")   # server, browser, external
+    profile: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)      # JupyterHub profile slug (server labs)
+    browser_kit: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # sql, python (browser labs)
+    external_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # e.g. AWS Academy Learner Lab
     network: Mapped[str] = mapped_column(String(32), default="none")              # none | isolated (cyber range)
     default_file: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
@@ -436,50 +487,39 @@ class Broadcast(TenantModel):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     delivery: Mapped[str] = mapped_column(Text, default="{}")                # JSON delivery report
-
-# Screen 11: My Courses
-class Course(TenantModel):
-    __tablename__ = "courses"
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    # S14: college announcements (41, L30) and fan-out at scale through the outbox, 500 per chunk
+    author_role: Mapped[str] = mapped_column(String(16), default="trainer", server_default="trainer")   # trainer, college
     title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    track: Mapped[str] = mapped_column(String(64), default="DSA")
-    semester_min: Mapped[int] = mapped_column(Integer, default=2)
-    thumbnail_color: Mapped[str] = mapped_column(String(32), default="blue")
-    total_lessons: Mapped[int] = mapped_column(Integer, default=0)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    body_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="done", server_default="done")              # sending, done
+    recipients_total: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    delivered: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    chunks_total: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    chunks_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
-class Module(TenantModel):
-    __tablename__ = "modules"
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    course_id: Mapped[str] = mapped_column(String(64), ForeignKey("courses.id"))
-    order_index: Mapped[int] = mapped_column(Integer, default=1)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-
-class Lesson(TenantModel):
-    __tablename__ = "lessons"
+class Survey(TenantModel):
+    """Screen 02 (college settings) creates it, screen 40 (parent) answers it: link L26."""
+    __tablename__ = "surveys"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    module_id: Mapped[str] = mapped_column(String(64), ForeignKey("modules.id"))
-    order_index: Mapped[int] = mapped_column(Integer, default=1)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    type: Mapped[str] = mapped_column(String(32), default="video")  # video, slides, notes, assignment
-    duration_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    content_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    questions: Mapped[list] = mapped_column(JSON, default=list)       # [{id, kind: rating|choice|text, text_en, text_ta, options_en, options_ta, required}]
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)   # draft, published, closed
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    closes_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
-class LessonProgress(TenantModel):
-    __tablename__ = "lesson_progress"
-    __table_args__ = (
-        {"sqlite_autoincrement": False},
-    )
+
+class SurveyResponse(TenantModel):
+    __tablename__ = "survey_responses"
+    __table_args__ = (UniqueConstraint("survey_id", "parent_user_id", name="uq_survey_response"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
-    lesson_id: Mapped[str] = mapped_column(String(64), ForeignKey("lessons.id"), index=True)
-    completed: Mapped[bool] = mapped_column(Boolean, default=True)
-    completed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    survey_id: Mapped[str] = mapped_column(String(64), ForeignKey("surveys.id", name="fk_response_survey"), index=True)
+    parent_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_response_parent"), index=True)
+    answers: Mapped[dict] = mapped_column(JSON, default=dict)          # {question_id: value}
 
 # Screen 15: Parent View Monthly Cards
 class ParentMonthlyRecord(TenantModel):
@@ -644,11 +684,20 @@ class Certificate(TenantModel):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     issuer: Mapped[str] = mapped_column(String(128), default="IREP")
     cert_type: Mapped[str] = mapped_column(String(32), default="course")   # course, external, exam
-    status: Mapped[str] = mapped_column(String(32), default="earned", index=True)  # earned, scheduled, pending_proof, revoked
+    status: Mapped[str] = mapped_column(String(32), default="earned", index=True)  # earned, scheduled, pending_proof, rejected, revoked
     issued_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, index=True)
     exam_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
     verify_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     proof_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    # S11 (26 ↔ 43, L10): external proof, verified only after trainer approval (release rule 5.1.4)
+    credential_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)     # the issuer's id or verify link
+    proof_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)         # services/storage key, never a public URL
+    proof_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    proof_submitted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    voucher_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)      # an IREP-funded exam voucher (28 counts them)
 
 
 class Internship(TenantModel):
@@ -675,6 +724,188 @@ class AuditLog(TenantModel):
     entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class Course(TenantModel):
+    """Screen 46: library course (platform tenant). Students read published ones (screen 11)."""
+    __tablename__ = "courses"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    track: Mapped[str] = mapped_column(String(64), default="All", index=True)        # a track name, or "All"
+    semester: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    skill_key: Mapped[str] = mapped_column(String(32), nullable=False)              # dashboard skill bar it feeds (L33)
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)    # draft, published
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class Lesson(TenantModel):
+    __tablename__ = "lessons"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    course_id: Mapped[str] = mapped_column(String(64), ForeignKey("courses.id", name="fk_lesson_course"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=1)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    body_en: Mapped[str] = mapped_column(Text, default="")
+    body_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    duration_min: Mapped[int] = mapped_column(Integer, default=20)
+
+
+class LessonProgress(TenantModel):
+    """A student's completed lesson (student's own college)."""
+    __tablename__ = "lesson_progress"
+    __table_args__ = (UniqueConstraint("student_id", "lesson_id", name="uq_lesson_progress"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_progress_student"), index=True)
+    lesson_id: Mapped[str] = mapped_column(String(64), ForeignKey("lessons.id", name="fk_progress_lesson"), index=True)
+    completed_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+
+
+class NotificationTemplate(TenantModel):
+    """Screen 46 -> 44 (L37): Tamil and English text for a notification key, with {placeholders}."""
+    __tablename__ = "notification_templates"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    body_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    body_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class LeaveRequest(TenantModel):
+    """Screens 10 -> 43 (link L09): a parent's leave request; changes attendance only when a trainer approves it."""
+    __tablename__ = "leave_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_leave_student"), index=True)
+    requested_by: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_leave_requested_by"))
+    start_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)   # pending, approved, denied
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class ScheduleChangeRequest(TenantModel):
+    """Screens 05 -> 06 (link L11): a trainer's proposed schedule change, approved by the college."""
+    __tablename__ = "schedule_change_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)                    # new, reschedule, cancel, substitute
+    batch_id: Mapped[str] = mapped_column(String(64), ForeignKey("batches.id"), index=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("sessions.id"), nullable=True)
+    proposed_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    proposed_start: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    proposed_end: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    proposed_room: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    substitute_trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id"), nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    requested_by_trainer_id: Mapped[str] = mapped_column(String(64), ForeignKey("trainers.id"))
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending, approved, rejected
+    clashes: Mapped[list] = mapped_column(JSON, default=list)
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class TrainerNote(TenantModel):
+    """Screen 04: private trainer note on a student (trainers of the student's batch only, §5.4)."""
+    __tablename__ = "trainer_notes"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    author_trainer_id: Mapped[str] = mapped_column(String(64), ForeignKey("trainers.id"), index=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class RosterChangeRequest(TenantModel):
+    """Screen 04 -> 03 (link L24 up): a trainer asks the college to move or remove a student."""
+    __tablename__ = "roster_change_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    from_batch_id: Mapped[str] = mapped_column(String(64), ForeignKey("batches.id"))
+    to_batch_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("batches.id"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)                    # move, remove
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    requested_by_trainer_id: Mapped[str] = mapped_column(String(64), ForeignKey("trainers.id"))
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)     # open, approved, rejected
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class NotificationPreference(TenantModel):
+    """Screen 44: per-user delivery preferences. In-app is always on; language
+    lives on users.language_pref (one source of truth)."""
+    __tablename__ = "notification_preferences"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), unique=True, index=True)
+    email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    sms_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    push_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    quiet_start_hour: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)   # local hour 0-23, e.g. 21
+    quiet_end_hour: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)     # e.g. 7 (wraps midnight)
+
+
+class ConsentRecord(TenantModel):
+    """Screen 48: one row per consent decision (append-only; a withdrawal is a
+    new row). The current state is the latest row per (student, purpose)."""
+    __tablename__ = "consent_records"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    subject_student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    granted_by_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False, index=True)   # services/consent.PURPOSES
+    status: Mapped[str] = mapped_column(String(16), nullable=False)                # granted, withdrawn, requested (a minor asked)
+    method: Mapped[str] = mapped_column(String(24), nullable=False)                # otp_parent, paper_form_upload, in_app
+    evidence_ref: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    notice_version: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)      # the notice the person saw (S16)
+    verified_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)  # parent's OTP sign-in (identity check)
+    recorded_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, default=datetime.datetime.utcnow, index=True)
+
+
+class DataRequest(TenantModel):
+    """Screen 48 / link L27: a college admin's export or deletion request for one student."""
+    __tablename__ = "data_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)                  # export, deletion
+    subject_student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id"), index=True)
+    requested_by: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="received", index=True)  # received, in_progress, completed, rejected
+    due_on: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    result_ref: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # storage key of the export file
+    result_summary: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    decision_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class OutboxEvent(TenantModel):
+    """Transactional outbox (Master Plan S1): written in the same transaction
+    as the state change; side effects (SMS, email, push, fan-out) run in the
+    worker after commit. See services/outbox.py."""
+    __tablename__ = "outbox_events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)  # notification.deliver, audit.<action>, ...
+    entity_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", index=True)  # pending, done, failed
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    available_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, default=datetime.datetime.utcnow, index=True)
+    processed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class OtpAttempt(TenantModel):
@@ -786,6 +1017,9 @@ class Event(TenantModel):
     description_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rsvp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # Screen 42: draft -> published -> cancelled; rows from before S7 are published
+    status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
 
 
 # ---------------------------------------------------------------------------
@@ -894,6 +1128,52 @@ class Rsvp(TenantModel):
 
 
 # ---------------------------------------------------------------------------
+# Screen 25: AI Study Buddy (the student's own chat; trainers see counts only, L21)
+# ---------------------------------------------------------------------------
+
+class StudyBuddyMessage(TenantModel):
+    __tablename__ = "study_buddy_messages"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_buddy_student"), index=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)                 # user, assistant
+    content: Mapped[str] = mapped_column(Text, nullable=False)                    # stored as sent to the model (redacted)
+    topic: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)       # e.g. a coding problem id
+    lang: Mapped[str] = mapped_column(String(8), default="en")
+    provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)    # fake, anthropic
+
+
+# ---------------------------------------------------------------------------
+# Screen 49: support desk (links L39 report-a-problem, L28 replies)
+# ---------------------------------------------------------------------------
+
+class SupportTicket(TenantModel):
+    """A report-a-problem ticket. college_id is the requester's college; IREP staff see all."""
+    __tablename__ = "support_tickets"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    requester_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_ticket_requester"), index=True)
+    requester_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    requester_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str] = mapped_column(String(16), default="question")         # bug, question, access, data
+    page_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)    # the screen it was reported from
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)     # open, answered, closed
+    last_activity_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+
+class SupportMessage(TenantModel):
+    __tablename__ = "support_messages"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ticket_id: Mapped[str] = mapped_column(String(64), ForeignKey("support_tickets.id", name="fk_support_msg_ticket"), index=True)
+    author_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    author_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    is_staff: Mapped[bool] = mapped_column(Boolean, default=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+# ---------------------------------------------------------------------------
 # Screen 08: recordings, reminders, recording views
 # ---------------------------------------------------------------------------
 
@@ -910,7 +1190,8 @@ class Recording(TenantModel):
     has_transcript: Mapped[bool] = mapped_column(Boolean, default=False)
     has_summary: Mapped[bool] = mapped_column(Boolean, default=False)
     recorded_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
-    status: Mapped[str] = mapped_column(String(16), default="ready")           # processing, ready
+    status: Mapped[str] = mapped_column(String(16), default="ready")           # processing, ready, over_quota
+    size_mb: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # counts against the MoU storage_gb (L36)
 
 
 class SessionReminder(TenantModel):
@@ -945,7 +1226,7 @@ class LiveMeeting(TenantModel):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), unique=True, index=True)
-    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb
+    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb, teams
     external_meeting_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     started_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
@@ -957,6 +1238,13 @@ class LiveMeeting(TenantModel):
     flow_title: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     flow_steps: Mapped[list] = mapped_column(JSON, default=list)
     finalized: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Microsoft Teams (LIVE_CLASS_ADAPTER=teams): Graph calendar event with a Teams meeting
+    join_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    organizer_upn: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    graph_event_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    graph_online_meeting_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    attendance_pulled_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    unmatched_attendees: Mapped[list] = mapped_column(JSON, default=list)   # Teams names the trainer must confirm
 
 
 class JoinEvent(TenantModel):
@@ -1031,6 +1319,39 @@ class LabSession(TenantModel):
     last_active_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
     stopped_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     stop_reason: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)   # user, expired, idle, trainer
+    # S13 metering (server labs, cAdvisor): cumulative CPU, peak memory, last sample
+    cpu_seconds: Mapped[float] = mapped_column(Float, default=0, server_default="0")
+    mem_peak_mb: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    metered_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class LabExercise(TenantModel):
+    """S13 grading checkers: a lab exercise checked against an expected result kept on the server."""
+    __tablename__ = "lab_exercises"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    lab_id: Mapped[str] = mapped_column(String(64), ForeignKey("virtual_labs.id", name="fk_exercise_lab"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=1)
+    title_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ta: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    prompt_en: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    setup: Mapped[Optional[str]] = mapped_column(Text, nullable=True)          # SQL run first (sql) or starter code (python)
+    expected: Mapped[list] = mapped_column(JSON, default=list)                 # sql: rows; python: output lines. Never sent to clients
+    ordered: Mapped[bool] = mapped_column(Boolean, default=False)              # sql: row order matters
+    points: Mapped[int] = mapped_column(Integer, default=10)
+
+
+class LabExerciseResult(TenantModel):
+    __tablename__ = "lab_exercise_results"
+    __table_args__ = (UniqueConstraint("student_id", "exercise_id", name="uq_exercise_result"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_exres_student"), index=True)
+    exercise_id: Mapped[str] = mapped_column(String(64), ForeignKey("lab_exercises.id", name="fk_exres_exercise"), index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    passed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class LabApproval(TenantModel):
@@ -1163,6 +1484,9 @@ class InterviewSlot(TenantModel):
     starts_at: Mapped[datetime.datetime] = mapped_column(DateTime, index=True)
     duration_min: Mapped[int] = mapped_column(Integer, default=40)
     status: Mapped[str] = mapped_column(String(16), default="open")              # open, booked, cancelled
+    # Screen 38 (L17): set when a mock drive's interview round created this slot
+    drive_round_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("drive_rounds.id", name="fk_slot_drive_round"),
+                                                          nullable=True, index=True)
 
 
 class InterviewBooking(TenantModel):
@@ -1255,6 +1579,17 @@ class MessageReport(TenantModel):
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)   # open, kept, removed
 
 
+class ModerationTerm(TenantModel):
+    """Screen 34 (S10): a college's own words. block = the post is refused; flag = it posts and goes to the L18 queue."""
+    __tablename__ = "moderation_terms"
+    __table_args__ = (UniqueConstraint("college_id", "term", name="uq_moderation_term"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    term: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(8), default="flag")      # block, flag
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
 class ModerationAction(TenantModel):
     __tablename__ = "moderation_actions"
 
@@ -1265,3 +1600,103 @@ class ModerationAction(TenantModel):
     action: Mapped[str] = mapped_column(String(16), nullable=False)               # remove, keep, mute
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     actor_user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class SupportSession(TenantModel):
+    """A logged support session: the super admin opens a time-boxed window, with a reason, during which
+    IREP support works on one college's account. Opening and ending are audited (docs/PERMISSIONS.md)."""
+    __tablename__ = "support_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    staff_user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_support_sessions_staff"), nullable=False)
+    opened_by: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_support_sessions_opened_by"), nullable=False)
+    ticket_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    opened_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    ended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    ended_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class MockDrive(TenantModel):
+    """Screen 38: a company-pattern mock drive. Created with its event (42, kind "drive", L29)."""
+    __tablename__ = "mock_drives"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(64), ForeignKey("events.id", name="fk_drive_event"), unique=True, index=True)
+    batch_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    company_pattern: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(24), default="draft")     # draft, published, results_published
+    published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    results_published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class DriveRound(TenantModel):
+    """One round of a mock drive: a practice test (22/46) or interview slots on 37 (L17)."""
+    __tablename__ = "drive_rounds"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    drive_id: Mapped[str] = mapped_column(String(64), ForeignKey("mock_drives.id", name="fk_round_drive"), index=True)
+    round_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)          # test, interview
+    test_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("practice_tests.id", name="fk_round_test"), nullable=True)
+    round_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)   # technical, hr, ai_coding
+    trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id", name="fk_round_trainer"), nullable=True)
+    starts_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    duration_min: Mapped[int] = mapped_column(Integer, default=40)
+    slot_count: Mapped[int] = mapped_column(Integer, default=0)
+    cutoff: Mapped[float] = mapped_column(Float, default=0)               # test: percent; interview: overall score
+
+
+class Invoice(TenantModel):
+    """S16 billing (screen 47): one monthly invoice per college. Amounts in paise (integers)."""
+    __tablename__ = "invoices"
+    __table_args__ = (UniqueConstraint("college_id", "period", "status_key", name="uq_invoice_period"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    period: Mapped[str] = mapped_column(String(7), index=True)                    # YYYY-MM
+    number: Mapped[Optional[str]] = mapped_column(String(32), unique=True, nullable=True)   # IREP/2026-27/0001 on issue
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)    # draft, issued, paid, void
+    # "live" for draft/issued/paid (one per college and period), the invoice id once void (frees the period)
+    status_key: Mapped[str] = mapped_column(String(64), default="live")
+    mou_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    students: Mapped[int] = mapped_column(Integer, default=0)
+    subtotal_paise: Mapped[int] = mapped_column(Integer, default=0)
+    credit_paise: Mapped[int] = mapped_column(Integer, default=0)
+    gst_pct: Mapped[float] = mapped_column(Float, default=18.0)
+    gst_paise: Mapped[int] = mapped_column(Integer, default=0)
+    total_paise: Mapped[int] = mapped_column(Integer, default=0)
+    usage: Mapped[dict] = mapped_column(JSON, default=dict)                        # lab minutes, AI calls, MB vs quota
+    issued_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    due_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    paid_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    payment_ref: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    void_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    pdf_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+
+class InvoiceLine(TenantModel):
+    __tablename__ = "invoice_lines"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    invoice_id: Mapped[str] = mapped_column(String(64), ForeignKey("invoices.id", name="fk_line_invoice"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)               # seats, lab_overage, storage_overage, credit
+    label_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    label_ta: Mapped[str] = mapped_column(String(255), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, default=0)
+    unit_paise: Mapped[int] = mapped_column(Integer, default=0)
+    amount_paise: Mapped[int] = mapped_column(Integer, default=0)
+    credit_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("billing_credits.id", name="fk_line_credit"), nullable=True)
+
+
+class BillingCredit(TenantModel):
+    """A credit for a college (goodwill, prepayment, correction), used by the next invoice(s)."""
+    __tablename__ = "billing_credits"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)
+    used_paise: Mapped[int] = mapped_column(Integer, default=0)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[str] = mapped_column(String(64), nullable=False)

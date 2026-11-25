@@ -3,7 +3,7 @@
 /** Screen 39 · Placement readiness (college): drill down college → branch → batch → student. The one
  *  readiness score and band (L34), as aggregates and bands (L35): per student only score, band and the
  *  monthly change; never trainer notes or chats. Spec: docs/screens/37-38-39-interviews-drives-readiness.md */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -41,13 +41,20 @@ export default function ReadinessPage() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
 
+  // only the latest request may set state (language or scope can change while one is in flight)
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const req = ++latest.current;
     const q = new URLSearchParams({ lang: language });
     if (scope.branch) q.set("branch_id", scope.branch);
     if (scope.batch) q.set("batch_id", scope.batch);
     if (scope.batch && band) q.set("band", band);
-    try { setData(await fetchApi<Data>(`/college/readiness?${q.toString()}`)); setError(""); }
-    catch (e) { setError(e instanceof ApiError ? String(e.detail) : t("readiness.load_failed")); }
+    try {
+      const res = await fetchApi<Data>(`/college/readiness?${q.toString()}`);
+      if (req === latest.current) { setData(res); setError(""); }
+    } catch (e) {
+      if (req === latest.current) setError(e instanceof ApiError ? String(e.detail) : t("readiness.load_failed"));
+    }
   }, [scope, band, language, t]);
   useEffect(() => { load(); }, [load]);
 

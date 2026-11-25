@@ -56,19 +56,19 @@ export default function SurveysPage() {
   });
   const showResults = (s: SurveyRow) => run(async () => setResults(await fetchApi<Results>(`/college/surveys/${s.id}/results`)));
   const setQ = (i: number, patch: Partial<Q>) => setQs(qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
-  const cls = "w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs";
+  const cls = "w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs";
 
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("surveys.title")}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-6xl">
-          <form onSubmit={create} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-3 space-y-2 h-fit" data-testid="survey-form">
-            <p className="text-[11px] text-[#64748B]">{t("surveys.help")}</p>
+          <form onSubmit={create} noValidate className="bg-white rounded-card border border-line p-3 space-y-2 h-fit" data-testid="survey-form">
+            <p className="text-caption text-muted">{t("surveys.help")}</p>
             <input className={cls} placeholder={t("surveys.title_en")} value={title.en} onChange={(e) => setTitle({ ...title, en: e.target.value })} data-testid="survey-title" />
             <input className={cls} placeholder={t("surveys.title_ta")} value={title.ta} onChange={(e) => setTitle({ ...title, ta: e.target.value })} data-testid="survey-title-ta" />
             {qs.map((q, i) => (
-              <fieldset key={i} className="border border-[#E2E8F0] rounded-lg p-2 space-y-1.5" data-testid="survey-q">
-                <legend className="text-[11px] font-bold px-1">{t("surveys.question")} {i + 1}</legend>
+              <fieldset key={i} className="border border-line rounded-tile p-2 space-y-1.5" data-testid="survey-q">
+                <legend className="text-caption font-semibold px-1">{t("surveys.question")} {i + 1}</legend>
                 <select className={cls} value={q.kind} onChange={(e) => setQ(i, { kind: e.target.value as Q["kind"] })} aria-label={t("surveys.kind")}>
                   {["rating", "choice", "text"].map((k) => <option key={k} value={k}>{t(`surveys.kind_${k}`)}</option>)}
                 </select>
@@ -83,37 +83,37 @@ export default function SurveysPage() {
               </fieldset>
             ))}
             <div className="flex gap-2">
-              <button type="button" onClick={() => setQs([...qs, { ...EMPTY_Q }])} className="px-3 py-1.5 border border-[#CBD5E1] text-xs font-bold rounded-lg">{t("surveys.add_question")}</button>
-              <button type="submit" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg" data-testid="survey-save">{t("surveys.save_draft")}</button>
+              <button type="button" onClick={() => setQs([...qs, { ...EMPTY_Q }])} className="px-3 py-1.5 border border-line-strong text-xs font-semibold rounded-tile">{t("surveys.add_question")}</button>
+              <button type="submit" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile" data-testid="survey-save">{t("surveys.save_draft")}</button>
             </div>
           </form>
           <section className="space-y-2">
-            {msg && <p className="text-xs text-[#166534] font-bold" role="status" data-testid="survey-msg">{msg}</p>}
+            {msg && <p className="text-xs text-success font-semibold" role="status" data-testid="survey-msg">{msg}</p>}
             {error && <p className="text-xs text-red-600" role="alert" data-testid="survey-error">{error}</p>}
             <ul className="space-y-2" data-testid="survey-list">
               {rows.map((s) => (
-                <li key={s.id} className="bg-white rounded-xl border border-[#E2E8F0] p-3 text-xs" data-testid="survey-row">
+                <li key={s.id} className="bg-white rounded-card border border-line p-3 text-xs" data-testid="survey-row">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold">{s.title}</span>
-                    <span className="text-[#64748B]" data-testid="survey-status">{t(`surveys.status_${s.status}`)} · {s.responses} {t("surveys.responses")}</span>
+                    <span className="font-semibold">{s.title}</span>
+                    <span className="text-muted" data-testid="survey-status">{t(`surveys.status_${s.status}`)} · {s.responses} {t("surveys.responses")}</span>
                   </div>
                   <div className="flex gap-2 mt-2">
-                    {s.status === "draft" && <button type="button" onClick={() => act(s, "publish")} className="px-2.5 py-1 bg-[#166534] text-white font-bold rounded-lg" data-testid="survey-publish">{t("surveys.publish")}</button>}
-                    {s.status === "published" && <button type="button" onClick={() => act(s, "close")} className="px-2.5 py-1 border border-[#CBD5E1] font-bold rounded-lg">{t("surveys.close")}</button>}
-                    {s.status !== "draft" && <button type="button" onClick={() => showResults(s)} className="px-2.5 py-1 border border-[#CBD5E1] font-bold rounded-lg" data-testid="survey-results">{t("surveys.results")}</button>}
+                    {s.status === "draft" && <button type="button" onClick={() => act(s, "publish")} className="px-2.5 py-1 bg-success text-white font-semibold rounded-tile" data-testid="survey-publish">{t("surveys.publish")}</button>}
+                    {s.status === "published" && <button type="button" onClick={() => act(s, "close")} className="px-2.5 py-1 border border-line-strong font-semibold rounded-tile">{t("surveys.close")}</button>}
+                    {s.status !== "draft" && <button type="button" onClick={() => showResults(s)} className="px-2.5 py-1 border border-line-strong font-semibold rounded-tile" data-testid="survey-results">{t("surveys.results")}</button>}
                   </div>
                 </li>
               ))}
             </ul>
             {results && (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 text-xs space-y-2" data-testid="survey-results-panel">
-                <div className="font-bold">{results.responses}/{results.invited} {t("surveys.answered")}</div>
-                {results.hidden ? <p className="text-[#64748B]">{t("surveys.hidden")} ({results.min_responses})</p> : results.questions.map((q) => (
-                  <div key={q.id} className="border-t border-[#F1F5F9] pt-1.5">
+              <div className="bg-white rounded-card border border-line p-3 text-xs space-y-2" data-testid="survey-results-panel">
+                <div className="font-semibold">{results.responses}/{results.invited} {t("surveys.answered")}</div>
+                {results.hidden ? <p className="text-muted">{t("surveys.hidden")} ({results.min_responses})</p> : results.questions.map((q) => (
+                  <div key={q.id} className="border-t border-line-soft pt-1.5">
                     <div className="font-semibold">{q.text}</div>
                     {q.average !== undefined && <div>{t("surveys.average")}: {q.average ?? "—"} / 5</div>}
                     {q.counts && <div>{Object.entries(q.counts).map(([k, v]) => `${k}: ${v}`).join(" · ")}</div>}
-                    {q.comments && <ul className="list-disc pl-4 text-[#475569]">{q.comments.map((c, i) => <li key={i}>{c}</li>)}</ul>}
+                    {q.comments && <ul className="list-disc pl-4 text-ink-soft">{q.comments.map((c, i) => <li key={i}>{c}</li>)}</ul>}
                   </div>
                 ))}
               </div>

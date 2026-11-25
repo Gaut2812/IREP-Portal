@@ -23,31 +23,30 @@ export default function CollegeBillingPage() {
   }, [language, t]);
   useEffect(() => { load(); }, [load]);
 
-  const card = "bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3";
+  const card = "bg-white rounded-card border border-line p-4 space-y-3";
   return (
     <RoleGuard allowedRoles={["college"]}>
-      <AppShell pageTitle={t("billing.title")}>
-        <div className="space-y-4 max-w-5xl">
-          <p className="text-xs text-[#64748B]">{t("billing.college_help")}</p>
+      <AppShell pageTitle={t("billing.title")} pageSubtitle={t("billing.college_help")}>
+        <div className="space-y-6 max-w-5xl">
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {data && (
             <section className="grid sm:grid-cols-2 gap-3" data-testid="billing-summary">
-              <div className={card}><div className="text-[11px] text-[#64748B]">{t("billing.outstanding")}</div>
-                <div className="text-2xl font-black text-[#0F1F3A]" data-testid="billing-outstanding">{inr(data.outstanding_paise)}</div></div>
-              <div className={card}><div className="text-[11px] text-[#64748B]">{t("billing.credit_left")}</div>
-                <div className="text-2xl font-black text-[#166534]" data-testid="billing-credit">{inr(data.credit_available_paise)}</div></div>
+              <div className={card}><div className="text-caption text-muted">{t("billing.outstanding")}</div>
+                <div className="text-2xl font-semibold text-ink" data-testid="billing-outstanding">{inr(data.outstanding_paise)}</div></div>
+              <div className={card}><div className="text-caption text-muted">{t("billing.credit_left")}</div>
+                <div className="text-2xl font-semibold text-success" data-testid="billing-credit">{inr(data.credit_available_paise)}</div></div>
             </section>
           )}
           <section className={card} data-testid="college-invoices">
-            {data && data.invoices.length === 0 && <p className="text-xs text-[#64748B]">{t("billing.none_college")}</p>}
+            {data && data.invoices.length === 0 && <p className="text-xs text-muted">{t("billing.none_college")}</p>}
             <ul className="space-y-3">
               {data?.invoices.map((inv) => (
-                <li key={inv.id} className="border border-[#F1F5F9] rounded-lg p-3 text-xs space-y-2" data-testid={`college-invoice-${inv.number}`}>
+                <li key={inv.id} className="border border-line-soft rounded-tile p-3 text-xs space-y-2" data-testid={`college-invoice-${inv.number}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span><b className="text-[#0F1F3A]">{inv.number}</b> · {inv.period}</span>
+                    <span><b className="text-ink">{inv.number}</b> · {inv.period}</span>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_STYLE[inv.status]}`}>{t(`billing.status_${inv.status}`)}</span>
-                      {inv.has_pdf && <button type="button" data-testid="college-invoice-pdf" className="px-2.5 py-1 border border-[#CBD5E1] rounded-lg font-bold"
+                      <span className={`px-2 py-0.5 rounded-full text-caption font-semibold ${STATUS_STYLE[inv.status]}`}>{t(`billing.status_${inv.status}`)}</span>
+                      {inv.has_pdf && <button type="button" data-testid="college-invoice-pdf" className="px-2.5 py-1 border border-line-strong rounded-tile font-semibold"
                         onClick={() => downloadWithAuth(`${API_BASE}/college/billing/invoices/${inv.id}/pdf`, authHeaders(), `${(inv.number || inv.id).replace(/\//g, "-")}.pdf`).catch(() => setError(t("billing.download_failed")))}>PDF</button>}
                     </div>
                   </div>

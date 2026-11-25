@@ -55,27 +55,26 @@ export default function CollegeReportsPage() {
 
   return (
     <RoleGuard allowedRoles={["college"]}>
-      <AppShell pageTitle={t("reports.mou_title")}>
-        <div className="space-y-4 max-w-4xl">
-          <p className="text-xs text-[#64748B]">{t("reports.mou_help")}</p>
+      <AppShell pageTitle={t("reports.mou_title")} pageSubtitle={t("reports.mou_help")}>
+        <div className="space-y-6 max-w-4xl">
           <div className="flex flex-wrap gap-2 items-center">
-            <select value={type} onChange={(e) => setType(e.target.value)} aria-label={t("reports.type")} data-testid="mou-type" className="px-2.5 py-1.5 border border-[#CBD5E1] rounded-lg text-xs">
+            <select value={type} onChange={(e) => setType(e.target.value)} aria-label={t("reports.type")} data-testid="mou-type" className="px-2.5 py-1.5 border border-line-strong rounded-tile text-xs">
               {["progress", "performance", "readiness"].map((k) => <option key={k} value={k}>{t(`reports.type_${k}`)}</option>)}
             </select>
-            <button type="button" disabled={busy} onClick={generate} data-testid="mou-generate" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1 disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={generate} data-testid="mou-generate" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile inline-flex items-center gap-1 disabled:opacity-50">
               <FilePlus2 className="w-3.5 h-3.5" />{t("reports.generate_report")}
             </button>
           </div>
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
-          <ul className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9]" data-testid="mou-list">
-            {reports.length === 0 && <li className="p-6 text-center text-xs text-[#64748B]">{t("reports.no_reports")}</li>}
+          <ul className="bg-white rounded-card border border-line divide-y divide-line-soft" data-testid="mou-list">
+            {reports.length === 0 && <li className="p-6 text-center text-xs text-muted">{t("reports.no_reports")}</li>}
             {reports.map((r) => (
               <li key={r.id} className="px-3 py-2.5 flex items-center justify-between gap-2" data-testid="mou-row">
                 <div className="min-w-0">
-                  <div className="text-xs font-bold text-[#0F1F3A] truncate">{r.title}</div>
-                  <div className="text-[11px] text-[#64748B]">{t("reports.data_as_of")} {r.data_as_of} · {r.size_kb} KB</div>
+                  <div className="text-xs font-semibold text-ink truncate">{r.title}</div>
+                  <div className="text-caption text-muted">{t("reports.data_as_of")} {r.data_as_of} · {r.size_kb} KB</div>
                 </div>
-                <button type="button" onClick={() => download(r)} data-testid="mou-download" className="px-2.5 py-1 border border-[#CBD5E1] text-xs font-bold rounded-lg inline-flex items-center gap-1 shrink-0">
+                <button type="button" onClick={() => download(r)} data-testid="mou-download" className="px-2.5 py-1 border border-line-strong text-xs font-semibold rounded-tile inline-flex items-center gap-1 shrink-0">
                   <Download className="w-3.5 h-3.5" />PDF
                 </button>
               </li>

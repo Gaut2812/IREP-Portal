@@ -140,7 +140,7 @@ export default function ParentViewPage() {
   };
 
   const k = data?.kpis;
-  const card = "bg-white p-4 rounded-2xl border border-[#E2E8F0] shadow-sm";
+  const card = "bg-white p-4 rounded-card border border-line shadow-card";
 
   return (
     <RoleGuard allowedRoles={["parent"]}>
@@ -149,57 +149,57 @@ export default function ParentViewPage() {
         <div className="w-full max-w-[420px] md:max-w-3xl mx-auto space-y-4" data-testid="parent-view">
 
           {(offline || cachedAt) && (
-            <div className="flex items-center gap-2 bg-[#FEF3C7] border border-[#FDE68A] text-[#92400E] text-xs rounded-xl p-3" data-testid="offline-banner">
+            <div className="flex items-center gap-2 bg-warning-soft border border-warning-line text-warning text-xs rounded-card p-3" data-testid="offline-banner">
               <WifiOff className="w-4 h-4 flex-shrink-0" />
               <span>{fill(t(offline ? "parent_view.offline_banner" : "parent_view.cached_banner"), { d: (cachedAt || "").slice(0, 10) })}</span>
             </div>
           )}
 
           {/* Header strip: ward + language toggle (always visible) */}
-          <div className="bg-[#14284B] text-white rounded-2xl p-4 flex items-center justify-between gap-3">
+          <div className="bg-navy text-white rounded-card p-4 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wider text-[#94A3B8]">{t("parent_view.your_ward")}</div>
+              <div className="text-caption text-subtle">{t("parent_view.your_ward")}</div>
               {children.length > 1 ? (
-                <select value={childId} onChange={(e) => setChildId(e.target.value)} className="mt-0.5 bg-white/10 text-white text-sm font-bold rounded-lg px-2 py-1 focus:outline-none" aria-label={t("parent_view.select_child")} data-testid="child-select">
-                  {children.map((c) => <option key={c.id} value={c.id} className="text-[#0F1F3A]">{c.name} · Sem {c.semester} · {c.branch}</option>)}
+                <select value={childId} onChange={(e) => setChildId(e.target.value)} className="mt-0.5 bg-white/10 text-white text-sm font-semibold rounded-tile px-2 py-1 focus:outline-none" aria-label={t("parent_view.select_child")} data-testid="child-select">
+                  {children.map((c) => <option key={c.id} value={c.id} className="text-ink">{c.name} · Sem {c.semester} · {c.branch}</option>)}
                 </select>
               ) : (
-                <div className="text-sm font-bold truncate" data-testid="ward-name">{data ? `${data.ward.name} · Sem ${data.ward.semester} · ${data.ward.branch}` : "…"}</div>
+                <div className="text-sm font-semibold truncate" data-testid="ward-name">{data ? `${data.ward.name} · Sem ${data.ward.semester} · ${data.ward.branch}` : "…"}</div>
               )}
             </div>
-            <button onClick={toggleLanguage} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 flex-shrink-0" aria-label="Toggle Tamil / English">
+            <button onClick={toggleLanguage} className="text-caption font-semibold px-2.5 py-1 rounded-tile bg-white/15 hover:bg-white/25 flex-shrink-0" aria-label="Toggle Tamil / English">
               {language === "en" ? "தமிழ்" : "EN"}
             </button>
           </div>
 
           {loading && (
             <div className="space-y-4 animate-pulse" aria-busy="true" aria-label={t("parent_view.loading")}>
-              <div className="h-24 bg-white rounded-2xl border border-[#E2E8F0]" />
-              <div className="grid grid-cols-2 gap-3"><div className="h-20 bg-white rounded-2xl border border-[#E2E8F0]" /><div className="h-20 bg-white rounded-2xl border border-[#E2E8F0]" /></div>
-              <div className="h-48 bg-white rounded-2xl border border-[#E2E8F0]" />
+              <div className="h-24 bg-white rounded-card border border-line" />
+              <div className="grid grid-cols-2 gap-3"><div className="h-20 bg-white rounded-card border border-line" /><div className="h-20 bg-white rounded-card border border-line" /></div>
+              <div className="h-48 bg-white rounded-card border border-line" />
             </div>
           )}
 
           {!loading && error && (
-            <div className="bg-white rounded-2xl border border-[#FECACA] p-6 text-center space-y-3">
-              <AlertCircle className="w-8 h-8 text-[#D93636] mx-auto" />
-              <h2 className="text-base font-bold text-[#0F1F3A]">{t("parent_view.error_title")}</h2>
-              <p className="text-xs text-[#64748B]">{error}</p>
-              <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg"><RefreshCw className="w-3.5 h-3.5" /> {t("parent_view.retry")}</button>
+            <div className="bg-white rounded-card border border-danger-line p-6 text-center space-y-3">
+              <AlertCircle className="w-8 h-8 text-danger mx-auto" />
+              <h2 className="text-base font-semibold text-ink">{t("parent_view.error_title")}</h2>
+              <p className="text-xs text-muted">{error}</p>
+              <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand text-white text-xs font-semibold rounded-tile"><RefreshCw className="w-3.5 h-3.5" /> {t("parent_view.retry")}</button>
             </div>
           )}
 
           {!loading && !error && !data && (
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 text-center text-xs text-[#64748B]">{t("parent_view.no_child")}</div>
+            <div className="bg-white rounded-card border border-line p-6 text-center text-xs text-muted">{t("parent_view.no_child")}</div>
           )}
 
           {!loading && !error && data?.consent_required && data.consent && (
-            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-5 space-y-3" data-testid="consent-card">
-              <h2 className="text-base font-bold text-[#0F1F3A]">{data.consent.title}</h2>
-              <p className="text-xs text-[#475569] leading-relaxed">{data.consent.body}</p>
-              <p className="text-[11px] text-[#64748B]">{data.ward.name}</p>
+            <div className="bg-white rounded-card border border-brand-line p-5 space-y-3" data-testid="consent-card">
+              <h2 className="text-base font-semibold text-ink">{data.consent.title}</h2>
+              <p className="text-xs text-ink-soft leading-relaxed">{data.consent.body}</p>
+              <p className="text-caption text-muted">{data.ward.name}</p>
               <button type="button" disabled={consentBusy} onClick={grantConsent} data-testid="consent-agree"
-                className="w-full py-2.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-xl disabled:opacity-50">
+                className="w-full py-2.5 bg-brand text-white text-xs font-semibold rounded-card disabled:opacity-50">
                 {t("parent_view.consent_agree")}
               </button>
             </div>
@@ -208,78 +208,78 @@ export default function ParentViewPage() {
           {!loading && !error && data && !data.consent_required && k && (
             <>
               {(data.support_alerts || []).map((al) => (
-                <Link key={al.id} href="/parent/messages" className="block bg-[#FFF7ED] border border-[#FED7AA] rounded-2xl p-4" data-testid="support-alert">
-                  <div className="text-xs font-black text-[#9A3412]">{t("parent_view.support_alert")}</div>
-                  <div className="text-sm text-[#7C2D12] mt-1">{al.issue} · {t("parent_view.next_step")}: {al.next_step}</div>
-                  <div className="text-[11px] text-[#9A3412] mt-1 font-semibold">{t("parent_view.support_reply")}</div>
+                <Link key={al.id} href="/parent/messages" className="block bg-warning-faint border border-warning-line rounded-card p-4" data-testid="support-alert">
+                  <div className="text-xs font-semibold text-warning">{t("parent_view.support_alert")}</div>
+                  <div className="text-sm text-warning mt-1">{al.issue} · {t("parent_view.next_step")}: {al.next_step}</div>
+                  <div className="text-caption text-warning mt-1 font-semibold">{t("parent_view.support_reply")}</div>
                 </Link>
               ))}
               {(data.announcements || []).length > 0 && (
-                <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 space-y-2" data-testid="announcements">
-                  <div className="text-xs font-black text-[#0F1F3A]">{t("parent_view.announcements")}</div>
+                <div className="bg-white border border-line rounded-card p-4 space-y-2" data-testid="announcements">
+                  <div className="text-xs font-semibold text-ink">{t("parent_view.announcements")}</div>
                   {(data.announcements || []).map((an) => (
-                    <div key={an.id} className="text-xs border-t border-[#F1F5F9] pt-2 first:border-0 first:pt-0" data-testid="announcement">
-                      <div className="font-bold text-[#0F1F3A]">{an.title}</div>
-                      <div className="text-[#475569]">{an.body}</div>
-                      <div className="text-[10px] text-[#94A3B8]">{an.from === "college" ? t("parent_view.from_college") : t("parent_view.from_trainer")}{an.at ? ` · ${an.at}` : ""}</div>
+                    <div key={an.id} className="text-xs border-t border-line-soft pt-2 first:border-0 first:pt-0" data-testid="announcement">
+                      <div className="font-semibold text-ink">{an.title}</div>
+                      <div className="text-ink-soft">{an.body}</div>
+                      <div className="text-caption text-subtle">{an.from === "college" ? t("parent_view.from_college") : t("parent_view.from_trainer")}{an.at ? ` · ${an.at}` : ""}</div>
                     </div>
                   ))}
                 </div>
               )}
               {/* Readiness card */}
-              <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-4 rounded-2xl" data-testid="readiness-card">
+              <div className="bg-brand-soft border border-brand-line p-4 rounded-card" data-testid="readiness-card">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#1D4ED8] font-semibold">{t("parent_view.readiness_score")}</span>
+                  <span className="text-xs text-info font-semibold">{t("parent_view.readiness_score")}</span>
                   <span className={BAND_CHIP[k.readiness_band] || "chip-blue"}>{k.readiness_band_label}</span>
                 </div>
-                <div className="text-4xl font-black text-[#1E3A8A] mt-1">
+                <div className="text-4xl font-semibold text-info mt-1">
                   {k.readiness_score}
-                  <span className={`text-sm ml-2 ${k.readiness_delta >= 0 ? "text-[#15803D]" : "text-[#D93636]"}`}>{k.readiness_delta >= 0 ? "▲" : "▼"} {Math.abs(k.readiness_delta)}</span>
+                  <span className={`text-sm ml-2 ${k.readiness_delta >= 0 ? "text-success" : "text-danger"}`}>{k.readiness_delta >= 0 ? "▲" : "▼"} {Math.abs(k.readiness_delta)}</span>
                 </div>
               </div>
 
               {/* Attendance / problems / certs */}
               <div className="grid grid-cols-2 gap-3" data-testid="parent-kpis">
                 <div className={card}>
-                  <div className="text-[10px] text-[#64748B] uppercase tracking-wide">{t("parent_view.attendance")}</div>
-                  <div className="flex items-baseline gap-2"><span className="text-2xl font-black text-[#0F1F3A]">{k.attendance_pct}%</span><span className={k.attendance_good ? "chip-green" : "chip-amber"}>{k.attendance_note}</span></div>
-                  <div className="text-[10px] text-[#64748B]">{fill(t("parent_view.sessions"), { a: k.sessions_attended, b: k.sessions_total })}</div>
+                  <div className="text-caption text-muted">{t("parent_view.attendance")}</div>
+                  <div className="flex items-baseline gap-2"><span className="text-2xl font-semibold text-ink">{k.attendance_pct}%</span><span className={k.attendance_good ? "chip-green" : "chip-amber"}>{k.attendance_note}</span></div>
+                  <div className="text-caption text-muted">{fill(t("parent_view.sessions"), { a: k.sessions_attended, b: k.sessions_total })}</div>
                 </div>
                 <div className={card}>
-                  <div className="text-[10px] text-[#64748B] uppercase tracking-wide">{t("parent_view.problems_solved")}</div>
-                  <div className="text-2xl font-black text-[#0F1F3A]">{k.problems_solved}</div>
+                  <div className="text-caption text-muted">{t("parent_view.problems_solved")}</div>
+                  <div className="text-2xl font-semibold text-ink">{k.problems_solved}</div>
                 </div>
                 <div className={`${card} col-span-2 flex items-center justify-between`}>
                   <div>
-                    <div className="text-[10px] text-[#64748B] uppercase tracking-wide">{t("parent_view.certifications")}</div>
-                    <div className="text-2xl font-black text-[#0F1F3A]">{k.certifications}</div>
+                    <div className="text-caption text-muted">{t("parent_view.certifications")}</div>
+                    <div className="text-2xl font-semibold text-ink">{k.certifications}</div>
                   </div>
-                  <div className="text-xs text-[#2B5CD0] font-semibold flex items-center gap-1"><Award className="w-4 h-4" />{k.cert_note}</div>
+                  <div className="text-xs text-brand font-semibold flex items-center gap-1"><Award className="w-4 h-4" />{k.cert_note}</div>
                 </div>
               </div>
 
               {/* Monthly progress card */}
               <div className={`${card} space-y-3`} data-testid="monthly-card">
-                <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                  <h3 className="font-bold text-xs text-[#0F1F3A]">{t("parent_view.monthly_card")}</h3>
-                  {data.monthly_card && <span className="text-[11px] font-semibold text-[#64748B]">{data.monthly_card.month}</span>}
+                <div className="flex items-center justify-between border-b border-line pb-2">
+                  <h3 className="font-semibold text-xs text-ink">{t("parent_view.monthly_card")}</h3>
+                  {data.monthly_card && <span className="text-caption font-semibold text-muted">{data.monthly_card.month}</span>}
                 </div>
                 {!data.monthly_card ? (
-                  <p className="text-xs text-[#64748B] py-4 text-center">{t("parent_view.no_card")}</p>
+                  <p className="text-xs text-muted py-4 text-center">{t("parent_view.no_card")}</p>
                 ) : (
                   <>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left">
-                        <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
+                        <thead><tr className="border-b border-line text-muted text-caption">
                           <th className="pb-2 font-semibold">{t("parent_view.area")}</th><th className="pb-2 px-1 font-semibold"><span className="sm:hidden">{data.monthly_card.prev_month.slice(0, 3)}</span><span className="hidden sm:inline">{data.monthly_card.prev_month}</span></th>
                           <th className="pb-2 px-1 font-semibold"><span className="sm:hidden">{data.monthly_card.month.slice(0, 3)}</span><span className="hidden sm:inline">{data.monthly_card.month}</span></th><th className="pb-2 font-semibold text-right">{t("parent_view.status")}</th>
                         </tr></thead>
-                        <tbody className="divide-y divide-[#E2E8F0]">
+                        <tbody className="divide-y divide-line">
                           {data.monthly_card.rows.map((r) => (
                             <tr key={r.area}>
-                              <td className="py-2.5 font-bold text-[#0F1F3A]">{r.area}</td>
-                              <td className="py-2.5 text-[#64748B]">{r.prev}</td>
-                              <td className="py-2.5 font-semibold text-[#0F1F3A]">{r.curr}</td>
+                              <td className="py-2.5 font-semibold text-ink">{r.area}</td>
+                              <td className="py-2.5 text-muted">{r.prev}</td>
+                              <td className="py-2.5 font-semibold text-ink">{r.curr}</td>
                               <td className="py-2.5 text-right"><span className={CHIP[r.color] || "chip-blue"}>{r.status}</span></td>
                             </tr>
                           ))}
@@ -287,19 +287,19 @@ export default function ParentViewPage() {
                       </table>
                     </div>
                     {data.monthly_card.how_to_help && (
-                      <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl p-3 flex items-start gap-2">
-                        <Heart className="w-4 h-4 text-[#2B5CD0] flex-shrink-0 mt-0.5" />
+                      <div className="bg-brand-soft border border-brand-line rounded-card p-3 flex items-start gap-2">
+                        <Heart className="w-4 h-4 text-brand flex-shrink-0 mt-0.5" />
                         <div>
-                          <div className="text-xs font-bold text-[#1D4ED8]">{t("parent_view.how_you_can_help")}</div>
-                          <p className="text-xs text-[#1E3A8A] mt-0.5 leading-relaxed">{data.monthly_card.how_to_help}</p>
+                          <div className="text-xs font-semibold text-info">{t("parent_view.how_you_can_help")}</div>
+                          <p className="text-xs text-info mt-0.5 leading-relaxed">{data.monthly_card.how_to_help}</p>
                         </div>
                       </div>
                     )}
                     {data.monthly_card.trainer_remark && (
-                      <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3">
-                        <div className="text-[10px] font-bold text-[#2B5CD0] uppercase tracking-wider">{t("parent_view.trainer_remark")} · {data.monthly_card.month}</div>
-                        <p className="text-xs text-[#334155] italic mt-1 leading-relaxed">“{data.monthly_card.trainer_remark}”</p>
-                        <div className="text-[10px] text-right font-bold text-[#64748B] mt-1">– {data.monthly_card.trainer_name}</div>
+                      <div className="bg-surface-2 border border-line rounded-card p-3">
+                        <div className="text-caption font-semibold text-brand">{t("parent_view.trainer_remark")} · {data.monthly_card.month}</div>
+                        <p className="text-xs text-ink-soft italic mt-1 leading-relaxed">“{data.monthly_card.trainer_remark}”</p>
+                        <div className="text-caption text-right font-semibold text-muted mt-1">– {data.monthly_card.trainer_name}</div>
                       </div>
                     )}
                   </>
@@ -308,40 +308,40 @@ export default function ParentViewPage() {
 
               {/* Portfolio */}
               <div className={`${card} space-y-2`}>
-                <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                  <h3 className="font-bold text-xs text-[#0F1F3A]">{t("parent_view.portfolio")}</h3>
-                  <Link href="/parent/portfolio" className="text-[11px] font-semibold text-[#2B5CD0] flex items-center gap-1">{t("parent_view.open_portfolio")} <ExternalLink className="w-3 h-3" /></Link>
+                <div className="flex items-center justify-between border-b border-line pb-2">
+                  <h3 className="font-semibold text-xs text-ink">{t("parent_view.portfolio")}</h3>
+                  <Link href="/parent/portfolio" className="text-caption font-semibold text-brand flex items-center gap-1">{t("parent_view.open_portfolio")} <ExternalLink className="w-3 h-3" /></Link>
                 </div>
                 <div className="text-xs space-y-1.5">
-                  <div className="flex justify-between"><span className="text-[#64748B]">{t("parent_view.github")}</span><span className="font-bold text-[#0F1F3A]">{fill(t("parent_view.projects"), { n: data.portfolio.github_projects })}</span></div>
-                  {data.portfolio.live_project && <div className="flex justify-between"><span className="text-[#64748B]">{t("parent_view.live")}</span><a href={data.portfolio.live_url || "#"} className="font-bold text-[#2B5CD0] truncate ml-2" target="_blank" rel="noreferrer">{data.portfolio.live_project}</a></div>}
-                  {data.portfolio.demo_video && <div className="flex justify-between"><span className="text-[#64748B]">{t("parent_view.demo_video")}</span><span className="font-semibold text-[#0F1F3A]">{data.portfolio.demo_video}</span></div>}
+                  <div className="flex justify-between"><span className="text-muted">{t("parent_view.github")}</span><span className="font-semibold text-ink">{fill(t("parent_view.projects"), { n: data.portfolio.github_projects })}</span></div>
+                  {data.portfolio.live_project && <div className="flex justify-between"><span className="text-muted">{t("parent_view.live")}</span><a href={data.portfolio.live_url || "#"} className="font-semibold text-brand truncate ml-2" target="_blank" rel="noreferrer">{data.portfolio.live_project}</a></div>}
+                  {data.portfolio.demo_video && <div className="flex justify-between"><span className="text-muted">{t("parent_view.demo_video")}</span><span className="font-semibold text-ink">{data.portfolio.demo_video}</span></div>}
                 </div>
               </div>
 
               {/* Upcoming + RSVP */}
               <div className={`${card} space-y-3`} data-testid="upcoming">
-                <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                  <h3 className="font-bold text-xs text-[#0F1F3A]">{t("parent_view.upcoming")}</h3><Calendar className="w-3.5 h-3.5 text-[#64748B]" />
+                <div className="flex items-center justify-between border-b border-line pb-2">
+                  <h3 className="font-semibold text-xs text-ink">{t("parent_view.upcoming")}</h3><Calendar className="w-3.5 h-3.5 text-muted" />
                 </div>
                 {data.upcoming.length === 0 ? (
-                  <p className="text-xs text-[#64748B] py-3 text-center">{t("parent_view.no_upcoming")}</p>
+                  <p className="text-xs text-muted py-3 text-center">{t("parent_view.no_upcoming")}</p>
                 ) : data.upcoming.map((e) => (
-                  <div key={e.id} className={`rounded-xl p-3 ${e.rsvp_enabled ? "bg-gradient-to-br from-[#F0FDF4] to-[#DCFCE7] border border-[#BBF7D0]" : "bg-[#F8FAFC] border border-[#E2E8F0]"}`} data-testid={`event-${e.id}`}>
+                  <div key={e.id} className={`rounded-card p-3 ${e.rsvp_enabled ? "bg-gradient-to-br from-success-faint to-success-soft border border-success-line" : "bg-surface-2 border border-line"}`} data-testid={`event-${e.id}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="text-xs font-bold text-[#0F1F3A]">{e.title}</div>
-                        <div className="text-[11px] text-[#64748B]">{e.when}{e.rsvp_enabled ? ` · ${t("parent_view.invited")}` : ""}</div>
+                        <div className="text-xs font-semibold text-ink">{e.title}</div>
+                        <div className="text-caption text-muted">{e.when}{e.rsvp_enabled ? ` · ${t("parent_view.invited")}` : ""}</div>
                       </div>
                       {e.rsvp_status && <span className={e.rsvp_status === "yes" ? "chip-green" : e.rsvp_status === "no" ? "chip-red" : "chip-amber"}>{t(`parent_view.rsvp_${e.rsvp_status}`)}</span>}
                     </div>
                     {e.rsvp_enabled && (
                       <div className="flex gap-2 pt-2">
-                        <button type="button" disabled={rsvpBusy === e.id} onClick={() => rsvp(e.id, "yes")} className="flex-1 py-2 bg-[#2BB3A0] hover:bg-[#249B8A] text-white font-bold text-xs rounded-lg shadow-sm disabled:opacity-50" data-testid="rsvp-yes">
+                        <button type="button" disabled={rsvpBusy === e.id} onClick={() => rsvp(e.id, "yes")} className="flex-1 py-2 bg-teal hover:bg-teal-hover text-white font-semibold text-xs rounded-tile shadow-card disabled:opacity-50" data-testid="rsvp-yes">
                           {e.rsvp_status === "yes" ? `${t("parent_view.rsvp_yes")} ✓` : t("parent_view.rsvp")}
                         </button>
-                        <button type="button" disabled={rsvpBusy === e.id} onClick={() => rsvp(e.id, "maybe")} className="px-3 py-2 border border-[#CBD5E1] text-[#0F1F3A] font-bold text-xs rounded-lg bg-white disabled:opacity-50">{t("parent_view.rsvp_maybe")}</button>
-                        <button type="button" disabled={rsvpBusy === e.id} onClick={() => rsvp(e.id, "no")} className="px-3 py-2 border border-[#CBD5E1] text-[#0F1F3A] font-bold text-xs rounded-lg bg-white disabled:opacity-50">{t("parent_view.rsvp_no")}</button>
+                        <button type="button" disabled={rsvpBusy === e.id} onClick={() => rsvp(e.id, "maybe")} className="px-3 py-2 border border-line-strong text-ink font-semibold text-xs rounded-tile bg-white disabled:opacity-50">{t("parent_view.rsvp_maybe")}</button>
+                        <button type="button" disabled={rsvpBusy === e.id} onClick={() => rsvp(e.id, "no")} className="px-3 py-2 border border-line-strong text-ink font-semibold text-xs rounded-tile bg-white disabled:opacity-50">{t("parent_view.rsvp_no")}</button>
                       </div>
                     )}
                   </div>
@@ -349,24 +349,24 @@ export default function ParentViewPage() {
               </div>
 
               {/* Message trainer */}
-              <Link href="/parent/messages" className="block bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm hover:border-[#2B5CD0]" data-testid="message-trainer">
+              <Link href="/parent/messages" className="block bg-white border border-line rounded-card p-4 shadow-card hover:border-brand" data-testid="message-trainer">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-full bg-[#2B5CD0] text-white flex items-center justify-center"><MessageSquare className="w-4 h-4" /></div>
+                    <div className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center"><MessageSquare className="w-4 h-4" /></div>
                     <div>
-                      <div className="text-xs font-bold text-[#0F1F3A]">{t("parent_view.message_trainer")}</div>
-                      <div className="text-[11px] text-[#64748B] flex items-center gap-1"><Users className="w-3 h-3" />{data.trainers.map((tr) => tr.name).join(", ") || "—"}</div>
+                      <div className="text-xs font-semibold text-ink">{t("parent_view.message_trainer")}</div>
+                      <div className="text-caption text-muted flex items-center gap-1"><Users className="w-3 h-3" />{data.trainers.map((tr) => tr.name).join(", ") || "—"}</div>
                     </div>
                   </div>
-                  <span className="text-[10px] text-[#64748B]">{fill(t("parent_view.replies_within"), { h: data.reply_promise_hours })}</span>
+                  <span className="text-caption text-muted">{fill(t("parent_view.replies_within"), { h: data.reply_promise_hours })}</span>
                 </div>
               </Link>
             </>
           )}
         </div>
         {toast && (
-          <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0F1F3A] text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2" data-testid="toast">
-            <CheckCircle2 className="w-4 h-4 text-[#2BB3A0]" /> {toast}
+          <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-xs font-semibold px-4 py-3 rounded-card shadow-pop flex items-center gap-2" data-testid="toast">
+            <CheckCircle2 className="w-4 h-4 text-teal" /> {toast}
           </div>
         )}
       </AppShell>

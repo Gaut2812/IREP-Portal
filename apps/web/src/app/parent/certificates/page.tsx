@@ -25,34 +25,34 @@ export default function ParentCertificatesPage() {
   return (
     <RoleGuard allowedRoles={["parent"]}>
       <AppShell pageTitle={t("certs.parent_title")}>
-        <div className="max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-6">
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {data?.consent_required && (
-            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-4 text-xs">{t("reports.consent_needed")} <Link href="/parent" className="text-[#2B5CD0] font-bold">{t("reports.open_overview")}</Link></div>
+            <div className="bg-white rounded-card border border-brand-line p-4 text-xs">{t("reports.consent_needed")} <Link href="/parent" className="text-brand font-semibold">{t("reports.open_overview")}</Link></div>
           )}
           {data && !data.consent_required && (
             <>
-              <p className="text-xs text-[#64748B]">{t("certs.for_child")} {data.ward.name}</p>
+              <p className="text-xs text-muted">{t("certs.for_child")} {data.ward.name}</p>
               <ul className="space-y-2" data-testid="parent-earned">
-                {data.earned.length === 0 && <li className="bg-white rounded-2xl border border-dashed border-[#CBD5E1] p-6 text-center text-xs text-[#64748B]">{t("certs.none_parent")}</li>}
+                {data.earned.length === 0 && <li className="bg-white rounded-card border border-dashed border-line-strong p-6 text-center text-xs text-muted">{t("certs.none_parent")}</li>}
                 {data.earned.map((c) => (
-                  <li key={c.id} className="bg-white rounded-2xl border border-[#E2E8F0] p-4 flex items-start gap-3" data-testid="parent-cert">
-                    <BadgeCheck className="w-5 h-5 text-[#166534] shrink-0" />
+                  <li key={c.id} className="bg-white rounded-card border border-line p-4 flex items-start gap-3" data-testid="parent-cert">
+                    <BadgeCheck className="w-5 h-5 text-success shrink-0" />
                     <div>
-                      <div className="text-sm font-black text-[#0F1F3A]">{c.title}</div>
-                      <div className="text-[11px] text-[#64748B]">{c.issuer}{c.issued_on ? ` · ${c.issued_on}` : ""} · {c.status_label}</div>
+                      <div className="text-sm font-semibold text-ink">{c.title}</div>
+                      <div className="text-caption text-muted">{c.issuer}{c.issued_on ? ` · ${c.issued_on}` : ""} · {c.status_label}</div>
                     </div>
                   </li>
                 ))}
               </ul>
               {data.upcoming.length > 0 && (
                 <>
-                  <h2 className="text-xs font-black text-[#64748B] uppercase tracking-wide pt-2">{t("certs.upcoming")}</h2>
+                  <h2 className="text-xs font-semibold text-muted pt-2">{t("certs.upcoming")}</h2>
                   <ul className="space-y-2">
                     {data.upcoming.map((c) => (
-                      <li key={c.id} className="bg-white rounded-2xl border border-[#E2E8F0] p-4 flex items-start gap-3" data-testid="parent-upcoming">
-                        <Clock className="w-5 h-5 text-[#1D4ED8] shrink-0" />
-                        <div><div className="text-sm font-bold">{c.title}</div><div className="text-[11px] text-[#64748B]">{t("certs.exam_on")} {c.exam_date}</div></div>
+                      <li key={c.id} className="bg-white rounded-card border border-line p-4 flex items-start gap-3" data-testid="parent-upcoming">
+                        <Clock className="w-5 h-5 text-info shrink-0" />
+                        <div><div className="text-sm font-semibold">{c.title}</div><div className="text-caption text-muted">{t("certs.exam_on")} {c.exam_date}</div></div>
                       </li>
                     ))}
                   </ul>

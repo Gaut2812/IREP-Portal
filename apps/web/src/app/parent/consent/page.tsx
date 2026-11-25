@@ -35,20 +35,20 @@ export default function ParentConsentPage() {
   return (
     <RoleGuard allowedRoles={["parent"]}>
       <AppShell pageTitle={t("privacy.parent_title")}>
-        <div className="max-w-2xl mx-auto space-y-3">
-          <p className="text-xs text-[#475569]">{t("privacy.parent_intro")}</p>
+        <div className="max-w-2xl mx-auto space-y-6">
+          <p className="text-xs text-ink-soft">{t("privacy.parent_intro")}</p>
           {data && !data.identity_fresh && (
-            <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl p-3 text-xs text-[#1E3A8A] space-y-2" data-testid="reauth-note">
+            <div className="bg-brand-soft border border-brand-line rounded-card p-3 text-xs text-info space-y-2" data-testid="reauth-note">
               <p>{t("privacy.reauth")}</p>
               <Btn onClick={logout} kind="ghost" testId="reauth">{t("privacy.reauth_button")}</Btn>
             </div>
           )}
           {error && <p className="text-xs text-red-600" role="alert" data-testid="consent-error">{error}</p>}
           {data?.children.map((c) => (
-            <section key={c.student_id} className="bg-white rounded-2xl border border-[#E2E8F0] p-4" data-testid="consent-child">
-              <h2 className="text-sm font-black text-[#0F1F3A]">{c.name}</h2>
-              <p className="text-[11px] text-[#64748B]">{c.is_minor ? t("privacy.child_minor") : t("privacy.child_adult")}</p>
-              <ul className="divide-y divide-[#F1F5F9]">
+            <section key={c.student_id} className="bg-white rounded-card border border-line p-4" data-testid="consent-child">
+              <h2 className="text-sm font-semibold text-ink">{c.name}</h2>
+              <p className="text-caption text-muted">{c.is_minor ? t("privacy.child_minor") : t("privacy.child_adult")}</p>
+              <ul className="divide-y divide-line-soft">
                 {PURPOSES.map((p) => {
                   const v = c.purposes[p];
                   if (!v) return null;
@@ -57,7 +57,7 @@ export default function ParentConsentPage() {
                     <PurposeRow key={p} purpose={p} view={v}>
                       {parentDecides && !v.effective && <Btn onClick={() => decide(c, p, "granted")} testId={`approve-${p}`}>{v.status === "requested" ? t("privacy.approve") : t("privacy.agree")}</Btn>}
                       {parentDecides && (v.effective || v.status === "requested") && <Btn kind="ghost" onClick={() => decide(c, p, "withdrawn")} testId={`decline-${p}`}>{v.status === "requested" ? t("privacy.decline") : t("privacy.withdraw")}</Btn>}
-                      {!parentDecides && <span className="text-[10px] text-[#64748B]">{t("privacy.adult_decides")}</span>}
+                      {!parentDecides && <span className="text-caption text-muted">{t("privacy.adult_decides")}</span>}
                     </PurposeRow>
                   );
                 })}

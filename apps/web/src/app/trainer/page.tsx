@@ -251,34 +251,38 @@ export default function TrainerDashboardPage() {
                 <CardHeader className="px-5 pt-5"
                   title={<span className="inline-flex items-center gap-2"><Code2 className="w-5 h-5 text-brand" />{t("trainer_dashboard.dsa_widget")}</span>}
                   actions={<>
-                    <span className="text-label text-muted inline-flex items-center gap-1"><Filter className="w-4 h-4" /> Week:</span>
-                    <Select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} aria-label="Week">
-                      <option value="All">All Weeks (1-8)</option>
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => <option key={w} value={String(w)}>Week {w}</option>)}
+                    <span className="text-label text-muted inline-flex items-center gap-1"><Filter className="w-4 h-4" /> {t("trainer_dashboard.dsa_week")}</span>
+                    <Select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} aria-label={t("trainer_dashboard.dsa_week")}>
+                      <option value="All">{t("trainer_dashboard.dsa_all_weeks")}</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => <option key={w} value={String(w)}>{fill(t("trainer_dashboard.dsa_week_n"), { n: w })}</option>)}
                     </Select>
                   </>} />
                 <Table>
                   <THead>
                     <tr>
-                      <Th>Problem</Th><Th>Schedule</Th><Th>Topic</Th><Th>Difficulty</Th>
-                      <Th align="right">Submissions</Th><Th align="right">Solved %</Th><Th align="right"><span className="sr-only">Open</span></Th>
+                      <Th>{t("trainer_dashboard.dsa_problem")}</Th><Th>{t("trainer_dashboard.dsa_schedule")}</Th>
+                      <Th>{t("trainer_dashboard.dsa_topic")}</Th><Th>{t("trainer_dashboard.dsa_difficulty")}</Th>
+                      <Th align="right">{t("trainer_dashboard.dsa_submissions")}</Th><Th align="right">{t("trainer_dashboard.dsa_solved")}</Th>
+                      <Th align="right"><span className="sr-only">{t("trainer_dashboard.dsa_open")}</span></Th>
                     </tr>
                   </THead>
                   <tbody>
                     {loadingProblems ? (
                       <Tr><Td colSpan={7} className="text-center text-muted">…</Td></Tr>
                     ) : filteredProblems.length === 0 ? (
-                      <Tr><Td colSpan={7}><EmptyState title="No problems for this week." className="py-4" /></Td></Tr>
+                      <Tr><Td colSpan={7}><EmptyState title={t("trainer_dashboard.dsa_none")} className="py-4" /></Td></Tr>
                     ) : filteredProblems.map((prob) => (
                       <Tr key={prob.id} className="hover:bg-surface-2">
                         <Td className="font-medium">{prob.title}</Td>
                         <Td className="text-muted">{prob.week_info}</Td>
                         <Td><Badge tone="info">{prob.topic}</Badge></Td>
-                        <Td><Badge tone={DIFFICULTY_TONE[prob.difficulty] ?? "neutral"}>{prob.difficulty}</Badge></Td>
+                        <Td><Badge tone={DIFFICULTY_TONE[prob.difficulty] ?? "neutral"}>
+                          {DIFFICULTY_TONE[prob.difficulty] ? t(`trainer_dashboard.dsa_${prob.difficulty.toLowerCase()}`) : prob.difficulty}
+                        </Badge></Td>
                         <Td align="right">{prob.total_submissions}</Td>
                         <Td align="right" className="font-medium text-success">{prob.solved_percentage}%</Td>
                         <Td align="right">
-                          <Link href={`/student/coding/${prob.id}`} className={buttonClass("secondary", "sm")}><span>Open</span><ExternalLink className="w-3.5 h-3.5" /></Link>
+                          <Link href={`/student/coding/${prob.id}`} className={buttonClass("secondary", "sm")}><span>{t("trainer_dashboard.dsa_open")}</span><ExternalLink className="w-3.5 h-3.5" /></Link>
                         </Td>
                       </Tr>
                     ))}

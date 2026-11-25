@@ -43,6 +43,10 @@ test.describe("Screen 13: Trainer Dashboard (/trainer)", () => {
     await expect(page.getByRole("heading", { name: "பயிற்சியாளர் டாஷ்போர்டு" })).toBeVisible();
     await expect(page.getByText("பேட்ச் தயார்நிலை மதிப்பெண்")).toBeVisible();
     await expect(page.getByText("ஆதரவு தேவைப்படும் மாணவர்கள்")).toBeVisible();
+    // the weekly DSA widget is translated too (column heads and week filter)
+    const dsa = page.getByTestId("trainer-dsa-widget");
+    await expect(dsa).toContainText("சமர்ப்பிப்புகள்");
+    await expect(dsa.getByRole("combobox")).toContainText("எல்லா வாரங்களும் (1–8)");
   });
 
   test("blocks the student role", async ({ page }) => {

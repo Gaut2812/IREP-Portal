@@ -71,35 +71,35 @@ export default function SuperAdminPage() {
       .then(() => setSess({ college_id: "", minutes: "60", reason: "" })));
   };
 
-  const card = "bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3";
-  const field = "px-2.5 py-1.5 border border-[#CBD5E1] rounded-lg text-xs";
+  const card = "bg-white rounded-card border border-line p-4 space-y-3";
+  const field = "px-2.5 py-1.5 border border-line-strong rounded-tile text-xs";
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("super_admin.title")}>
-        <div className="space-y-4 max-w-5xl">
+        <div className="space-y-6 max-w-5xl">
           {forbidden ? (
             <div className={card} data-testid="super-forbidden">
-              <p className="text-sm font-bold text-[#0F1F3A]">{t("super_admin.only_title")}</p>
-              <p className="text-xs text-[#64748B]">{t("super_admin.only_body")}</p>
+              <p className="text-sm font-semibold text-ink">{t("super_admin.only_title")}</p>
+              <p className="text-xs text-muted">{t("super_admin.only_body")}</p>
             </div>
           ) : (
             <>
-              <p className="text-xs text-[#64748B] flex items-center gap-1.5" data-testid="super-help"><ShieldCheck className="w-4 h-4 text-[#2BB3A0]" />{t("super_admin.help")}</p>
+              <p className="text-xs text-muted flex items-center gap-1.5" data-testid="super-help"><ShieldCheck className="w-4 h-4 text-teal" />{t("super_admin.help")}</p>
               {error && <p className="text-xs text-red-600" role="alert" data-testid="super-error">{error}</p>}
 
               <section className={card} data-testid="staff-section">
-                <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><KeyRound className="w-4 h-4 text-[#2B5CD0]" />{t("super_admin.staff")}</h2>
+                <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><KeyRound className="w-4 h-4 text-brand" />{t("super_admin.staff")}</h2>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
-                    <thead><tr className="text-left text-[#64748B] border-b border-[#E2E8F0]">
+                    <thead><tr className="text-left text-muted border-b border-line">
                       <th className="py-2 pr-2">{t("super_admin.name")}</th><th className="pr-2">{t("super_admin.role")}</th>
                       <th className="pr-2">{t("super_admin.two_factor")}</th><th className="pr-2">{t("super_admin.status")}</th><th />
                     </tr></thead>
                     <tbody>
                       {staff.map((s) => (
-                        <tr key={s.id} className="border-b border-[#F1F5F9]" data-testid="staff-row">
-                          <td className="py-2 pr-2"><div className="font-bold text-[#0F1F3A]">{s.name}{s.is_you && <span className="text-[#64748B] font-normal"> ({t("super_admin.you")})</span>}</div><div className="text-[#64748B]">{s.email}</div></td>
+                        <tr key={s.id} className="border-b border-line-soft" data-testid="staff-row">
+                          <td className="py-2 pr-2"><div className="font-semibold text-ink">{s.name}{s.is_you && <span className="text-muted font-normal"> ({t("super_admin.you")})</span>}</div><div className="text-muted">{s.email}</div></td>
                           <td className="pr-2">
                             <select value={s.role} disabled={busy || s.is_you} aria-label={t("super_admin.role")} data-testid="staff-role" className={field}
                               onChange={(e) => act(() => fetchApi(`/admin/staff/${s.id}/role`, { method: "PUT", body: JSON.stringify({ role: e.target.value }) }))}>
@@ -107,38 +107,38 @@ export default function SuperAdminPage() {
                               <option value="super_admin">{t("super_admin.role_super_admin")}</option>
                             </select>
                           </td>
-                          <td className="pr-2"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#DCFCE7] text-[#166534]">{t("super_admin.required")}</span></td>
+                          <td className="pr-2"><span className="px-2 py-0.5 rounded-full text-caption font-semibold bg-success-soft text-success">{t("super_admin.required")}</span></td>
                           <td className="pr-2" data-testid="staff-status">{s.is_active ? t("super_admin.active") : t("super_admin.deactivated")}</td>
                           <td className="text-right">
                             {!s.is_you && (s.is_active
-                              ? <button type="button" disabled={busy} data-testid="staff-deactivate" onClick={() => act(() => fetchApi(`/admin/staff/${s.id}/deactivate`, { method: "POST" }))} className="px-2.5 py-1 border border-[#CBD5E1] rounded-lg font-bold">{t("super_admin.deactivate")}</button>
-                              : <button type="button" disabled={busy} data-testid="staff-reactivate" onClick={() => act(() => fetchApi(`/admin/staff/${s.id}/reactivate`, { method: "POST" }))} className="px-2.5 py-1 border border-[#CBD5E1] rounded-lg font-bold">{t("super_admin.reactivate")}</button>)}
+                              ? <button type="button" disabled={busy} data-testid="staff-deactivate" onClick={() => act(() => fetchApi(`/admin/staff/${s.id}/deactivate`, { method: "POST" }))} className="px-2.5 py-1 border border-line-strong rounded-tile font-semibold">{t("super_admin.deactivate")}</button>
+                              : <button type="button" disabled={busy} data-testid="staff-reactivate" onClick={() => act(() => fetchApi(`/admin/staff/${s.id}/reactivate`, { method: "POST" }))} className="px-2.5 py-1 border border-line-strong rounded-tile font-semibold">{t("super_admin.reactivate")}</button>)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <form onSubmit={sendInvite} noValidate className="flex flex-wrap gap-2 items-end pt-2 border-t border-[#F1F5F9]" data-testid="staff-invite">
-                  <UserPlus className="w-4 h-4 text-[#2B5CD0] mb-1.5" />
+                <form onSubmit={sendInvite} noValidate className="flex flex-wrap gap-2 items-end pt-2 border-t border-line-soft" data-testid="staff-invite">
+                  <UserPlus className="w-4 h-4 text-brand mb-1.5" />
                   <input value={invite.name} onChange={(e) => setInvite({ ...invite, name: e.target.value })} placeholder={t("super_admin.name")} aria-label={t("super_admin.name")} data-testid="invite-name" className={field} />
                   <input value={invite.email} onChange={(e) => setInvite({ ...invite, email: e.target.value })} placeholder={t("super_admin.email")} aria-label={t("super_admin.email")} data-testid="invite-email" className={`${field} min-w-[220px]`} />
                   <select value={invite.role} onChange={(e) => setInvite({ ...invite, role: e.target.value as StaffRole })} aria-label={t("super_admin.role")} data-testid="invite-role" className={field}>
                     <option value="irep_admin">{t("super_admin.role_irep_admin")}</option>
                     <option value="super_admin">{t("super_admin.role_super_admin")}</option>
                   </select>
-                  <button type="submit" disabled={busy} data-testid="invite-send" className="px-3.5 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("super_admin.invite")}</button>
+                  <button type="submit" disabled={busy} data-testid="invite-send" className="px-3.5 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("super_admin.invite")}</button>
                 </form>
                 {invited && (
-                  <p className="text-[11px] text-[#166534] bg-[#F0FDF4] rounded-lg p-2" data-testid="invite-result">
+                  <p className="text-caption text-success bg-success-faint rounded-tile p-2" data-testid="invite-result">
                     {invited.password ? `${t("super_admin.invited_dev")} ${invited.email}: ${invited.password}` : `${t("super_admin.invited")} ${invited.email}`}
                   </p>
                 )}
               </section>
 
               <section className={card} data-testid="sessions-section">
-                <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><LifeBuoy className="w-4 h-4 text-[#2B5CD0]" />{t("super_admin.sessions")}</h2>
-                <p className="text-[11px] text-[#64748B]">{t("super_admin.sessions_help")}</p>
+                <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><LifeBuoy className="w-4 h-4 text-brand" />{t("super_admin.sessions")}</h2>
+                <p className="text-caption text-muted">{t("super_admin.sessions_help")}</p>
                 <form onSubmit={openSession} noValidate className="flex flex-wrap gap-2 items-end" data-testid="session-form">
                   <select value={sess.college_id} onChange={(e) => setSess({ ...sess, college_id: e.target.value })} aria-label={t("super_admin.college")} data-testid="session-college" className={field}>
                     <option value="">{t("super_admin.choose_college")}</option>
@@ -148,22 +148,22 @@ export default function SuperAdminPage() {
                     {["15", "30", "60", "120", "240"].map((m) => <option key={m} value={m}>{m} {t("super_admin.min")}</option>)}
                   </select>
                   <input value={sess.reason} onChange={(e) => setSess({ ...sess, reason: e.target.value })} placeholder={t("super_admin.reason")} aria-label={t("super_admin.reason")} data-testid="session-reason" className={`${field} flex-1 min-w-[220px]`} />
-                  <button type="submit" disabled={busy} data-testid="session-open" className="px-3.5 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("super_admin.open_session")}</button>
+                  <button type="submit" disabled={busy} data-testid="session-open" className="px-3.5 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("super_admin.open_session")}</button>
                 </form>
-                {sessions.length === 0 && <p className="text-xs text-[#64748B]">{t("super_admin.no_sessions")}</p>}
+                {sessions.length === 0 && <p className="text-xs text-muted">{t("super_admin.no_sessions")}</p>}
                 <ul className="space-y-2">
                   {sessions.map((s) => (
-                    <li key={s.id} className="border border-[#F1F5F9] rounded-lg p-2.5 text-xs flex flex-wrap items-center justify-between gap-2" data-testid="session-row">
+                    <li key={s.id} className="border border-line-soft rounded-tile p-2.5 text-xs flex flex-wrap items-center justify-between gap-2" data-testid="session-row">
                       <div>
-                        <div className="font-bold text-[#0F1F3A]">{s.college_name} · {s.staff_name}</div>
-                        <div className="text-[#64748B]">{s.reason}</div>
-                        <div className="text-[#94A3B8]">{fmt(s.opened_at)} → {fmt(s.ended_at || s.expires_at)}</div>
+                        <div className="font-semibold text-ink">{s.college_name} · {s.staff_name}</div>
+                        <div className="text-muted">{s.reason}</div>
+                        <div className="text-subtle">{fmt(s.opened_at)} → {fmt(s.ended_at || s.expires_at)}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${s.active ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#F1F5F9] text-[#475569]"}`} data-testid="session-state">
+                        <span className={`px-2 py-0.5 rounded-full text-caption font-semibold ${s.active ? "bg-success-soft text-success" : "bg-line-soft text-ink-soft"}`} data-testid="session-state">
                           {s.active ? t("super_admin.session_active") : t("super_admin.session_closed")}
                         </span>
-                        {s.active && <button type="button" disabled={busy} data-testid="session-end" onClick={() => act(() => fetchApi(`/admin/support-sessions/${s.id}/end`, { method: "POST" }))} className="px-2.5 py-1 border border-[#CBD5E1] rounded-lg font-bold">{t("super_admin.end_session")}</button>}
+                        {s.active && <button type="button" disabled={busy} data-testid="session-end" onClick={() => act(() => fetchApi(`/admin/support-sessions/${s.id}/end`, { method: "POST" }))} className="px-2.5 py-1 border border-line-strong rounded-tile font-semibold">{t("super_admin.end_session")}</button>}
                       </div>
                     </li>
                   ))}

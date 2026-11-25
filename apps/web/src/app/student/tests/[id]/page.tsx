@@ -363,7 +363,7 @@ export default function PracticeTestPage() {
   if (loading) {
     return (
       <AppShell pageTitle={t("practice_test.title_default")}>
-        <div className="max-w-7xl mx-auto space-y-4">
+        <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex items-center gap-3 text-xs text-muted pb-2 animate-pulse">
             <Info className="w-4 h-4 text-brand" />
             <span>{t("practice_test.loading_test")}</span>
@@ -392,7 +392,7 @@ export default function PracticeTestPage() {
   if (error || !testData) {
     return (
       <AppShell pageTitle={t("practice_test.title_default")}>
-        <div className="max-w-xl mx-auto my-12 bg-white rounded-card border border-line p-8 shadow-card text-center space-y-4">
+        <div className="max-w-xl mx-auto my-12 bg-white rounded-card border border-line p-8 shadow-card text-center space-y-6">
           <div className="w-14 h-14 rounded-full bg-danger-soft text-danger flex items-center justify-center mx-auto">
             <AlertTriangle className="w-7 h-7" />
           </div>
@@ -635,7 +635,7 @@ export default function PracticeTestPage() {
 
   return (
     <AppShell pageTitle={testData.title || t("practice_test.title_default")}>
-      <div className="space-y-4 max-w-7xl mx-auto" onContextMenu={(e) => e.preventDefault()}>
+      <div className="space-y-6 max-w-7xl mx-auto" onContextMenu={(e) => e.preventDefault()}>
 
         {/* Proctoring Banner & Controls */}
         <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white border border-line rounded-card text-xs shadow-card">

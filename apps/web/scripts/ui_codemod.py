@@ -2,9 +2,9 @@
 heavy weights -> semibold, radius/shadow -> card/tile tokens. Class names only; no logic.
 
     python scripts/ui_codemod.py src/app/college [more paths...]   # rewrites in place
-    python scripts/ui_codemod.py --check src                       # lists what it would change
+    python scripts/ui_codemod.py --check src                       # CI: fails if anything is off the standard
 
-Dark code/lab surfaces (#1B2236, #141A29, #0F172A ...) are left alone on purpose.
+Dark code/lab surfaces (#1B2236, #141A29, #0F172A ...) are left alone on purpose (DARK_OK).
 """
 import re
 import sys
@@ -77,17 +77,23 @@ PAGE_GAP = re.compile(r'(<AppShell[^\n]*>\s*\r?\n\s*<div className="[^"]*?)\bspa
 
 def rewrite(text: str) -> str:
     text = SUBTITLE.sub(_subtitle, text, count=1)
-    text = PAGE_GAP.sub(r"\1space-y-6", text, count=1)
+    text = PAGE_GAP.sub(r"\1space-y-6", text)  # every AppShell (loading / error / main states)
     for rx, fn in RULES:
         text = rx.sub(fn, text)
     # a removal at the very start of a class string leaves a leading space
     return re.sub(r'(className=")\s+', r"\1", text)
 
 
+# Dark code/lab surfaces may stay as literal classes; any other hex in a class needs a token.
+DARK_OK = {"0F172A", "1E293B", "2D3748", "1B2236", "141A29", "0B0F19", "1E6B7B", "93C5FD", "38BDF8"}
+UNKNOWN_HEX = re.compile(r"-\[#([0-9A-Fa-f]{6})\]")
+
+
 def main(argv: list[str]) -> int:
     check = "--check" in argv
     paths = [Path(a) for a in argv if a != "--check"]
     changed = 0
+    problems = 0
     for root in paths:
         files = [root] if root.is_file() else sorted(root.rglob("*.tsx"))
         for f in files:
@@ -102,8 +108,16 @@ def main(argv: list[str]) -> int:
                 if not check:
                     with open(f, "w", encoding="utf-8", newline="") as fh:
                         fh.write(new)
-    print(f"{changed} file(s)")
-    return 1 if (check and changed) else 0
+            for n, line in enumerate(new.splitlines(), 1):
+                for m in UNKNOWN_HEX.finditer(line):
+                    if m.group(1).upper() not in DARK_OK:
+                        problems += 1
+                        print(f"{f.as_posix()}:{n}: colour #{m.group(1)} has no token; add one to globals.css @theme")
+    print(f"{changed} file(s) off the standard, {problems} colour(s) without a token")
+    if check and (changed or problems):
+        print("Fix with: python scripts/ui_codemod.py <path>   (rules: docs/UI_STANDARDS.md)")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

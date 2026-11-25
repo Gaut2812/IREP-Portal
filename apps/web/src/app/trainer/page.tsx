@@ -121,7 +121,7 @@ export default function TrainerDashboardPage() {
   };
 
   const filteredProblems = selectedWeek === "All" ? codingProblems : codingProblems.filter((p) => p.week_info?.includes(`Week ${selectedWeek}`));
-  const card = "bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-2";
+  const card = "bg-white p-4 rounded-card border border-line shadow-card space-y-2";
   const quickLabel = (key: string) => t(`trainer_dashboard.${key}`);
 
   return (
@@ -130,17 +130,17 @@ export default function TrainerDashboardPage() {
         <div className="space-y-6 max-w-7xl mx-auto pb-10" data-testid="trainer-dashboard">
           {loading && (
             <div className="space-y-6 animate-pulse" aria-busy="true" aria-label={t("trainer_dashboard.loading")}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 bg-white rounded-xl border border-[#E2E8F0]" />)}</div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="h-64 bg-white rounded-xl border border-[#E2E8F0]" /><div className="h-64 bg-white rounded-xl border border-[#E2E8F0]" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 bg-white rounded-card border border-line" />)}</div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="h-64 bg-white rounded-card border border-line" /><div className="h-64 bg-white rounded-card border border-line" /></div>
             </div>
           )}
 
           {!loading && error && (
-            <div className="bg-white rounded-2xl border border-[#FECACA] p-8 text-center space-y-3 max-w-md mx-auto">
-              <AlertCircle className="w-8 h-8 text-[#D93636] mx-auto" />
-              <h2 className="text-base font-bold text-[#0F1F3A]">{t("trainer_dashboard.error_title")}</h2>
-              <p className="text-xs text-[#64748B]">{error}</p>
-              <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg"><RefreshCw className="w-3.5 h-3.5" /> {t("trainer_dashboard.retry")}</button>
+            <div className="bg-white rounded-card border border-danger-line p-8 text-center space-y-3 max-w-md mx-auto">
+              <AlertCircle className="w-8 h-8 text-danger mx-auto" />
+              <h2 className="text-base font-semibold text-ink">{t("trainer_dashboard.error_title")}</h2>
+              <p className="text-xs text-muted">{error}</p>
+              <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand text-white text-xs font-semibold rounded-tile"><RefreshCw className="w-3.5 h-3.5" /> {t("trainer_dashboard.retry")}</button>
             </div>
           )}
 
@@ -151,51 +151,51 @@ export default function TrainerDashboardPage() {
               {/* Row 1 KPI cards (PDF 8) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="trainer-kpis">
                 <div className={card}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.active_batches")}</div>
-                  <div className="text-3xl font-black text-[#0F1F3A]">{data.kpis.active_batches.value}</div>
-                  <div className="text-[11px] text-[#64748B]">{fill(t(data.kpis.active_batches.colleges === 1 ? "trainer_dashboard.students_colleges" : "trainer_dashboard.students_colleges_plural"), { s: data.kpis.active_batches.students, c: data.kpis.active_batches.colleges })}</div>
+                  <div className="text-xs text-muted font-medium">{t("trainer_dashboard.active_batches")}</div>
+                  <div className="text-3xl font-semibold text-ink">{data.kpis.active_batches.value}</div>
+                  <div className="text-caption text-muted">{fill(t(data.kpis.active_batches.colleges === 1 ? "trainer_dashboard.students_colleges" : "trainer_dashboard.students_colleges_plural"), { s: data.kpis.active_batches.students, c: data.kpis.active_batches.colleges })}</div>
                 </div>
                 <div className={card}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.today_attendance")}</div>
+                  <div className="text-xs text-muted font-medium">{t("trainer_dashboard.today_attendance")}</div>
                   {data.kpis.today_attendance.value === null ? (
-                    <div className="text-sm text-[#64748B] py-2">{t("trainer_dashboard.no_attendance")}</div>
+                    <div className="text-sm text-muted py-2">{t("trainer_dashboard.no_attendance")}</div>
                   ) : (
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-[#0F1F3A]">{data.kpis.today_attendance.value}%</span>
+                      <span className="text-3xl font-semibold text-ink">{data.kpis.today_attendance.value}%</span>
                       {data.kpis.today_attendance.delta_vs_last_week !== null && (
-                        <span className={`text-xs font-bold ${data.kpis.today_attendance.delta_vs_last_week >= 0 ? "text-[#15803D]" : "text-[#D93636]"}`}>
+                        <span className={`text-xs font-semibold ${data.kpis.today_attendance.delta_vs_last_week >= 0 ? "text-success" : "text-danger"}`}>
                           {data.kpis.today_attendance.delta_vs_last_week >= 0 ? "▲" : "▼"} {Math.abs(data.kpis.today_attendance.delta_vs_last_week)}% {t("trainer_dashboard.vs_last_week")}
                         </span>
                       )}
                     </div>
                   )}
-                  <div className="text-[11px] text-[#64748B]">{fill(t("trainer_dashboard.sessions_today"), { n: data.kpis.today_attendance.sessions })} · {data.kpis.today_attendance.day}</div>
+                  <div className="text-caption text-muted">{fill(t("trainer_dashboard.sessions_today"), { n: data.kpis.today_attendance.sessions })} · {data.kpis.today_attendance.day}</div>
                 </div>
                 <div className={card}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.pending_reviews")}</div>
+                  <div className="text-xs text-muted font-medium">{t("trainer_dashboard.pending_reviews")}</div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-[#0F1F3A]">{data.kpis.pending_code_reviews.value}</span>
+                    <span className="text-3xl font-semibold text-ink">{data.kpis.pending_code_reviews.value}</span>
                     {data.kpis.pending_code_reviews.older_than_2_days > 0 ? (
-                      <span className="text-xs font-bold text-[#D93636]">{fill(t("trainer_dashboard.older_than"), { n: data.kpis.pending_code_reviews.older_than_2_days })}</span>
+                      <span className="text-xs font-semibold text-danger">{fill(t("trainer_dashboard.older_than"), { n: data.kpis.pending_code_reviews.older_than_2_days })}</span>
                     ) : (
-                      <span className="text-xs font-bold text-[#15803D]">{t("trainer_dashboard.queue_clear")}</span>
+                      <span className="text-xs font-semibold text-success">{t("trainer_dashboard.queue_clear")}</span>
                     )}
                   </div>
-                  <Link href="/trainer/reviews" className="text-[11px] text-[#2B5CD0] font-semibold hover:underline">{t("trainer_dashboard.review_prs")} →</Link>
+                  <Link href="/trainer/reviews" className="text-caption text-brand font-semibold hover:underline">{t("trainer_dashboard.review_prs")} →</Link>
                 </div>
                 <div className={card}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.at_risk")}</div>
-                  <div className="text-3xl font-black text-[#D93636]">{data.kpis.at_risk_students.value}</div>
-                  <div className="text-[11px] text-[#64748B]">{fill(t("trainer_dashboard.parents_notified"), { n: data.kpis.at_risk_students.parents_notified })}</div>
+                  <div className="text-xs text-muted font-medium">{t("trainer_dashboard.at_risk")}</div>
+                  <div className="text-3xl font-semibold text-danger">{data.kpis.at_risk_students.value}</div>
+                  <div className="text-caption text-muted">{fill(t("trainer_dashboard.parents_notified"), { n: data.kpis.at_risk_students.parents_notified })}</div>
                 </div>
               </div>
 
               {/* Row 2 chart + schedule */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                    <h3 className="font-bold text-xs text-[#0F1F3A]">{t("trainer_dashboard.batch_readiness")}</h3>
-                    <span className="text-[11px] text-[#64748B]">{t("trainer_dashboard.average_semester")}</span>
+                <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-3">
+                  <div className="flex items-center justify-between border-b border-line pb-2">
+                    <h3 className="font-semibold text-xs text-ink">{t("trainer_dashboard.batch_readiness")}</h3>
+                    <span className="text-caption text-muted">{t("trainer_dashboard.average_semester")}</span>
                   </div>
                   <div className="h-56 w-full pt-2" data-testid="batch-readiness-chart">
                     <ResponsiveContainer width="100%" height="100%">
@@ -209,34 +209,34 @@ export default function TrainerDashboardPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="flex items-center justify-center gap-4 text-[11px] text-[#64748B] pt-1">
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2BB3A0]" /> {t("trainer_dashboard.legend_ready")}</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2B5CD0]" /> {t("trainer_dashboard.legend_below")}</span>
+                  <div className="flex items-center justify-center gap-4 text-caption text-muted pt-1">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-teal" /> {t("trainer_dashboard.legend_ready")}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-brand" /> {t("trainer_dashboard.legend_below")}</span>
                   </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                    <h3 className="font-bold text-xs text-[#0F1F3A]">{data.today_schedule.is_today ? t("trainer_dashboard.today_schedule") : t("trainer_dashboard.next_day_schedule")}</h3>
-                    <span className="text-[11px] text-[#64748B] font-semibold">{data.today_schedule.label}</span>
+                <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-3">
+                  <div className="flex items-center justify-between border-b border-line pb-2">
+                    <h3 className="font-semibold text-xs text-ink">{data.today_schedule.is_today ? t("trainer_dashboard.today_schedule") : t("trainer_dashboard.next_day_schedule")}</h3>
+                    <span className="text-caption text-muted font-semibold">{data.today_schedule.label}</span>
                   </div>
                   {data.today_schedule.items.length === 0 ? (
-                    <p className="text-xs text-[#64748B] py-6 text-center">{t("trainer_dashboard.no_schedule")}</p>
+                    <p className="text-xs text-muted py-6 text-center">{t("trainer_dashboard.no_schedule")}</p>
                   ) : (
                     <div className="space-y-2.5" data-testid="today-schedule">
                       {data.today_schedule.items.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] gap-2">
+                        <div key={item.id} className="flex items-center justify-between p-3 rounded-card bg-surface-2 border border-line gap-2">
                           <div className="flex items-center gap-3 min-w-0">
-                            <span className="w-16 text-xs font-bold text-[#0F1F3A] flex-shrink-0">{item.time}</span>
+                            <span className="w-16 text-xs font-semibold text-ink flex-shrink-0">{item.time}</span>
                             <div className="min-w-0">
-                              <div className="text-xs font-bold text-[#0F1F3A] truncate">{item.topic}</div>
-                              <div className="text-[10px] text-[#64748B]">{item.batch}</div>
+                              <div className="text-xs font-semibold text-ink truncate">{item.topic}</div>
+                              <div className="text-caption text-muted">{item.batch}</div>
                             </div>
                           </div>
                           {item.can_enter ? (
-                            <Link href={item.room} className="px-3 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white text-xs font-bold rounded-lg shadow-sm flex-shrink-0">{t("trainer_dashboard.enter_room")}</Link>
+                            <Link href={item.room} className="px-3 py-1 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-tile shadow-card flex-shrink-0">{t("trainer_dashboard.enter_room")}</Link>
                           ) : (
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${statusChip[item.status] || "bg-slate-100 text-slate-600"}`}>{item.status_label}</span>
+                            <span className={`text-caption font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${statusChip[item.status] || "bg-slate-100 text-slate-600"}`}>{item.status_label}</span>
                           )}
                         </div>
                       ))}
@@ -246,15 +246,15 @@ export default function TrainerDashboardPage() {
               </div>
 
               {/* Row 3 weekly DSA widget (Screen 24 integration) */}
-              <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4" data-testid="trainer-dsa-widget">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
+              <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-4" data-testid="trainer-dsa-widget">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-line pb-3">
                   <div className="flex items-center gap-2">
-                    <Code2 className="w-5 h-5 text-[#2B5CD0]" />
-                    <h3 className="font-bold text-sm text-[#0F1F3A]">{t("trainer_dashboard.dsa_widget")}</h3>
+                    <Code2 className="w-5 h-5 text-brand" />
+                    <h3 className="font-semibold text-sm text-ink">{t("trainer_dashboard.dsa_widget")}</h3>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-[#64748B] font-medium flex items-center gap-1"><Filter className="w-3.5 h-3.5" /> Week:</span>
-                    <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="bg-[#F8FAFC] border border-[#CBD5E1] text-xs font-semibold text-[#0F1F3A] rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer" aria-label="Week">
+                    <span className="text-xs text-muted font-medium flex items-center gap-1"><Filter className="w-3.5 h-3.5" /> Week:</span>
+                    <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="bg-surface-2 border border-line-strong text-xs font-semibold text-ink rounded-tile px-2.5 py-1 focus:outline-none cursor-pointer" aria-label="Week">
                       <option value="All">All Weeks (1-8)</option>
                       {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => <option key={w} value={String(w)}>Week {w}</option>)}
                     </select>
@@ -262,24 +262,24 @@ export default function TrainerDashboardPage() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
-                    <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
+                    <thead><tr className="border-b border-line text-muted text-caption">
                       <th className="pb-2.5 font-semibold">Problem</th><th className="pb-2.5 font-semibold">Schedule</th><th className="pb-2.5 font-semibold">Topic</th>
                       <th className="pb-2.5 font-semibold">Difficulty</th><th className="pb-2.5 font-semibold text-center">Submissions</th><th className="pb-2.5 font-semibold text-center">Solved %</th><th className="pb-2.5 font-semibold text-right"></th>
                     </tr></thead>
-                    <tbody className="divide-y divide-[#E2E8F0]">
+                    <tbody className="divide-y divide-line">
                       {loadingProblems ? (
-                        <tr><td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">…</td></tr>
+                        <tr><td colSpan={7} className="py-6 text-center text-xs text-muted">…</td></tr>
                       ) : filteredProblems.length === 0 ? (
-                        <tr><td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">No problems for this week.</td></tr>
+                        <tr><td colSpan={7} className="py-6 text-center text-xs text-muted">No problems for this week.</td></tr>
                       ) : filteredProblems.map((prob) => (
-                        <tr key={prob.id} className="hover:bg-[#F8FAFC]">
-                          <td className="py-2.5 font-bold text-[#0F1F3A]">{prob.title}</td>
-                          <td className="py-2.5 text-[#64748B]">{prob.week_info}</td>
-                          <td className="py-2.5"><span className="chip-blue text-[10px]">{prob.topic}</span></td>
-                          <td className="py-2.5"><span className={prob.difficulty === "Easy" ? "chip-green text-[10px]" : prob.difficulty === "Medium" ? "chip-amber text-[10px]" : "chip-red text-[10px]"}>{prob.difficulty}</span></td>
-                          <td className="py-2.5 text-center font-mono text-[#0F1F3A]">{prob.total_submissions}</td>
-                          <td className="py-2.5 text-center font-bold text-[#15803D] text-[11px]">{prob.solved_percentage}%</td>
-                          <td className="py-2.5 text-right"><Link href={`/student/coding/${prob.id}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-[11px] rounded-lg"><span>Open</span><ExternalLink className="w-2.5 h-2.5" /></Link></td>
+                        <tr key={prob.id} className="hover:bg-surface-2">
+                          <td className="py-2.5 font-semibold text-ink">{prob.title}</td>
+                          <td className="py-2.5 text-muted">{prob.week_info}</td>
+                          <td className="py-2.5"><span className="chip-blue text-caption">{prob.topic}</span></td>
+                          <td className="py-2.5"><span className={prob.difficulty === "Easy" ? "chip-green text-caption" : prob.difficulty === "Medium" ? "chip-amber text-caption" : "chip-red text-caption"}>{prob.difficulty}</span></td>
+                          <td className="py-2.5 text-center font-mono text-ink">{prob.total_submissions}</td>
+                          <td className="py-2.5 text-center font-semibold text-success text-caption">{prob.solved_percentage}%</td>
+                          <td className="py-2.5 text-right"><Link href={`/student/coding/${prob.id}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand hover:bg-brand-hover text-white font-semibold text-caption rounded-tile"><span>Open</span><ExternalLink className="w-2.5 h-2.5" /></Link></td>
                         </tr>
                       ))}
                     </tbody>
@@ -289,31 +289,31 @@ export default function TrainerDashboardPage() {
 
               {/* Row 4 support table + quick actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                    <h3 className="font-bold text-xs text-[#0F1F3A]">{t("trainer_dashboard.needing_support")}</h3>
-                    <span className="text-[11px] text-[#D93636] font-semibold">{fill(t("trainer_dashboard.score_below"), { n: data.thresholds.score_below })}</span>
+                <div className="lg:col-span-2 bg-white p-5 rounded-card border border-line shadow-card space-y-3">
+                  <div className="flex items-center justify-between border-b border-line pb-2">
+                    <h3 className="font-semibold text-xs text-ink">{t("trainer_dashboard.needing_support")}</h3>
+                    <span className="text-caption text-danger font-semibold">{fill(t("trainer_dashboard.score_below"), { n: data.thresholds.score_below })}</span>
                   </div>
                   {data.students_needing_support.length === 0 ? (
-                    <p className="text-xs text-[#64748B] py-6 text-center">{t("trainer_dashboard.no_support")}</p>
+                    <p className="text-xs text-muted py-6 text-center">{t("trainer_dashboard.no_support")}</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left" data-testid="support-table">
-                        <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
+                        <thead><tr className="border-b border-line text-muted text-caption">
                           <th className="pb-2 font-semibold">{t("trainer_dashboard.student")}</th><th className="pb-2 font-semibold">{t("trainer_dashboard.batch")}</th>
                           <th className="pb-2 font-semibold">{t("trainer_dashboard.score")}</th><th className="pb-2 font-semibold">{t("trainer_dashboard.issue")}</th>
                           <th className="pb-2 font-semibold text-right">{t("trainer_dashboard.action")}</th>
                         </tr></thead>
-                        <tbody className="divide-y divide-[#E2E8F0]">
+                        <tbody className="divide-y divide-line">
                           {data.students_needing_support.map((st) => (
-                            <tr key={st.flag_id} className="hover:bg-[#F8FAFC]">
-                              <td className="py-2.5 font-bold text-[#0F1F3A]">{st.name}{st.parent_notified && <span className="ml-1.5 text-[9px] text-[#15803D] font-semibold" title={t("trainer_dashboard.notified")}>✓</span>}</td>
-                              <td className="py-2.5 text-[#64748B]">{st.batch}</td>
-                              <td className="py-2.5"><span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 font-bold text-[11px]">{st.score}</span></td>
-                              <td className="py-2.5 text-[#64748B]">{st.issue}</td>
+                            <tr key={st.flag_id} className="hover:bg-surface-2">
+                              <td className="py-2.5 font-semibold text-ink">{st.name}{st.parent_notified && <span className="ml-1.5 text-caption text-success font-semibold" title={t("trainer_dashboard.notified")}>✓</span>}</td>
+                              <td className="py-2.5 text-muted">{st.batch}</td>
+                              <td className="py-2.5"><span className="px-2 py-0.5 rounded-tile bg-red-100 text-red-700 font-semibold text-caption">{st.score}</span></td>
+                              <td className="py-2.5 text-muted">{st.issue}</td>
                               <td className="py-2.5 text-right whitespace-nowrap">
                                 <button type="button" disabled={acting === st.flag_id} onClick={() => runAction(st)} className={`${actionChip[st.action] || "chip-blue"} cursor-pointer disabled:opacity-50`} data-testid="support-action">{st.action_label}</button>
-                                <button type="button" onClick={() => { setResolving(st); setResolveNote(""); }} className="ml-1.5 text-[10px] text-[#64748B] hover:text-[#0F1F3A] underline" aria-label={`${t("trainer_dashboard.resolve")} ${st.name}`}>{t("trainer_dashboard.resolve")}</button>
+                                <button type="button" onClick={() => { setResolving(st); setResolveNote(""); }} className="ml-1.5 text-caption text-muted hover:text-ink underline" aria-label={`${t("trainer_dashboard.resolve")} ${st.name}`}>{t("trainer_dashboard.resolve")}</button>
                               </td>
                             </tr>
                           ))}
@@ -323,11 +323,11 @@ export default function TrainerDashboardPage() {
                   )}
                 </div>
 
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-[#0F1F3A] border-b border-[#E2E8F0] pb-2">{t("trainer_dashboard.quick_actions")}</h3>
+                <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-3">
+                  <h3 className="font-semibold text-xs text-ink border-b border-line pb-2">{t("trainer_dashboard.quick_actions")}</h3>
                   <div className="grid grid-cols-2 gap-2.5 pt-1" data-testid="quick-actions">
                     {data.quick_actions.map((qa) => (
-                      <Link key={qa.key} href={qa.href} className={`py-2.5 px-3 text-center font-bold text-xs rounded-xl transition-all ${qa.variant === "blue" ? "bg-[#2B5CD0] hover:bg-[#1E46B0] text-white shadow" : qa.variant === "teal" ? "bg-[#2BB3A0] hover:bg-[#249B8A] text-white shadow" : "border border-[#CBD5E1] hover:bg-[#F8FAFC] text-[#0F1F3A]"}`}>
+                      <Link key={qa.key} href={qa.href} className={`py-2.5 px-3 text-center font-semibold text-xs rounded-card transition-all ${qa.variant === "blue" ? "bg-brand hover:bg-brand-hover text-white shadow-card" : qa.variant === "teal" ? "bg-teal hover:bg-teal-hover text-white shadow-card" : "border border-line-strong hover:bg-surface-2 text-ink"}`}>
                         {quickLabel(qa.key)}
                       </Link>
                     ))}
@@ -339,24 +339,24 @@ export default function TrainerDashboardPage() {
         </div>
 
         {toast && (
-          <div role="status" className="fixed bottom-6 right-6 z-50 bg-[#0F1F3A] text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2" data-testid="toast">
-            <CheckCircle2 className="w-4 h-4 text-[#2BB3A0]" /> {toast}
+          <div role="status" className="fixed bottom-6 right-6 z-50 bg-ink text-white text-xs font-semibold px-4 py-3 rounded-card shadow-pop flex items-center gap-2" data-testid="toast">
+            <CheckCircle2 className="w-4 h-4 text-teal" /> {toast}
           </div>
         )}
 
         {resolving && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-[#E2E8F0]">
+            <div className="bg-white rounded-card max-w-md w-full p-6 space-y-4 shadow-pop border border-line">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-[#0F1F3A]">{t("trainer_dashboard.resolve")} · {resolving.name}</h3>
-                <button onClick={() => setResolving(null)} className="p-1.5 rounded-lg hover:bg-[#F1F5F9]" aria-label={t("trainer_dashboard.cancel")}><X className="w-4 h-4 text-[#64748B]" /></button>
+                <h3 className="text-base font-semibold text-ink">{t("trainer_dashboard.resolve")} · {resolving.name}</h3>
+                <button onClick={() => setResolving(null)} className="p-1.5 rounded-tile hover:bg-line-soft" aria-label={t("trainer_dashboard.cancel")}><X className="w-4 h-4 text-muted" /></button>
               </div>
-              <label className="block text-xs font-bold text-[#0F1F3A]">{t("trainer_dashboard.resolve_note")}
-                <textarea value={resolveNote} onChange={(e) => setResolveNote(e.target.value)} rows={3} className="mt-1 w-full px-3 py-2 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-xs font-normal focus:outline-none focus:border-[#2B5CD0]" data-testid="resolve-note" />
+              <label className="block text-xs font-semibold text-ink">{t("trainer_dashboard.resolve_note")}
+                <textarea value={resolveNote} onChange={(e) => setResolveNote(e.target.value)} rows={3} className="mt-1 w-full px-3 py-2 border border-line rounded-tile bg-surface-2 text-xs font-normal focus:outline-none focus:border-brand" data-testid="resolve-note" />
               </label>
               <div className="flex gap-2">
-                <button onClick={() => setResolving(null)} className="flex-1 py-2 bg-[#F1F5F9] text-[#0F1F3A] font-bold text-xs rounded-xl">{t("trainer_dashboard.cancel")}</button>
-                <button onClick={submitResolve} disabled={!resolveNote.trim()} className="flex-1 py-2 bg-[#2BB3A0] text-white font-bold text-xs rounded-xl disabled:opacity-50">{t("trainer_dashboard.resolve_confirm")}</button>
+                <button onClick={() => setResolving(null)} className="flex-1 py-2 bg-line-soft text-ink font-semibold text-xs rounded-card">{t("trainer_dashboard.cancel")}</button>
+                <button onClick={submitResolve} disabled={!resolveNote.trim()} className="flex-1 py-2 bg-teal text-white font-semibold text-xs rounded-card disabled:opacity-50">{t("trainer_dashboard.resolve_confirm")}</button>
               </div>
             </div>
           </div>

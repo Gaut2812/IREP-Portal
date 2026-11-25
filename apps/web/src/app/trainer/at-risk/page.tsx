@@ -66,18 +66,18 @@ export default function AtRiskPage() {
     }
   };
 
-  const sev: Record<string, string> = { high: "bg-[#FEE2E2] text-[#991B1B]", medium: "bg-[#FEF3C7] text-[#92400E]", low: "bg-[#F1F5F9] text-[#475569]" };
+  const sev: Record<string, string> = { high: "bg-danger-soft text-danger", medium: "bg-warning-soft text-warning", low: "bg-line-soft text-ink-soft" };
 
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("at_risk.title")}>
-        <div className="space-y-4 max-w-6xl">
+        <div className="space-y-6 max-w-6xl">
           {data && (
             <div className="grid grid-cols-3 gap-3" data-testid="risk-summary">
               {([["open", data.summary.open], ["high", data.summary.high], ["parents_alerted", data.summary.parents_alerted]] as const).map(([k, v]) => (
-                <div key={k} className="bg-white rounded-xl border border-[#E2E8F0] p-3">
-                  <div className="text-2xl font-black text-[#0F1F3A]">{v}</div>
-                  <div className="text-[11px] text-[#64748B]">{t(`at_risk.sum_${k}`)}</div>
+                <div key={k} className="bg-white rounded-card border border-line p-3">
+                  <div className="text-2xl font-semibold text-ink">{v}</div>
+                  <div className="text-caption text-muted">{t(`at_risk.sum_${k}`)}</div>
                 </div>
               ))}
             </div>
@@ -85,59 +85,59 @@ export default function AtRiskPage() {
           <div className="flex gap-2" role="tablist">
             {(["open", "resolved"] as const).map((s) => (
               <button key={s} type="button" role="tab" aria-selected={status === s} onClick={() => { setStatus(s); setSelected(null); }} data-testid={`risk-tab-${s}`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold ${status === s ? "bg-[#2B5CD0] text-white" : "border border-[#CBD5E1]"}`}>{t(`at_risk.tab_${s}`)}</button>
+                className={`px-3 py-1.5 rounded-tile text-xs font-semibold ${status === s ? "bg-brand text-white" : "border border-line-strong"}`}>{t(`at_risk.tab_${s}`)}</button>
             ))}
           </div>
-          {msg && <p className="text-xs text-[#166534] font-bold" role="status" data-testid="risk-msg">{msg}</p>}
+          {msg && <p className="text-xs text-success font-semibold" role="status" data-testid="risk-msg">{msg}</p>}
           {error && <p className="text-xs text-red-600" role="alert" data-testid="risk-error">{error}</p>}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <ul className="lg:col-span-3 bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9]" data-testid="risk-list">
-              {data?.flags.length === 0 && <li className="p-6 text-center text-xs text-[#64748B]">{t("at_risk.none")}</li>}
+            <ul className="lg:col-span-3 bg-white rounded-card border border-line divide-y divide-line-soft" data-testid="risk-list">
+              {data?.flags.length === 0 && <li className="p-6 text-center text-xs text-muted">{t("at_risk.none")}</li>}
               {data?.flags.map((f) => (
                 <li key={f.id}>
                   <button type="button" onClick={() => setSelected(f)} aria-pressed={selected?.id === f.id} data-testid="risk-row"
-                    className={`w-full text-left px-3 py-2.5 flex items-center gap-3 ${selected?.id === f.id ? "bg-[#EFF6FF]" : "hover:bg-[#F8FAFC]"}`}>
-                    <AlertTriangle className={`w-4 h-4 shrink-0 ${f.severity === "high" ? "text-[#DC2626]" : "text-[#D97706]"}`} />
+                    className={`w-full text-left px-3 py-2.5 flex items-center gap-3 ${selected?.id === f.id ? "bg-brand-soft" : "hover:bg-surface-2"}`}>
+                    <AlertTriangle className={`w-4 h-4 shrink-0 ${f.severity === "high" ? "text-danger" : "text-warning"}`} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold text-[#0F1F3A] truncate">{f.name}</div>
-                      <div className="text-[11px] text-[#64748B]">{f.issue} · {t("at_risk.score")} {f.score ?? "—"} · {t("at_risk.attendance")} {f.attendance_pct ?? "—"}%{f.batch ? ` · ${f.batch}` : ""}{` · ${t("at_risk.ai_calls")} ${f.ai_calls_7d ?? 0}`}</div>
+                      <div className="text-sm font-semibold text-ink truncate">{f.name}</div>
+                      <div className="text-caption text-muted">{f.issue} · {t("at_risk.score")} {f.score ?? "—"} · {t("at_risk.attendance")} {f.attendance_pct ?? "—"}%{f.batch ? ` · ${f.batch}` : ""}{` · ${t("at_risk.ai_calls")} ${f.ai_calls_7d ?? 0}`}</div>
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sev[f.severity] || sev.low}`}>{t(`at_risk.sev_${f.severity}`)}</span>
-                    {f.parent_notified && <Phone className="w-3.5 h-3.5 text-[#2BB3A0]" aria-label={t("at_risk.parent_alerted")} />}
+                    <span className={`text-caption font-semibold px-2 py-0.5 rounded-full ${sev[f.severity] || sev.low}`}>{t(`at_risk.sev_${f.severity}`)}</span>
+                    {f.parent_notified && <Phone className="w-3.5 h-3.5 text-teal" aria-label={t("at_risk.parent_alerted")} />}
                   </button>
                 </li>
               ))}
             </ul>
             {selected && (
-              <section className="lg:col-span-2 bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3 h-fit" data-testid="risk-detail">
+              <section className="lg:col-span-2 bg-white rounded-card border border-line p-4 space-y-3 h-fit" data-testid="risk-detail">
                 <div>
-                  <h2 className="text-sm font-black text-[#0F1F3A]">{selected.name}</h2>
-                  <p className="text-xs text-[#475569]">{selected.issue} · {t("at_risk.suggested")}: <b>{selected.action_label}</b></p>
-                  {selected.parent_notified && <p className="text-[11px] text-[#2BB3A0] font-semibold mt-1">{t("at_risk.parent_alerted")}</p>}
+                  <h2 className="text-sm font-semibold text-ink">{selected.name}</h2>
+                  <p className="text-xs text-ink-soft">{selected.issue} · {t("at_risk.suggested")}: <b>{selected.action_label}</b></p>
+                  {selected.parent_notified && <p className="text-caption text-teal font-semibold mt-1">{t("at_risk.parent_alerted")}</p>}
                 </div>
                 {selected.status !== "resolved" && (
                   <>
                     <div className="grid grid-cols-2 gap-2">
-                      <button type="button" disabled={busy} onClick={() => act("parent_call")} data-testid="act-parent-call" className="px-2 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg inline-flex items-center justify-center gap-1 disabled:opacity-50">
+                      <button type="button" disabled={busy} onClick={() => act("parent_call")} data-testid="act-parent-call" className="px-2 py-2 bg-brand text-white text-xs font-semibold rounded-tile inline-flex items-center justify-center gap-1 disabled:opacity-50">
                         <Phone className="w-3.5 h-3.5" />{t("at_risk.parent_call")}
                       </button>
-                      <button type="button" disabled={busy} onClick={() => act("extra_saturday")} className="px-2 py-2 border border-[#CBD5E1] text-xs font-bold rounded-lg disabled:opacity-50">{t("at_risk.extra_saturday")}</button>
-                      <button type="button" disabled={busy} onClick={() => act("mentor")} className="px-2 py-2 border border-[#CBD5E1] text-xs font-bold rounded-lg disabled:opacity-50">{t("at_risk.mentor")}</button>
-                      <button type="button" disabled={busy} onClick={() => act("note")} className="px-2 py-2 border border-[#CBD5E1] text-xs font-bold rounded-lg disabled:opacity-50">{t("at_risk.add_note")}</button>
+                      <button type="button" disabled={busy} onClick={() => act("extra_saturday")} className="px-2 py-2 border border-line-strong text-xs font-semibold rounded-tile disabled:opacity-50">{t("at_risk.extra_saturday")}</button>
+                      <button type="button" disabled={busy} onClick={() => act("mentor")} className="px-2 py-2 border border-line-strong text-xs font-semibold rounded-tile disabled:opacity-50">{t("at_risk.mentor")}</button>
+                      <button type="button" disabled={busy} onClick={() => act("note")} className="px-2 py-2 border border-line-strong text-xs font-semibold rounded-tile disabled:opacity-50">{t("at_risk.add_note")}</button>
                     </div>
                     <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("at_risk.note_ph")} data-testid="risk-note"
-                      className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs" />
-                    <button type="button" disabled={busy} onClick={() => act("resolve")} data-testid="act-resolve" className="w-full px-2 py-2 bg-[#166534] text-white text-xs font-bold rounded-lg inline-flex items-center justify-center gap-1 disabled:opacity-50">
+                      className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs" />
+                    <button type="button" disabled={busy} onClick={() => act("resolve")} data-testid="act-resolve" className="w-full px-2 py-2 bg-success text-white text-xs font-semibold rounded-tile inline-flex items-center justify-center gap-1 disabled:opacity-50">
                       <CheckCircle2 className="w-3.5 h-3.5" />{t("at_risk.resolve")}
                     </button>
                   </>
                 )}
                 <div>
-                  <h3 className="text-[11px] font-black text-[#64748B] uppercase tracking-wide">{t("at_risk.history")}</h3>
+                  <h3 className="text-caption font-semibold text-muted">{t("at_risk.history")}</h3>
                   <ol className="mt-1 space-y-1" data-testid="risk-history">
-                    {(history?.actions || []).length === 0 && <li className="text-[11px] text-[#94A3B8]">{t("at_risk.no_history")}</li>}
+                    {(history?.actions || []).length === 0 && <li className="text-caption text-subtle">{t("at_risk.no_history")}</li>}
                     {history?.actions.map((a, i) => (
-                      <li key={i} className="text-[11px] text-[#334155]">
+                      <li key={i} className="text-caption text-ink-soft">
                         <b>{t(`at_risk.act_${a.type}`)}</b>{a.by ? ` · ${a.by}` : ""}{a.at ? ` · ${a.at.slice(0, 10)}` : ""}{a.note ? `: ${a.note}` : ""}
                       </li>
                     ))}

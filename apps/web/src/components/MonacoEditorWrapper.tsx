@@ -13,7 +13,7 @@ const MONACO_LANG_MAP: Record<string, string> = {
 const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full bg-[#1B2236] animate-pulse flex items-center justify-center text-xs text-[#64748B] font-mono">
+    <div className="w-full h-full bg-[#1B2236] animate-pulse flex items-center justify-center text-xs text-muted font-mono">
       Loading Code Editor...
     </div>
   ),

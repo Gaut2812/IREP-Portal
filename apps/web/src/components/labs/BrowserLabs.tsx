@@ -40,10 +40,10 @@ type Status = "loading" | "ready" | "error";
 function Shell({ status, title, children }: { status: Status; title: string; children: React.ReactNode }) {
   const { t } = useLanguage();
   return (
-    <div className="bg-[#1B2236] rounded-xl border border-[#2D3748] overflow-hidden" data-testid="browser-lab">
-      <div className="px-4 py-2 border-b border-[#2D3748] text-xs text-[#CBD5E1] flex items-center justify-between">
+    <div className="bg-[#1B2236] rounded-card border border-[#2D3748] overflow-hidden" data-testid="browser-lab">
+      <div className="px-4 py-2 border-b border-[#2D3748] text-xs text-line-strong flex items-center justify-between">
         <span>{title}</span>
-        <span data-testid="engine-status" className={status === "ready" ? "text-[#2BB3A0]" : status === "error" ? "text-[#F87171]" : "text-[#FBBF24]"}>
+        <span data-testid="engine-status" className={status === "ready" ? "text-teal" : status === "error" ? "text-danger-fill" : "text-warning-fill"}>
           {t(`labs.engine_${status}`)}
         </span>
       </div>
@@ -91,17 +91,17 @@ export function SqlLab({ onActivity, setup, onResult }: { onActivity: () => void
   return (
     <Shell status={status} title={t("labs.sql_title")}>
       <textarea value={sql} onChange={(e) => setSql(e.target.value)} rows={7} spellCheck={false} aria-label={t("labs.sql_editor")} data-testid="sql-editor"
-        className="w-full bg-transparent font-mono text-xs text-[#E2E8F0] p-4 focus:outline-none resize-y" />
+        className="w-full bg-transparent font-mono text-xs text-line p-4 focus:outline-none resize-y" />
       <div className="border-t border-[#2D3748] p-2 flex">
         <button type="button" onClick={run} disabled={status !== "ready"} data-testid="sql-run"
-          className="px-3 py-1.5 bg-[#2BB3A0] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1 disabled:opacity-40"><Play className="w-3.5 h-3.5" />{t("labs.run")}</button>
+          className="px-3 py-1.5 bg-teal text-white text-xs font-semibold rounded-tile inline-flex items-center gap-1 disabled:opacity-40"><Play className="w-3.5 h-3.5" />{t("labs.run")}</button>
       </div>
       <div className="bg-white p-3 text-xs overflow-x-auto min-h-[60px]" data-testid="sql-output">
         {err && <pre className="text-red-600 whitespace-pre-wrap" data-testid="sql-error">{err}</pre>}
         {out && (
           <table className="min-w-full">
-            <thead><tr>{out.fields.map((f) => <th key={f} className="text-left px-2 py-1 border-b border-[#E2E8F0] font-bold">{f}</th>)}</tr></thead>
-            <tbody>{out.rows.map((r, i) => <tr key={i}>{r.map((v, j) => <td key={j} className="px-2 py-1 border-b border-[#F1F5F9] font-mono">{String(v)}</td>)}</tr>)}</tbody>
+            <thead><tr>{out.fields.map((f) => <th key={f} className="text-left px-2 py-1 border-b border-line font-semibold">{f}</th>)}</tr></thead>
+            <tbody>{out.rows.map((r, i) => <tr key={i}>{r.map((v, j) => <td key={j} className="px-2 py-1 border-b border-line-soft font-mono">{String(v)}</td>)}</tr>)}</tbody>
           </table>
         )}
         {status === "error" && <p className="text-red-600">{t("labs.engine_failed")}</p>}
@@ -146,12 +146,12 @@ export function PythonLab({ onActivity, starter, onOutput }: { onActivity: () =>
   return (
     <Shell status={status} title={t("labs.python_title")}>
       <textarea value={code} onChange={(e) => setCode(e.target.value)} rows={8} spellCheck={false} aria-label={t("labs.python_editor")} data-testid="py-editor"
-        className="w-full bg-transparent font-mono text-xs text-[#E2E8F0] p-4 focus:outline-none resize-y" />
+        className="w-full bg-transparent font-mono text-xs text-line p-4 focus:outline-none resize-y" />
       <div className="border-t border-[#2D3748] p-2 flex">
         <button type="button" onClick={run} disabled={status !== "ready"} data-testid="py-run"
-          className="px-3 py-1.5 bg-[#2BB3A0] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1 disabled:opacity-40"><Play className="w-3.5 h-3.5" />{t("labs.run")}</button>
+          className="px-3 py-1.5 bg-teal text-white text-xs font-semibold rounded-tile inline-flex items-center gap-1 disabled:opacity-40"><Play className="w-3.5 h-3.5" />{t("labs.run")}</button>
       </div>
-      <pre className="bg-[#0F172A] text-[#E2E8F0] p-3 text-xs min-h-[60px] whitespace-pre-wrap" data-testid="py-output">{out || (status === "error" ? t("labs.engine_failed") : "")}</pre>
+      <pre className="bg-[#0F172A] text-line p-3 text-xs min-h-[60px] whitespace-pre-wrap" data-testid="py-output">{out || (status === "error" ? t("labs.engine_failed") : "")}</pre>
     </Shell>
   );
 }

@@ -113,77 +113,77 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row w-full font-sans">
       {/* LEFT PANEL (~60%): Navy-to-Teal Gradient */}
-      <div className="hidden md:flex md:w-[58%] bg-gradient-to-br from-[#14284B] via-[#1E3A6E] to-[#1E6B7B] text-white p-12 flex-col justify-between relative overflow-hidden">
+      <div className="hidden md:flex md:w-[58%] bg-gradient-to-br from-navy via-navy-2 to-[#1E6B7B] text-white p-12 flex-col justify-between relative overflow-hidden">
         {/* Subtle decorative circles */}
         <div className="absolute top-0 right-0 -mt-16 -mr-16 w-80 h-80 rounded-full bg-white/5 blur-2xl" />
-        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-96 h-96 rounded-full bg-[#2BB3A0]/10 blur-3xl" />
+        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-96 h-96 rounded-full bg-teal/10 blur-3xl" />
 
         {/* Brand */}
         <div className="flex items-center gap-3 z-10">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#2BB3A0] to-[#2B5CD0] flex items-center justify-center font-bold text-white text-lg shadow-lg">
+          <div className="w-10 h-10 rounded-card bg-gradient-to-tr from-teal to-brand flex items-center justify-center font-semibold text-white text-lg shadow-pop">
             IR
           </div>
           <div>
-            <div className="font-extrabold text-xl tracking-tight leading-none">IREP Portal</div>
-            <div className="text-xs text-[#94A3B8] font-medium tracking-wide mt-1">Industry-Ready Engineer Program</div>
+            <div className="font-semibold text-xl tracking-tight leading-none">IREP Portal</div>
+            <div className="text-xs text-subtle font-medium mt-1">Industry-Ready Engineer Program</div>
           </div>
         </div>
 
         {/* Headline & Description */}
         <div className="max-w-xl z-10 space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold text-[#2BB3A0] border border-white/15">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold text-teal border border-white/15">
             <ShieldCheck className="w-4 h-4" /> B.Tech Semesters 2 to 7
           </div>
-          <h1 className="text-3xl lg:text-4xl font-extrabold leading-tight text-white tracking-tight">
+          <h1 className="text-3xl lg:text-4xl font-semibold leading-tight text-white tracking-tight">
             {t("login.hero_headline")}
           </h1>
-          <p className="text-[#CBD5E1] text-sm lg:text-base leading-relaxed">
+          <p className="text-line-strong text-sm lg:text-base leading-relaxed">
             {t("login.hero_subline")}
           </p>
 
           {/* 3 Stats from Mockup */}
           <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/15">
             <div>
-              <div className="text-2xl font-black text-[#2BB3A0]">576</div>
-              <div className="text-xs text-[#94A3B8] font-medium mt-0.5">{t("login.stats_hours")}</div>
+              <div className="text-2xl font-semibold text-teal">576</div>
+              <div className="text-xs text-subtle font-medium mt-0.5">{t("login.stats_hours")}</div>
             </div>
             <div>
-              <div className="text-2xl font-black text-white">6</div>
-              <div className="text-xs text-[#94A3B8] font-medium mt-0.5">{t("login.stats_projects")}</div>
+              <div className="text-2xl font-semibold text-white">6</div>
+              <div className="text-xs text-subtle font-medium mt-0.5">{t("login.stats_projects")}</div>
             </div>
             <div>
-              <div className="text-2xl font-black text-[#2BB3A0]">4</div>
-              <div className="text-xs text-[#94A3B8] font-medium mt-0.5">{t("login.stats_roles")}</div>
+              <div className="text-2xl font-semibold text-teal">4</div>
+              <div className="text-xs text-subtle font-medium mt-0.5">{t("login.stats_roles")}</div>
             </div>
           </div>
         </div>
 
         {/* Footer info */}
-        <div className="text-xs text-[#94A3B8] z-10 flex items-center justify-between">
+        <div className="text-xs text-subtle z-10 flex items-center justify-between">
           <span>Demo Engineering College · Autonomous Institute</span>
           <span>v1.0 (2026)</span>
         </div>
       </div>
 
       {/* RIGHT PANEL: Pink Background with Centered White Card */}
-      <div className="flex-1 bg-[#FDE8E8] flex items-center justify-center p-6 md:p-12 relative">
+      <div className="flex-1 bg-danger-soft flex items-center justify-center p-6 md:p-12 relative">
         {/* Language switch button top right */}
         <div className="absolute top-6 right-6">
           <button
             onClick={() => { setLangTouched(true); setLanguage(language === "en" ? "ta" : "en", false); }}
             data-testid="login-lang"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-sm border border-[#E2E8F0] rounded-lg text-xs font-bold text-[#0F1F3A] hover:bg-[#F8FAFC] transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-card border border-line rounded-tile text-xs font-semibold text-ink hover:bg-surface-2 transition-all"
           >
-            <Languages className="w-3.5 h-3.5 text-[#2B5CD0]" />
+            <Languages className="w-3.5 h-3.5 text-brand" />
             <span>{language === "en" ? "தமிழ்" : "English"}</span>
           </button>
         </div>
 
         {/* Centered White Card (PDF 1) */}
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-[#E2E8F0] p-8 space-y-6">
+        <div className="w-full max-w-md bg-white rounded-card shadow-pop border border-line p-8 space-y-6">
           <div>
-            <h2 className="text-2xl font-black text-[#881337] tracking-tight">{t("login.welcome")}</h2>
-            <p className="text-xs text-[#64748B] mt-1 font-medium">{t("login.choose_role")}</p>
+            <h2 className="text-2xl font-semibold text-danger tracking-tight">{t("login.welcome")}</h2>
+            <p className="text-xs text-muted mt-1 font-medium">{t("login.choose_role")}</p>
           </div>
 
           {/* 2 by 2 Role Grid */}
@@ -198,18 +198,18 @@ export default function LoginPage() {
                   data-testid={`role-${r.id}`}
                   aria-pressed={isSelected}
                   onClick={() => handleRoleSelect(r.id)}
-                  className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                  className={`flex items-center gap-2.5 p-3 rounded-card border text-left transition-all ${
                     isSelected
-                      ? "border-[#2B5CD0] bg-[#EFF6FF] text-[#2B5CD0] font-bold shadow-sm ring-1 ring-[#2B5CD0]"
-                      : "border-[#E2E8F0] bg-white text-[#0F1F3A] hover:bg-[#F8FAFC]"
+                      ? "border-brand bg-brand-soft text-brand font-semibold shadow-card ring-1 ring-brand"
+                      : "border-line bg-white text-ink hover:bg-surface-2"
                   }`}
                 >
-                  <div className={`p-2 rounded-lg ${isSelected ? "bg-[#2B5CD0] text-white" : "bg-[#F1F5F9] text-[#64748B]"}`}>
+                  <div className={`p-2 rounded-tile ${isSelected ? "bg-brand text-white" : "bg-line-soft text-muted"}`}>
                     <Icon className="w-4 h-4" />
                   </div>
                   <div>
                     <div className="text-xs font-semibold leading-none">{r.title}</div>
-                    <div className="text-[10px] text-[#64748B] font-normal mt-0.5">
+                    <div className="text-caption text-muted font-normal mt-0.5">
                       {r.id === "student" ? t("login.sem_hint") : (r.id === "parent" ? t("login.otp_hint") : t("login.staff_hint"))}
                     </div>
                   </div>
@@ -223,18 +223,18 @@ export default function LoginPage() {
             data-testid="role-admin"
             aria-pressed={selectedRole === "admin"}
             onClick={() => handleRoleSelect("admin")}
-            className={`w-full text-[11px] font-semibold underline-offset-2 hover:underline ${selectedRole === "admin" ? "text-[#2B5CD0]" : "text-[#64748B]"}`}
+            className={`w-full text-caption font-semibold underline-offset-2 hover:underline ${selectedRole === "admin" ? "text-brand" : "text-muted"}`}
           >
             {t("login.staff_link")}
           </button>
 
           {reauth2fa && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-medium" role="status" data-testid="login-reauth-2fa">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-tile text-xs text-amber-800 font-medium" role="status" data-testid="login-reauth-2fa">
               {t("login.reauth_2fa")}
             </div>
           )}
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium" role="alert" data-testid="login-error">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-tile text-xs text-red-600 font-medium" role="alert" data-testid="login-error">
               {error}
             </div>
           )}
@@ -245,7 +245,7 @@ export default function LoginPage() {
               /* Parent Mobile + OTP view */
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#0F1F3A] mb-1">{t("login.phone_label")}</label>
+                  <label className="block text-xs font-semibold text-ink mb-1">{t("login.phone_label")}</label>
                   <input
                     type="tel"
                     value={phone}
@@ -254,17 +254,17 @@ export default function LoginPage() {
                     disabled={otpSent}
                     aria-invalid={!!fieldErrors.phone}
                     data-testid="login-phone"
-                    className={`w-full px-3.5 py-2.5 bg-[#F8FAFC] border ${fieldErrors.phone ? "border-red-400" : "border-[#E2E8F0]"} rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all disabled:opacity-70`}
+                    className={`w-full px-3.5 py-2.5 bg-surface-2 border ${fieldErrors.phone ? "border-red-400" : "border-line"} rounded-card text-xs text-ink focus:outline-none focus:border-brand focus:bg-white transition-all disabled:opacity-70`}
                   />
-                  {fieldErrors.phone && <p className="text-[11px] text-red-600 mt-1">{fieldErrors.phone}</p>}
-                  {otpSent && <button type="button" onClick={() => { setOtpSent(false); setOtp(""); setDemoOtp(null); }} className="text-[11px] text-[#2B5CD0] underline mt-1">{t("login.resend")}</button>}
+                  {fieldErrors.phone && <p className="text-caption text-red-600 mt-1">{fieldErrors.phone}</p>}
+                  {otpSent && <button type="button" onClick={() => { setOtpSent(false); setOtp(""); setDemoOtp(null); }} className="text-caption text-brand underline mt-1">{t("login.resend")}</button>}
                 </div>
 
                 {otpSent && (
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="block text-xs font-bold text-[#0F1F3A]">{t("login.otp_label")}</label>
-                      {demoOtp ? <span className="text-[10px] text-[#2BB3A0] font-bold" data-testid="demo-otp">{t("login.demo_otp").replace("{otp}", demoOtp)}</span> : <span className="text-[10px] text-[#64748B]" data-testid="otp-sent">{t(otpChannel === "email" ? "login.otp_sent_email" : "login.otp_sent")}</span>}
+                      <label className="block text-xs font-semibold text-ink">{t("login.otp_label")}</label>
+                      {demoOtp ? <span className="text-caption text-teal font-semibold" data-testid="demo-otp">{t("login.demo_otp").replace("{otp}", demoOtp)}</span> : <span className="text-caption text-muted" data-testid="otp-sent">{t(otpChannel === "email" ? "login.otp_sent_email" : "login.otp_sent")}</span>}
                     </div>
                     <input
                       type="text"
@@ -276,20 +276,20 @@ export default function LoginPage() {
                       autoComplete="one-time-code"
                       aria-invalid={!!fieldErrors.otp}
                       data-testid="login-otp"
-                      className={`w-full px-3.5 py-2.5 bg-[#F8FAFC] border ${fieldErrors.otp ? "border-red-400" : "border-[#E2E8F0]"} rounded-xl text-xs text-[#0F1F3A] tracking-widest font-mono text-center focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all`}
+                      className={`w-full px-3.5 py-2.5 bg-surface-2 border ${fieldErrors.otp ? "border-red-400" : "border-line"} rounded-card text-xs text-ink font-mono text-center focus:outline-none focus:border-brand focus:bg-white transition-all`}
                     />
-                    {fieldErrors.otp && <p className="text-[11px] text-red-600 mt-1">{fieldErrors.otp}</p>}
+                    {fieldErrors.otp && <p className="text-caption text-red-600 mt-1">{fieldErrors.otp}</p>}
                   </div>
                 )}
               </div>
             ) : sso ? (
               /* Keycloak single sign-on */
-              <p className="text-xs text-[#64748B] leading-relaxed" data-testid="login-sso-hint">{t("login.sso_hint")}</p>
+              <p className="text-xs text-muted leading-relaxed" data-testid="login-sso-hint">{t("login.sso_hint")}</p>
             ) : (
               /* Student / Trainer / College Username + Password view */
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#0F1F3A] mb-1">
+                  <label className="block text-xs font-semibold text-ink mb-1">
                     {selectedRole === "student" ? t("login.student_id_label") : t("login.staff_id_label")}
                   </label>
                   <input
@@ -299,15 +299,15 @@ export default function LoginPage() {
                     placeholder={t("login.id_placeholder")}
                     aria-invalid={!!fieldErrors.identifier}
                     data-testid="login-identifier"
-                    className={`w-full px-3.5 py-2.5 bg-[#F8FAFC] border ${fieldErrors.identifier ? "border-red-400" : "border-[#E2E8F0]"} rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all`}
+                    className={`w-full px-3.5 py-2.5 bg-surface-2 border ${fieldErrors.identifier ? "border-red-400" : "border-line"} rounded-card text-xs text-ink focus:outline-none focus:border-brand focus:bg-white transition-all`}
                   />
-                  {fieldErrors.identifier && <p className="text-[11px] text-red-600 mt-1">{fieldErrors.identifier}</p>}
+                  {fieldErrors.identifier && <p className="text-caption text-red-600 mt-1">{fieldErrors.identifier}</p>}
                 </div>
 
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-bold text-[#0F1F3A]">{t("login.password_label")}</label>
-                    <span className="text-[10px] text-[#64748B]">{t("login.demo_password")}</span>
+                    <label className="block text-xs font-semibold text-ink">{t("login.password_label")}</label>
+                    <span className="text-caption text-muted">{t("login.demo_password")}</span>
                   </div>
                   <input
                     type="password"
@@ -316,9 +316,9 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     aria-invalid={!!fieldErrors.password}
                     data-testid="login-password"
-                    className={`w-full px-3.5 py-2.5 bg-[#F8FAFC] border ${fieldErrors.password ? "border-red-400" : "border-[#E2E8F0]"} rounded-xl text-xs text-[#0F1F3A] focus:outline-none focus:border-[#2B5CD0] focus:bg-white transition-all`}
+                    className={`w-full px-3.5 py-2.5 bg-surface-2 border ${fieldErrors.password ? "border-red-400" : "border-line"} rounded-card text-xs text-ink focus:outline-none focus:border-brand focus:bg-white transition-all`}
                   />
-                  {fieldErrors.password && <p className="text-[11px] text-red-600 mt-1">{fieldErrors.password}</p>}
+                  {fieldErrors.password && <p className="text-caption text-red-600 mt-1">{fieldErrors.password}</p>}
                 </div>
               </div>
             )}
@@ -328,7 +328,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               data-testid="login-submit"
-              className="w-full py-3 px-4 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 px-4 bg-brand hover:bg-brand-hover text-white font-semibold text-xs rounded-card shadow-pop transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <span>
                 {selectedRole === "parent"
@@ -340,7 +340,7 @@ export default function LoginPage() {
           </form>
 
           {/* Footer remark */}
-          <div className="pt-2 text-center text-[11px] text-[#64748B]">
+          <div className="pt-2 text-center text-caption text-muted">
             {t("login.parent_help")}
           </div>
         </div>

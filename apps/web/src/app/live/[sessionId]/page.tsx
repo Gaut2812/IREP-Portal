@@ -30,12 +30,12 @@ interface LiveState {
 }
 
 const FLOW_STYLE: Record<string, string> = {
-  blue: "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]", green: "bg-[#DCFCE7] border-[#BBF7D0] text-[#15803D]",
-  amber: "bg-[#FEF3C7] border-[#FDE68A] text-[#B45309]", purple: "bg-[#EDE9FE] border-[#DDD6FE] text-[#6D28D9]",
+  blue: "bg-brand-soft border-brand-line text-info", green: "bg-success-soft border-success-line text-success",
+  amber: "bg-warning-soft border-warning-line text-warning", purple: "bg-violet-soft border-violet-soft text-violet",
 };
-const BAR: Record<string, string> = { red: "bg-red-500", teal: "bg-[#2BB3A0]", blue: "bg-blue-500", amber: "bg-amber-500", purple: "bg-purple-500" };
-const PCT_TEXT: Record<string, string> = { red: "text-red-400", teal: "text-[#2BB3A0]", blue: "text-blue-400", amber: "text-amber-400", purple: "text-purple-400" };
-const AVATAR = ["bg-[#2B5CD0]", "bg-[#2BB3A0]", "bg-[#7C5CE0]", "bg-[#F59E0B]", "bg-pink-600"];
+const BAR: Record<string, string> = { red: "bg-red-500", teal: "bg-teal", blue: "bg-blue-500", amber: "bg-amber-500", purple: "bg-purple-500" };
+const PCT_TEXT: Record<string, string> = { red: "text-red-400", teal: "text-teal", blue: "text-blue-400", amber: "text-amber-400", purple: "text-purple-400" };
+const AVATAR = ["bg-brand", "bg-teal", "bg-violet", "bg-warning-fill", "bg-pink-600"];
 
 function fill(template: string, vars: Record<string, string | number>) {
   return Object.entries(vars).reduce((acc, [k, v]) => acc.replace(`{${k}}`, String(v)), template);
@@ -200,14 +200,14 @@ export default function LiveClassroomPage() {
     </RoleGuard>
   );
 
-  if (loading) return shell(<div className="flex-1 flex items-center justify-center text-sm text-[#94A3B8]" aria-busy="true">{t("live_class.loading")}</div>);
+  if (loading) return shell(<div className="flex-1 flex items-center justify-center text-sm text-subtle" aria-busy="true">{t("live_class.loading")}</div>);
   if (error || !st) return shell(
     <div className="flex-1 flex items-center justify-center p-6">
-      <div className="bg-[#141A29] border border-[#2D3748] rounded-2xl p-8 text-center space-y-3 max-w-md">
+      <div className="bg-[#141A29] border border-[#2D3748] rounded-card p-8 text-center space-y-3 max-w-md">
         <AlertCircle className="w-8 h-8 text-red-400 mx-auto" />
-        <h2 className="text-base font-bold">{t("live_class.error_title")}</h2>
-        <p className="text-xs text-[#94A3B8]">{error}</p>
-        <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg"><RefreshCw className="w-3.5 h-3.5" /> {t("live_class.retry")}</button>
+        <h2 className="text-base font-semibold">{t("live_class.error_title")}</h2>
+        <p className="text-xs text-subtle">{error}</p>
+        <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand text-white text-xs font-semibold rounded-tile"><RefreshCw className="w-3.5 h-3.5" /> {t("live_class.retry")}</button>
       </div>
     </div>
   );
@@ -222,34 +222,34 @@ export default function LiveClassroomPage() {
   if (st.meeting.state === "ended" || (!joined && !(isTrainer && live))) {
     return shell(
       <div className="flex-1 flex items-center justify-center p-6">
-        <div className="bg-[#141A29] border border-[#2D3748] rounded-2xl p-8 text-center space-y-4 max-w-md w-full" data-testid="live-lobby">
-          <div className="flex items-center justify-center gap-2"><span className="w-7 h-7 rounded-md bg-[#2BB3A0] flex items-center justify-center font-bold text-xs">IR</span><span className="font-extrabold">{t("live_class.brand")}</span></div>
-          <h1 className="text-lg font-black">{st.title}</h1>
-          <p className="text-xs text-[#94A3B8]">{st.subtext}</p>
+        <div className="bg-[#141A29] border border-[#2D3748] rounded-card p-8 text-center space-y-4 max-w-md w-full" data-testid="live-lobby">
+          <div className="flex items-center justify-center gap-2"><span className="w-7 h-7 rounded-tile bg-teal flex items-center justify-center font-semibold text-xs">IR</span><span className="font-semibold">{t("live_class.brand")}</span></div>
+          <h1 className="text-lg font-semibold">{st.title}</h1>
+          <p className="text-xs text-subtle">{st.subtext}</p>
           {st.meeting.state === "ended" ? (
             <>
-              <div className="text-sm font-bold text-[#2BB3A0]">{t("live_class.ended_title")}</div>
-              <p className="text-xs text-[#CBD5E1]">{t("live_class.ended_desc")}</p>
-              <Link href={isTrainer ? "/trainer" : "/student/live"} className="inline-block px-4 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg">{t("live_class.back_to_sessions")}</Link>
+              <div className="text-sm font-semibold text-teal">{t("live_class.ended_title")}</div>
+              <p className="text-xs text-line-strong">{t("live_class.ended_desc")}</p>
+              <Link href={isTrainer ? "/trainer" : "/student/live"} className="inline-block px-4 py-2 bg-brand text-white text-xs font-semibold rounded-tile">{t("live_class.back_to_sessions")}</Link>
             </>
           ) : (
             <>
-              <div className="text-sm font-bold">{t("live_class.lobby_title")}</div>
-              <p className="text-xs text-[#CBD5E1]">{live ? "" : isTrainer ? "" : st.can_join ? "" : `${t("live_class.lobby_not_started")} ${fill(t("live_class.lobby_opens"), { t: startsAt })}`}</p>
+              <div className="text-sm font-semibold">{t("live_class.lobby_title")}</div>
+              <p className="text-xs text-line-strong">{live ? "" : isTrainer ? "" : st.can_join ? "" : `${t("live_class.lobby_not_started")} ${fill(t("live_class.lobby_opens"), { t: startsAt })}`}</p>
               {isTrainer ? (
-                <button onClick={join} disabled={busy} className="w-full py-3 bg-[#2BB3A0] hover:bg-[#249B8A] text-white font-bold text-sm rounded-xl disabled:opacity-50 flex items-center justify-center gap-2" data-testid="start-class">
+                <button onClick={join} disabled={busy} className="w-full py-3 bg-teal hover:bg-teal-hover text-white font-semibold text-sm rounded-card disabled:opacity-50 flex items-center justify-center gap-2" data-testid="start-class">
                   <Radio className="w-4 h-4" /> {t("live_class.start_class")}
                 </button>
               ) : (
-                <button onClick={join} disabled={busy || !st.can_join} className="w-full py-3 bg-[#2BB3A0] hover:bg-[#249B8A] text-white font-bold text-sm rounded-xl disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2" data-testid="join-now">
+                <button onClick={join} disabled={busy || !st.can_join} className="w-full py-3 bg-teal hover:bg-teal-hover text-white font-semibold text-sm rounded-card disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2" data-testid="join-now">
                   <Radio className="w-4 h-4" /> {t("live_class.join_now")}
                 </button>
               )}
-              <Link href={isTrainer ? "/trainer" : "/student/live"} className="block text-xs text-[#94A3B8] hover:text-white">{t("live_class.back_to_sessions")}</Link>
+              <Link href={isTrainer ? "/trainer" : "/student/live"} className="block text-xs text-subtle hover:text-white">{t("live_class.back_to_sessions")}</Link>
             </>
           )}
         </div>
-        {toast && <div role="status" className="fixed bottom-6 right-6 bg-[#0F172A] border border-[#334155] text-xs font-semibold px-4 py-3 rounded-xl" data-testid="toast">{toast}</div>}
+        {toast && <div role="status" className="fixed bottom-6 right-6 bg-[#0F172A] border border-ink-soft text-xs font-semibold px-4 py-3 rounded-card" data-testid="toast">{toast}</div>}
       </div>
     );
   }
@@ -259,20 +259,20 @@ export default function LiveClassroomPage() {
       {/* Top bar (PDF 13) */}
       <header className="h-12 bg-[#141A29] border-b border-[#2D3748] px-4 flex items-center justify-between flex-shrink-0 gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="w-6 h-6 rounded-md bg-[#2BB3A0] flex items-center justify-center font-bold text-xs flex-shrink-0">IR</span>
-          <span className="font-extrabold text-sm tracking-wide flex-shrink-0">{t("live_class.brand")}</span>
-          <span className="font-bold text-xs text-[#E2E8F0] truncate">{st.title}</span>
-          <span className="text-[11px] text-[#94A3B8] hidden md:inline truncate">{st.subtext}</span>
+          <span className="w-6 h-6 rounded-tile bg-teal flex items-center justify-center font-semibold text-xs flex-shrink-0">IR</span>
+          <span className="font-semibold text-sm flex-shrink-0">{t("live_class.brand")}</span>
+          <span className="font-semibold text-xs text-line truncate">{st.title}</span>
+          <span className="text-caption text-subtle hidden md:inline truncate">{st.subtext}</span>
         </div>
         <div className="flex items-center gap-3 text-xs flex-shrink-0">
           {st.meeting.is_recording && (
-            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-950/80 border border-red-800 text-red-400 font-bold text-[10px]">
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-950/80 border border-red-800 text-red-400 font-semibold text-caption">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> {t("live_class.rec")}
             </span>
           )}
-          <span className="font-mono text-[#CBD5E1]" data-testid="live-timer">{fmt(elapsed)} / {fmt(st.timer.duration_sec)}</span>
+          <span className="font-mono text-line-strong" data-testid="live-timer">{fmt(elapsed)} / {fmt(st.timer.duration_sec)}</span>
           {!isTrainer && st.attendance_on_track !== null && (
-            <span className={`${a?.marked_present || st.attendance_on_track ? "chip-green" : "chip-amber"} text-[10px] font-bold`} data-testid="attendance-pill">
+            <span className={`${a?.marked_present || st.attendance_on_track ? "chip-green" : "chip-amber"} text-caption font-semibold`} data-testid="attendance-pill">
               {a?.marked_present ? t("live_class.marked_present") : st.attendance_on_track ? t("live_class.attendance_on_track") : t("live_class.attendance_at_risk")}
             </span>
           )}
@@ -283,39 +283,39 @@ export default function LiveClassroomPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Stage */}
         <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden min-w-0">
-          <div className="flex-1 bg-[#141A29] rounded-2xl border border-[#2D3748] p-4 flex flex-col overflow-hidden">
+          <div className="flex-1 bg-[#141A29] rounded-card border border-[#2D3748] p-4 flex flex-col overflow-hidden">
             {joinUrl && joinProvider === "teams" ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center" data-testid="teams-join">
-                <p className="text-sm text-[#E2E8F0] font-semibold">{t("live_class.teams_opened")}</p>
-                <a href={joinUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 bg-[#5B5FC7] text-white text-xs font-bold rounded-xl" data-testid="teams-join-link">
+                <p className="text-sm text-line font-semibold">{t("live_class.teams_opened")}</p>
+                <a href={joinUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 bg-violet text-white text-xs font-semibold rounded-card" data-testid="teams-join-link">
                   {t("live_class.join_in_teams")}
                 </a>
-                <p className="text-[11px] text-[#94A3B8] max-w-sm">{t("live_class.teams_attendance_note")}</p>
-                {!isTrainer && <p className="text-[11px] text-[#94A3B8] max-w-sm" data-testid="teams-name-rule">{t("live_class.teams_name_rule")}</p>}
+                <p className="text-caption text-subtle max-w-sm">{t("live_class.teams_attendance_note")}</p>
+                {!isTrainer && <p className="text-caption text-subtle max-w-sm" data-testid="teams-name-rule">{t("live_class.teams_name_rule")}</p>}
               </div>
             ) : joinUrl ? (
-              <iframe src={joinUrl} title={st.title} className="flex-1 w-full rounded-xl bg-black" allow="camera; microphone; display-capture; fullscreen" />
+              <iframe src={joinUrl} title={st.title} className="flex-1 w-full rounded-card bg-black" allow="camera; microphone; display-capture; fullscreen" />
             ) : (
               <>
                 <div className="flex items-center justify-between pb-3 border-b border-[#2D3748] gap-2">
                   <div className="flex items-center gap-2 text-xs min-w-0">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#2BB3A0] flex-shrink-0" />
-                    <span className="font-bold text-[#E2E8F0] truncate" data-testid="stage-sharing">
-                      {st.stage.sharing_user ? <>{fill(t("live_class.sharing"), { n: st.stage.sharing_user })} · <code className="font-mono text-[#2BB3A0]">{st.stage.file}</code></> : t("live_class.waiting_share")}
+                    <span className="w-2.5 h-2.5 rounded-full bg-teal flex-shrink-0" />
+                    <span className="font-semibold text-line truncate" data-testid="stage-sharing">
+                      {st.stage.sharing_user ? <>{fill(t("live_class.sharing"), { n: st.stage.sharing_user })} · <code className="font-mono text-teal">{st.stage.file}</code></> : t("live_class.waiting_share")}
                     </span>
                   </div>
-                  {st.stage.source && <span className="text-[10px] text-[#94A3B8] bg-[#1E293B] px-2 py-0.5 rounded flex-shrink-0">{st.stage.source}</span>}
+                  {st.stage.source && <span className="text-caption text-subtle bg-[#1E293B] px-2 py-0.5 rounded flex-shrink-0">{st.stage.source}</span>}
                 </div>
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 py-3 overflow-hidden">
-                  <pre className="md:col-span-8 bg-[#0F172A] rounded-xl p-3.5 font-mono text-xs overflow-auto border border-[#1E293B] text-[#E2E8F0] leading-relaxed whitespace-pre-wrap" data-testid="stage-code">{st.stage.code}</pre>
+                  <pre className="md:col-span-8 bg-[#0F172A] rounded-card p-3.5 font-mono text-xs overflow-auto border border-[#1E293B] text-line leading-relaxed whitespace-pre-wrap" data-testid="stage-code">{st.stage.code}</pre>
                   {st.stage.flow_steps.length > 0 && (
-                    <div className="md:col-span-4 bg-white rounded-xl p-4 text-[#0F1F3A] flex flex-col shadow-lg" data-testid="stage-flow">
-                      <div className="text-xs font-bold border-b border-[#E2E8F0] pb-2 text-center">{st.stage.flow_title}</div>
+                    <div className="md:col-span-4 bg-white rounded-card p-4 text-ink flex flex-col shadow-pop" data-testid="stage-flow">
+                      <div className="text-xs font-semibold border-b border-line pb-2 text-center">{st.stage.flow_title}</div>
                       <div className="space-y-2 py-2">
                         {st.stage.flow_steps.map((f, i) => (
                           <React.Fragment key={f.step}>
-                            <div className={`p-2 rounded-lg border text-center text-xs font-bold ${FLOW_STYLE[f.color] || FLOW_STYLE.blue}`}>{f.step}. {f.title}</div>
-                            {i < st.stage.flow_steps.length - 1 && <div className="flex justify-center text-[#94A3B8]"><ArrowDown className="w-3.5 h-3.5" /></div>}
+                            <div className={`p-2 rounded-tile border text-center text-xs font-semibold ${FLOW_STYLE[f.color] || FLOW_STYLE.blue}`}>{f.step}. {f.title}</div>
+                            {i < st.stage.flow_steps.length - 1 && <div className="flex justify-center text-subtle"><ArrowDown className="w-3.5 h-3.5" /></div>}
                           </React.Fragment>
                         ))}
                       </div>
@@ -327,36 +327,36 @@ export default function LiveClassroomPage() {
             {/* Participant tiles */}
             <div className="flex items-center gap-2 pt-2 border-t border-[#2D3748] overflow-x-auto" data-testid="participants">
               {st.participants.map((p, i) => (
-                <div key={p.user_id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1E293B] border border-[#334155] text-xs flex-shrink-0">
-                  <span className={`w-5 h-5 rounded-full ${AVATAR[i % AVATAR.length]} text-white font-bold text-[10px] flex items-center justify-center`}>{p.initials}</span>
-                  <span className="text-[11px] text-[#E2E8F0] whitespace-nowrap">{p.name}{p.role === "trainer" ? ` (${t("live_class.trainer")})` : p.is_you ? ` (${t("live_class.you")})` : ""}</span>
+                <div key={p.user_id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-tile bg-[#1E293B] border border-ink-soft text-xs flex-shrink-0">
+                  <span className={`w-5 h-5 rounded-full ${AVATAR[i % AVATAR.length]} text-white font-semibold text-caption flex items-center justify-center`}>{p.initials}</span>
+                  <span className="text-caption text-line whitespace-nowrap">{p.name}{p.role === "trainer" ? ` (${t("live_class.trainer")})` : p.is_you ? ` (${t("live_class.you")})` : ""}</span>
                 </div>
               ))}
-              {st.more_participants > 0 && <span className="text-[11px] text-[#94A3B8] px-2 flex-shrink-0">{fill(t("live_class.more"), { n: st.more_participants })}</span>}
+              {st.more_participants > 0 && <span className="text-caption text-subtle px-2 flex-shrink-0">{fill(t("live_class.more"), { n: st.more_participants })}</span>}
             </div>
           </div>
 
           {/* Control bar */}
-          <div className="h-12 bg-[#141A29] rounded-xl border border-[#2D3748] px-4 flex items-center justify-between flex-shrink-0">
+          <div className="h-12 bg-[#141A29] rounded-card border border-[#2D3748] px-4 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
-              <button onClick={() => setMic(!mic)} aria-label={mic ? t("live_class.mute") : t("live_class.unmute")} aria-pressed={mic} className={`p-2 rounded-lg ${mic ? "bg-[#2BB3A0]" : "bg-[#1E293B] text-[#94A3B8] hover:text-white"}`}>{mic ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}</button>
-              <button onClick={() => setCam(!cam)} aria-label={t("live_class.camera")} aria-pressed={cam} className={`p-2 rounded-lg ${cam ? "bg-[#2BB3A0]" : "bg-[#1E293B] text-[#94A3B8] hover:text-white"}`}>{cam ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}</button>
-              <button onClick={() => setHand(!hand)} aria-label={t("live_class.raise_hand")} aria-pressed={hand} className={`p-2 rounded-lg ${hand ? "bg-[#F59E0B]" : "bg-[#1E293B] text-[#94A3B8] hover:text-white"}`}><Hand className="w-4 h-4" /></button>
-              <a href="#qa" aria-label={t("live_class.chat")} className="p-2 rounded-lg bg-[#1E293B] text-[#94A3B8] hover:text-white"><MessageSquare className="w-4 h-4" /></a>
+              <button onClick={() => setMic(!mic)} aria-label={mic ? t("live_class.mute") : t("live_class.unmute")} aria-pressed={mic} className={`p-2 rounded-tile ${mic ? "bg-teal" : "bg-[#1E293B] text-subtle hover:text-white"}`}>{mic ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}</button>
+              <button onClick={() => setCam(!cam)} aria-label={t("live_class.camera")} aria-pressed={cam} className={`p-2 rounded-tile ${cam ? "bg-teal" : "bg-[#1E293B] text-subtle hover:text-white"}`}>{cam ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}</button>
+              <button onClick={() => setHand(!hand)} aria-label={t("live_class.raise_hand")} aria-pressed={hand} className={`p-2 rounded-tile ${hand ? "bg-warning-fill" : "bg-[#1E293B] text-subtle hover:text-white"}`}><Hand className="w-4 h-4" /></button>
+              <a href="#qa" aria-label={t("live_class.chat")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white"><MessageSquare className="w-4 h-4" /></a>
               {isTrainer ? (
-                <button onClick={() => setPollOpen(true)} aria-label={t("live_class.new_poll")} className="p-2 rounded-lg bg-[#1E293B] text-[#94A3B8] hover:text-white" data-testid="new-poll"><BarChart2 className="w-4 h-4" /></button>
+                <button onClick={() => setPollOpen(true)} aria-label={t("live_class.new_poll")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white" data-testid="new-poll"><BarChart2 className="w-4 h-4" /></button>
               ) : (
-                <a href="#poll" aria-label={t("live_class.poll")} className="p-2 rounded-lg bg-[#1E293B] text-[#94A3B8] hover:text-white"><BarChart2 className="w-4 h-4" /></a>
+                <a href="#poll" aria-label={t("live_class.poll")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white"><BarChart2 className="w-4 h-4" /></a>
               )}
-              <Link href="/student/labs" aria-label={t("live_class.lab")} className="p-2 rounded-lg bg-[#1E293B] text-[#2BB3A0] hover:text-white"><Cpu className="w-4 h-4" /></Link>
+              <Link href="/student/labs" aria-label={t("live_class.lab")} className="p-2 rounded-tile bg-[#1E293B] text-teal hover:text-white"><Cpu className="w-4 h-4" /></Link>
             </div>
             <div className="flex items-center gap-2">
               {isTrainer && (
-                <button onClick={endClass} disabled={busy} className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500 text-red-400 hover:bg-red-950 text-xs font-bold rounded-lg disabled:opacity-50" data-testid="end-class">
+                <button onClick={endClass} disabled={busy} className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500 text-red-400 hover:bg-red-950 text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="end-class">
                   <Square className="w-3.5 h-3.5" /> {t("live_class.end_class")}
                 </button>
               )}
-              <button onClick={leave} className="flex items-center gap-1.5 px-4 py-1.5 bg-[#D93636] hover:bg-[#B91C1C] text-white text-xs font-bold rounded-lg" data-testid="leave">
+              <button onClick={leave} className="flex items-center gap-1.5 px-4 py-1.5 bg-danger hover:bg-danger text-white text-xs font-semibold rounded-tile" data-testid="leave">
                 <LogOut className="w-3.5 h-3.5" /> {t("live_class.leave")}
               </button>
             </div>
@@ -365,22 +365,22 @@ export default function LiveClassroomPage() {
 
         {/* Right column */}
         <aside className="w-80 bg-[#141A29] border-l border-[#2D3748] p-4 flex-col gap-4 overflow-y-auto hidden lg:flex">
-          <section id="poll" className="bg-[#1E293B] border border-[#334155] rounded-xl p-3.5 space-y-2.5" data-testid="live-poll">
+          <section id="poll" className="bg-[#1E293B] border border-ink-soft rounded-card p-3.5 space-y-2.5" data-testid="live-poll">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-[#E2E8F0]">{t("live_class.live_poll")}</span>
-              {st.poll && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2B5CD0] text-white font-bold">{fill(t("live_class.votes"), { n: st.poll.total_votes })}</span>}
+              <span className="font-semibold text-line">{t("live_class.live_poll")}</span>
+              {st.poll && <span className="text-caption px-2 py-0.5 rounded-full bg-brand text-white font-semibold">{fill(t("live_class.votes"), { n: st.poll.total_votes })}</span>}
             </div>
-            {!st.poll ? <p className="text-[11px] text-[#94A3B8]">{t("live_class.no_poll")}</p> : (
+            {!st.poll ? <p className="text-caption text-subtle">{t("live_class.no_poll")}</p> : (
               <>
-                <p className="text-[11px] text-[#CBD5E1] leading-tight font-medium">{st.poll.question}</p>
+                <p className="text-caption text-line-strong leading-tight font-medium">{st.poll.question}</p>
                 <div className="space-y-2 pt-1">
                   {st.poll.options.map((o) => {
                     const canVote = st.poll!.is_open && !st.poll!.my_vote;
                     return (
-                      <button key={o.key} type="button" disabled={!canVote} onClick={() => vote(o.key)} className={`w-full text-left space-y-1 rounded-md ${canVote ? "hover:bg-[#0F172A] cursor-pointer p-1 -m-1" : "cursor-default"}`} data-testid={`poll-option-${o.key}`}>
-                        <div className={`flex justify-between text-[11px] ${st.poll!.my_vote === o.key ? "text-white font-bold" : "text-[#94A3B8]"}`}>
+                      <button key={o.key} type="button" disabled={!canVote} onClick={() => vote(o.key)} className={`w-full text-left space-y-1 rounded-tile ${canVote ? "hover:bg-[#0F172A] cursor-pointer p-1 -m-1" : "cursor-default"}`} data-testid={`poll-option-${o.key}`}>
+                        <div className={`flex justify-between text-caption ${st.poll!.my_vote === o.key ? "text-white font-semibold" : "text-subtle"}`}>
                           <span>{o.text}{st.poll!.my_vote === o.key ? ` · ${t("live_class.you_voted")}` : ""}</span>
-                          <span className={`font-bold ${PCT_TEXT[o.color] || "text-blue-400"}`}>{o.pct}%</span>
+                          <span className={`font-semibold ${PCT_TEXT[o.color] || "text-blue-400"}`}>{o.pct}%</span>
                         </div>
                         <div className="w-full bg-[#0F172A] h-1.5 rounded-full overflow-hidden"><div className={`${BAR[o.color] || "bg-blue-500"} h-full`} style={{ width: `${o.pct}%` }} /></div>
                       </button>
@@ -391,51 +391,51 @@ export default function LiveClassroomPage() {
             )}
           </section>
 
-          <section id="qa" className="bg-[#1E293B] border border-[#334155] rounded-xl p-3.5 space-y-2.5 flex-1" data-testid="live-qa">
+          <section id="qa" className="bg-[#1E293B] border border-ink-soft rounded-card p-3.5 space-y-2.5 flex-1" data-testid="live-qa">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-[#E2E8F0]">{t("live_class.qa")}</span>
-              <span className="text-[10px] text-[#94A3B8]">{t("live_class.qa_label")}</span>
+              <span className="font-semibold text-line">{t("live_class.qa")}</span>
+              <span className="text-caption text-subtle">{t("live_class.qa_label")}</span>
             </div>
-            {st.qa.length === 0 && <p className="text-[11px] text-[#94A3B8]">{t("live_class.no_questions")}</p>}
+            {st.qa.length === 0 && <p className="text-caption text-subtle">{t("live_class.no_questions")}</p>}
             {st.qa.map((q) => (
-              <div key={q.id} className="p-2.5 rounded-lg bg-[#0F172A] border border-[#334155] space-y-1.5 text-xs">
+              <div key={q.id} className="p-2.5 rounded-tile bg-[#0F172A] border border-ink-soft space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-[#2BB3A0]">{q.author}</span>
-                  <button onClick={() => upvote(q.id)} aria-pressed={q.my_upvote} aria-label={`${t("live_class.upvote")} ${q.text}`} className={`flex items-center gap-1 text-[10px] font-bold ${q.my_upvote ? "text-white" : "text-[#38BDF8]"} hover:text-white`}>
+                  <span className="text-caption font-semibold text-teal">{q.author}</span>
+                  <button onClick={() => upvote(q.id)} aria-pressed={q.my_upvote} aria-label={`${t("live_class.upvote")} ${q.text}`} className={`flex items-center gap-1 text-caption font-semibold ${q.my_upvote ? "text-white" : "text-[#38BDF8]"} hover:text-white`}>
                     <ThumbsUp className="w-3 h-3" /><span>{q.upvotes}</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-[#E2E8F0]">{q.text}</p>
+                <p className="text-caption text-line">{q.text}</p>
                 {q.answered_at ? (
-                  <div className="text-[10px] text-[#2BB3A0] font-semibold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {fill(t("live_class.answered_live"), { t: q.answered_at })}</div>
+                  <div className="text-caption text-teal font-semibold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {fill(t("live_class.answered_live"), { t: q.answered_at })}</div>
                 ) : isTrainer && (
-                  <button onClick={() => answered(q.id)} className="text-[10px] text-[#94A3B8] hover:text-white underline">{t("live_class.mark_answered")}</button>
+                  <button onClick={() => answered(q.id)} className="text-caption text-subtle hover:text-white underline">{t("live_class.mark_answered")}</button>
                 )}
               </div>
             ))}
             <form onSubmit={ask} className="flex gap-1.5 pt-1">
-              <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t("live_class.ask")} aria-label={t("live_class.ask")} className="flex-1 px-2.5 py-1.5 bg-[#0F172A] border border-[#334155] rounded-lg text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#2B5CD0]" data-testid="qa-input" />
-              <button type="submit" aria-label={t("live_class.send")} className="px-2.5 bg-[#2B5CD0] rounded-lg"><Send className="w-3.5 h-3.5" /></button>
+              <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t("live_class.ask")} aria-label={t("live_class.ask")} className="flex-1 px-2.5 py-1.5 bg-[#0F172A] border border-ink-soft rounded-tile text-xs text-white placeholder-muted focus:outline-none focus:border-brand" data-testid="qa-input" />
+              <button type="submit" aria-label={t("live_class.send")} className="px-2.5 bg-brand rounded-tile"><Send className="w-3.5 h-3.5" /></button>
             </form>
           </section>
 
           {!isTrainer && (
-            <section className="bg-[#0F172A] border border-[#334155] rounded-xl p-3.5 space-y-2 text-xs" data-testid="auto-attendance">
-              <div className="flex items-center justify-between font-bold text-[#E2E8F0]">
-                <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#2BB3A0]" /> {t("live_class.auto_attendance")}</span>
-                {a && <span className="text-[#2BB3A0]">{a.minutes_present} / {a.total_minutes} min</span>}
+            <section className="bg-[#0F172A] border border-ink-soft rounded-card p-3.5 space-y-2 text-xs" data-testid="auto-attendance">
+              <div className="flex items-center justify-between font-semibold text-line">
+                <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-teal" /> {t("live_class.auto_attendance")}</span>
+                {a && <span className="text-teal">{a.minutes_present} / {a.total_minutes} min</span>}
               </div>
               {a ? (
                 <>
                   <div className="w-full bg-[#1E293B] h-2 rounded-full overflow-hidden" role="progressbar" aria-valuenow={a.minutes_present} aria-valuemin={0} aria-valuemax={a.total_minutes}>
-                    <div className="bg-[#2BB3A0] h-full rounded-full" style={{ width: `${Math.min(100, (a.minutes_present / a.total_minutes) * 100)}%` }} />
+                    <div className="bg-teal h-full rounded-full" style={{ width: `${Math.min(100, (a.minutes_present / a.total_minutes) * 100)}%` }} />
                   </div>
-                  <p className="text-[11px] text-[#94A3B8] leading-tight">
+                  <p className="text-caption text-subtle leading-tight">
                     {a.joined_at ? fill(t("live_class.attendance_detail"), { j: new Date(a.joined_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), m: a.minutes_present, t: a.total_minutes }) : t("live_class.not_joined")}{" "}
                     {fill(t("live_class.attendance_rule"), { th: a.threshold_minutes, p: a.threshold_pct })}
                   </p>
                 </>
-              ) : <p className="text-[11px] text-[#94A3B8]">{t("live_class.not_joined")}</p>}
+              ) : <p className="text-caption text-subtle">{t("live_class.not_joined")}</p>}
             </section>
           )}
         </aside>
@@ -443,23 +443,23 @@ export default function LiveClassroomPage() {
 
       {pollOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-label={t("live_class.new_poll")}>
-          <div className="bg-[#141A29] border border-[#334155] rounded-2xl max-w-md w-full p-5 space-y-3">
-            <h3 className="text-sm font-bold flex items-center gap-2"><Plus className="w-4 h-4" /> {t("live_class.new_poll")}</h3>
+          <div className="bg-[#141A29] border border-ink-soft rounded-card max-w-md w-full p-5 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2"><Plus className="w-4 h-4" /> {t("live_class.new_poll")}</h3>
             <label className="block text-xs font-semibold">{t("live_class.poll_question")}
-              <input value={pollQ} onChange={(e) => setPollQ(e.target.value)} className="mt-1 w-full px-3 py-2 bg-[#0F172A] border border-[#334155] rounded-lg text-xs focus:outline-none focus:border-[#2B5CD0]" data-testid="poll-question" />
+              <input value={pollQ} onChange={(e) => setPollQ(e.target.value)} className="mt-1 w-full px-3 py-2 bg-[#0F172A] border border-ink-soft rounded-tile text-xs focus:outline-none focus:border-brand" data-testid="poll-question" />
             </label>
             <label className="block text-xs font-semibold">{t("live_class.poll_options")}
-              <textarea rows={3} value={pollOpts} onChange={(e) => setPollOpts(e.target.value)} className="mt-1 w-full px-3 py-2 bg-[#0F172A] border border-[#334155] rounded-lg text-xs focus:outline-none focus:border-[#2B5CD0]" data-testid="poll-options" />
+              <textarea rows={3} value={pollOpts} onChange={(e) => setPollOpts(e.target.value)} className="mt-1 w-full px-3 py-2 bg-[#0F172A] border border-ink-soft rounded-tile text-xs focus:outline-none focus:border-brand" data-testid="poll-options" />
             </label>
             <div className="flex gap-2">
-              <button onClick={() => setPollOpen(false)} className="flex-1 py-2 bg-[#1E293B] text-xs font-bold rounded-lg">✕</button>
-              <button onClick={launchPoll} className="flex-1 py-2 bg-[#2BB3A0] text-xs font-bold rounded-lg" data-testid="launch-poll">{t("live_class.launch_poll")}</button>
+              <button onClick={() => setPollOpen(false)} className="flex-1 py-2 bg-[#1E293B] text-xs font-semibold rounded-tile">✕</button>
+              <button onClick={launchPoll} className="flex-1 py-2 bg-teal text-xs font-semibold rounded-tile" data-testid="launch-poll">{t("live_class.launch_poll")}</button>
             </div>
           </div>
         </div>
       )}
 
-      {toast && <div role="status" className="fixed bottom-20 right-6 z-50 bg-[#0F172A] border border-[#334155] text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl" data-testid="toast">{toast}</div>}
+      {toast && <div role="status" className="fixed bottom-20 right-6 z-50 bg-[#0F172A] border border-ink-soft text-xs font-semibold px-4 py-3 rounded-card shadow-pop" data-testid="toast">{toast}</div>}
     </>
   );
 }

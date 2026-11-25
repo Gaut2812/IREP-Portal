@@ -32,23 +32,23 @@ export function SpectateBar({ sessionId, spectate, isTrainer, onChange }: {
   if (!isTrainer && !spectate) return null;
   return (
     <div className="px-4 py-2 bg-[#141A29] border-b border-[#2D3748] flex flex-wrap items-center gap-2 text-xs" data-testid="spectate-bar">
-      <Eye className="w-4 h-4 text-[#2BB3A0]" />
+      <Eye className="w-4 h-4 text-teal" />
       {spectate ? (
         <>
-          <a href={spectate.url} target="_blank" rel="noopener noreferrer" className="font-bold text-[#2BB3A0] underline" data-testid="spectate-link">
+          <a href={spectate.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-teal underline" data-testid="spectate-link">
             {spectate.label || t("live_class.spectate_default_label")}
           </a>
-          <span className="text-[#94A3B8]">{t("live_class.spectate_readonly")}</span>
-          {isTrainer && <button type="button" onClick={remove} className="ml-auto text-[#F87171] font-bold" data-testid="spectate-remove">{t("live_class.spectate_remove")}</button>}
+          <span className="text-subtle">{t("live_class.spectate_readonly")}</span>
+          {isTrainer && <button type="button" onClick={remove} className="ml-auto text-danger-fill font-semibold" data-testid="spectate-remove">{t("live_class.spectate_remove")}</button>}
         </>
       ) : (
         <>
           <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t("live_class.spectate_ph")} aria-label={t("live_class.spectate_ph")}
-            className="flex-1 min-w-[200px] bg-[#0F172A] border border-[#334155] rounded-lg px-2 py-1 text-[#E2E8F0]" data-testid="spectate-url" />
-          <button type="button" onClick={post} disabled={url.trim().length < 10} className="px-3 py-1 bg-[#2BB3A0] text-white font-bold rounded-lg disabled:opacity-40" data-testid="spectate-post">
+            className="flex-1 min-w-[200px] bg-[#0F172A] border border-ink-soft rounded-tile px-2 py-1 text-line" data-testid="spectate-url" />
+          <button type="button" onClick={post} disabled={url.trim().length < 10} className="px-3 py-1 bg-teal text-white font-semibold rounded-tile disabled:opacity-40" data-testid="spectate-post">
             {t("live_class.spectate_post")}
           </button>
-          {error && <span className="text-[#F87171] w-full" role="alert" data-testid="spectate-error">{error}</span>}
+          {error && <span className="text-danger-fill w-full" role="alert" data-testid="spectate-error">{error}</span>}
         </>
       )}
     </div>

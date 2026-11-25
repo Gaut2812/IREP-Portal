@@ -26,15 +26,15 @@ export function errText(e: unknown, fallback: string): string {
 export function PurposeRow({ purpose, view, children }: { purpose: string; view: PurposeView; children?: React.ReactNode }) {
   const { t } = useLanguage();
   const state = view.effective ? "on" : view.status === "requested" ? "requested" : "off";
-  const style = state === "on" ? "bg-[#DCFCE7] text-[#166534]" : state === "requested" ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#F1F5F9] text-[#475569]";
+  const style = state === "on" ? "bg-success-soft text-success" : state === "requested" ? "bg-warning-soft text-warning" : "bg-line-soft text-ink-soft";
   return (
     <li className="py-3 space-y-1.5" data-testid={`purpose-${purpose}`}>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-bold text-[#0F1F3A]">{t(`privacy.purpose.${purpose}`)}</p>
-        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${style}`} data-testid="purpose-state">{t(`privacy.state.${state}`)}</span>
+        <p className="text-xs font-semibold text-ink">{t(`privacy.purpose.${purpose}`)}</p>
+        <span className={`shrink-0 px-2 py-0.5 rounded-full text-caption font-semibold ${style}`} data-testid="purpose-state">{t(`privacy.state.${state}`)}</span>
       </div>
-      {view.notice && <p className="text-[11px] text-[#475569] leading-relaxed">{view.notice}</p>}
-      {view.notice_version && <p className="text-[10px] text-[#94A3B8]">{t("privacy.notice_version")} {view.notice_version}</p>}
+      {view.notice && <p className="text-caption text-ink-soft leading-relaxed">{view.notice}</p>}
+      {view.notice_version && <p className="text-caption text-subtle">{t("privacy.notice_version")} {view.notice_version}</p>}
       {children && <div className="flex flex-wrap gap-2 pt-1">{children}</div>}
     </li>
   );
@@ -43,7 +43,7 @@ export function PurposeRow({ purpose, view, children }: { purpose: string; view:
 export function Btn({ onClick, kind = "primary", children, testId }: { onClick: () => void; kind?: "primary" | "ghost"; children: React.ReactNode; testId?: string }) {
   return (
     <button type="button" onClick={onClick} data-testid={testId}
-      className={kind === "primary" ? "px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg" : "px-3 py-1.5 border border-[#CBD5E1] text-[#334155] text-xs font-bold rounded-lg"}>
+      className={kind === "primary" ? "px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile" : "px-3 py-1.5 border border-line-strong text-ink-soft text-xs font-semibold rounded-tile"}>
       {children}
     </button>
   );
@@ -83,31 +83,31 @@ export function DataRequests({ kids, blocked }: { kids?: { id: string; name: str
   };
 
   return (
-    <section className="bg-white rounded-2xl border border-[#E2E8F0] p-4 space-y-3" data-testid="data-requests">
-      <h2 className="text-sm font-black text-[#0F1F3A]">{t("privacy.req_title")}</h2>
-      <p className="text-[11px] text-[#64748B]">{t("privacy.req_intro")}</p>
-      {blocked ? <p className="text-xs text-[#92400E] bg-[#FEF3C7] rounded-lg p-2" data-testid="ask-parent">{t("privacy.req_minor")}</p> : (
+    <section className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="data-requests">
+      <h2 className="text-sm font-semibold text-ink">{t("privacy.req_title")}</h2>
+      <p className="text-caption text-muted">{t("privacy.req_intro")}</p>
+      {blocked ? <p className="text-xs text-warning bg-warning-soft rounded-tile p-2" data-testid="ask-parent">{t("privacy.req_minor")}</p> : (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
             {kids && kids.length > 1 && (
-              <select aria-label={t("privacy.req_child")} value={child} onChange={(e) => setChild(e.target.value)} className="px-2 py-1.5 border border-[#CBD5E1] rounded-lg text-xs">
+              <select aria-label={t("privacy.req_child")} value={child} onChange={(e) => setChild(e.target.value)} className="px-2 py-1.5 border border-line-strong rounded-tile text-xs">
                 {kids.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
               </select>
             )}
-            <select aria-label={t("privacy.req_kind")} value={kind} onChange={(e) => setKind(e.target.value as "export" | "deletion")} className="px-2 py-1.5 border border-[#CBD5E1] rounded-lg text-xs" data-testid="req-kind">
+            <select aria-label={t("privacy.req_kind")} value={kind} onChange={(e) => setKind(e.target.value as "export" | "deletion")} className="px-2 py-1.5 border border-line-strong rounded-tile text-xs" data-testid="req-kind">
               <option value="export">{t("privacy.kind.export")}</option>
               <option value="deletion">{t("privacy.kind.deletion")}</option>
             </select>
           </div>
           <textarea rows={2} aria-label={t("privacy.req_reason")} placeholder={t("privacy.req_reason")} value={reason} onChange={(e) => setReason(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs" data-testid="req-reason" />
+            className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs" data-testid="req-reason" />
           <Btn onClick={submit} testId="req-submit">{t("privacy.req_submit")}</Btn>
         </div>
       )}
-      {msg && <p className="text-xs text-[#166534] font-bold" data-testid="req-ok">{msg}</p>}
+      {msg && <p className="text-xs text-success font-semibold" data-testid="req-ok">{msg}</p>}
       {err && <p className="text-xs text-red-600" role="alert" data-testid="req-error">{err}</p>}
       {items.length > 0 && (
-        <ul className="divide-y divide-[#F1F5F9]">
+        <ul className="divide-y divide-line-soft">
           {items.map((r) => (
             <li key={r.id} className="py-2 flex items-center justify-between gap-2 text-xs" data-testid="req-row">
               <span>{t(`privacy.kind.${r.kind}`)} · {t(`privacy.req_status.${r.status}`)} · {t("privacy.req_due")} {r.due_on}</span>

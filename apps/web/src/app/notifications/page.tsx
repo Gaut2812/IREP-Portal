@@ -89,9 +89,9 @@ export default function NotificationCentrePage() {
   };
 
   const hourSelect = (value: number | null, onChange: (v: number | null) => void, testid: string, label: string) => (
-    <label className="text-[11px] font-bold text-[#0F1F3A]">{label}
+    <label className="text-caption font-semibold text-ink">{label}
       <select value={value === null ? "" : String(value)} data-testid={testid} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-        className="mt-1 w-full px-2 py-1.5 border border-[#E2E8F0] rounded-lg text-xs font-normal bg-white">
+        className="mt-1 w-full px-2 py-1.5 border border-line rounded-tile text-xs font-normal bg-white">
         <option value="">{t("notifications.off")}</option>
         {HOURS.map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
       </select>
@@ -111,65 +111,65 @@ export default function NotificationCentrePage() {
           <section className="lg:col-span-2 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <select value={kind} onChange={(e) => setKind(e.target.value)} data-testid="filter-kind" aria-label={t("notifications.filter_kind")}
-                className="px-2.5 py-1.5 border border-[#E2E8F0] rounded-lg text-xs bg-white">
+                className="px-2.5 py-1.5 border border-line rounded-tile text-xs bg-white">
                 <option value="">{t("notifications.all_kinds")}</option>
                 {kinds.map((k) => <option key={k} value={k}>{k}</option>)}
               </select>
               <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={unreadOnly} data-testid="filter-unread" onChange={(e) => setUnreadOnly(e.target.checked)} />{t("notifications.unread_only")}</label>
-              <span className="text-xs text-[#64748B]" data-testid="unread-count">{unread} {t("notifications.unread")}</span>
-              <button type="button" onClick={markAll} data-testid="page-mark-all" className="ml-auto flex items-center gap-1 text-xs font-semibold text-[#2B5CD0]"><CheckCheck className="w-3.5 h-3.5" />{t("notifications.mark_all_read")}</button>
+              <span className="text-xs text-muted" data-testid="unread-count">{unread} {t("notifications.unread")}</span>
+              <button type="button" onClick={markAll} data-testid="page-mark-all" className="ml-auto flex items-center gap-1 text-xs font-semibold text-brand"><CheckCheck className="w-3.5 h-3.5" />{t("notifications.mark_all_read")}</button>
             </div>
             {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
-            <ul className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9]" data-testid="notification-list">
-              {items.length === 0 && <li className="p-6 text-center text-xs text-[#64748B] flex flex-col items-center gap-1.5"><Inbox className="w-5 h-5 text-[#94A3B8]" />{t("notifications.empty")}</li>}
+            <ul className="bg-white rounded-card border border-line divide-y divide-line-soft" data-testid="notification-list">
+              {items.length === 0 && <li className="p-6 text-center text-xs text-muted flex flex-col items-center gap-1.5"><Inbox className="w-5 h-5 text-subtle" />{t("notifications.empty")}</li>}
               {items.map((it) => {
                 const content = (
-                  <div className={`px-4 py-3 ${it.read ? "" : "bg-[#EFF6FF]"}`}>
+                  <div className={`px-4 py-3 ${it.read ? "" : "bg-brand-soft"}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div className="text-xs font-semibold text-[#0F1F3A]">{it.title}</div>
-                      <span className="text-[10px] text-[#64748B] whitespace-nowrap">{it.created_at?.slice(0, 16).replace("T", " ")}</span>
+                      <div className="text-xs font-semibold text-ink">{it.title}</div>
+                      <span className="text-caption text-muted whitespace-nowrap">{it.created_at?.slice(0, 16).replace("T", " ")}</span>
                     </div>
-                    {it.body && <div className="text-[11px] text-[#64748B] mt-0.5">{it.body}</div>}
-                    <span className="text-[10px] text-[#94A3B8]">{it.kind}</span>
+                    {it.body && <div className="text-caption text-muted mt-0.5">{it.body}</div>}
+                    <span className="text-caption text-subtle">{it.kind}</span>
                   </div>
                 );
                 return (
                   <li key={it.id} data-testid="notification-item" data-read={it.read ? "true" : "false"}>
-                    {it.link ? <Link href={it.link} onClick={() => markOne(it)} className="block hover:bg-[#F8FAFC]">{content}</Link>
-                      : <button type="button" onClick={() => markOne(it)} className="block w-full text-left hover:bg-[#F8FAFC]">{content}</button>}
+                    {it.link ? <Link href={it.link} onClick={() => markOne(it)} className="block hover:bg-surface-2">{content}</Link>
+                      : <button type="button" onClick={() => markOne(it)} className="block w-full text-left hover:bg-surface-2">{content}</button>}
                   </li>
                 );
               })}
             </ul>
-            {next && <button type="button" onClick={more} data-testid="load-more" className="w-full py-2 border border-[#CBD5E1] rounded-lg text-xs font-bold">{t("notifications.load_more")}</button>}
+            {next && <button type="button" onClick={more} data-testid="load-more" className="w-full py-2 border border-line-strong rounded-tile text-xs font-semibold">{t("notifications.load_more")}</button>}
           </section>
 
-          <form onSubmit={savePrefs} className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3 h-fit" data-testid="prefs-form">
-            <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><BellRing className="w-4 h-4 text-[#2B5CD0]" />{t("notifications.preferences")}</h2>
+          <form onSubmit={savePrefs} className="bg-white rounded-card border border-line p-4 space-y-3 h-fit" data-testid="prefs-form">
+            <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><BellRing className="w-4 h-4 text-brand" />{t("notifications.preferences")}</h2>
             {prefs && (
               <>
-                <label className="flex items-center justify-between text-xs py-1 text-[#64748B]"><span>{t("notifications.channel_in_app")}</span><input type="checkbox" checked disabled /></label>
+                <label className="flex items-center justify-between text-xs py-1 text-muted"><span>{t("notifications.channel_in_app")}</span><input type="checkbox" checked disabled /></label>
                 {toggle("email_enabled", t("notifications.channel_email"))}
                 {toggle("sms_enabled", t("notifications.channel_sms"))}
                 {toggle("push_enabled", t("notifications.channel_push"))}
-                <div className="pt-2 border-t border-[#F1F5F9]">
-                  <p className="text-[11px] font-bold flex items-center gap-1.5"><Moon className="w-3.5 h-3.5" />{t("notifications.quiet_hours")}</p>
+                <div className="pt-2 border-t border-line-soft">
+                  <p className="text-caption font-semibold flex items-center gap-1.5"><Moon className="w-3.5 h-3.5" />{t("notifications.quiet_hours")}</p>
                   <div className="grid grid-cols-2 gap-2 mt-1">
                     {hourSelect(prefs.quiet_start_hour, (v) => setPrefs({ ...prefs, quiet_start_hour: v }), "pref-quiet-start", t("notifications.from"))}
                     {hourSelect(prefs.quiet_end_hour, (v) => setPrefs({ ...prefs, quiet_end_hour: v }), "pref-quiet-end", t("notifications.to"))}
                   </div>
-                  <p className="text-[10px] text-[#64748B] mt-1">{t("notifications.quiet_help")}</p>
+                  <p className="text-caption text-muted mt-1">{t("notifications.quiet_help")}</p>
                 </div>
-                <label className="text-[11px] font-bold block">{t("notifications.language")}
+                <label className="text-caption font-semibold block">{t("notifications.language")}
                   <select value={prefs.language} data-testid="pref-language" onChange={(e) => setPrefs({ ...prefs, language: e.target.value as "en" | "ta" })}
-                    className="mt-1 w-full px-2 py-1.5 border border-[#E2E8F0] rounded-lg text-xs font-normal bg-white">
+                    className="mt-1 w-full px-2 py-1.5 border border-line rounded-tile text-xs font-normal bg-white">
                     <option value="en">English</option>
                     <option value="ta">தமிழ்</option>
                   </select>
                 </label>
                 <div className="flex items-center gap-2">
-                  <button type="submit" data-testid="prefs-save" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg">{t("notifications.save")}</button>
-                  {saved && <span className="text-xs text-[#166534] font-bold" data-testid="prefs-saved">{t("notifications.saved")}</span>}
+                  <button type="submit" data-testid="prefs-save" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile">{t("notifications.save")}</button>
+                  {saved && <span className="text-xs text-success font-semibold" data-testid="prefs-saved">{t("notifications.saved")}</span>}
                 </div>
               </>
             )}

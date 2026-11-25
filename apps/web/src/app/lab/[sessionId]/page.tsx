@@ -153,32 +153,32 @@ export default function LabWorkspacePage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={s ? `${t("labs.workspace_title")} · ${s.lab_name}` : t("labs.workspace_title")}>
-        <div className="max-w-5xl mx-auto space-y-4" data-testid="lab-workspace">
-          <Link href="/student/labs" className="inline-flex items-center gap-1 text-xs font-semibold text-[#2B5CD0] hover:underline"><ArrowLeft className="w-3.5 h-3.5" /> {t("labs.workspace_back")}</Link>
-          {error && <div className="bg-white rounded-xl border border-[#FECACA] p-4 text-xs text-[#D93636] flex items-center gap-2" role="alert"><AlertCircle className="w-4 h-4" />{error}</div>}
-          {!s && !error && <div className="h-80 bg-white rounded-xl border border-[#E2E8F0] animate-pulse" aria-busy="true" />}
+        <div className="max-w-5xl mx-auto space-y-6" data-testid="lab-workspace">
+          <Link href="/student/labs" className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"><ArrowLeft className="w-3.5 h-3.5" /> {t("labs.workspace_back")}</Link>
+          {error && <div className="bg-white rounded-card border border-danger-line p-4 text-xs text-danger flex items-center gap-2" role="alert"><AlertCircle className="w-4 h-4" />{error}</div>}
+          {!s && !error && <div className="h-80 bg-white rounded-card border border-line animate-pulse" aria-busy="true" />}
           {s && (
             <>
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="bg-white rounded-card border border-line p-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="text-xs space-y-1">
-                  <div><span className="text-[#64748B]">{t("labs.workspace_status")}:</span> <span className={live ? "chip-green" : "chip-red"} data-testid="workspace-status">{s.status}</span></div>
-                  {s.workspace_file && <div><span className="text-[#64748B]">{t("labs.workspace_file")}:</span> <code className="font-mono text-[#2B5CD0]">{s.workspace_file}</code></div>}
-                  {s.status === "running" && <div className="text-[#64748B]">{fill(t("labs.workspace_expires"), { t: new Date(s.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })} · {fill(t("labs.minutes_left"), { n: s.minutes_left, i: s.idle_limit_min })}</div>}
+                  <div><span className="text-muted">{t("labs.workspace_status")}:</span> <span className={live ? "chip-green" : "chip-red"} data-testid="workspace-status">{s.status}</span></div>
+                  {s.workspace_file && <div><span className="text-muted">{t("labs.workspace_file")}:</span> <code className="font-mono text-brand">{s.workspace_file}</code></div>}
+                  {s.status === "running" && <div className="text-muted">{fill(t("labs.workspace_expires"), { t: new Date(s.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })} · {fill(t("labs.minutes_left"), { n: s.minutes_left, i: s.idle_limit_min })}</div>}
                 </div>
                 <div className="flex gap-2">
                   {s.can_connect && (
-                    <button onClick={open} disabled={opening} className="flex items-center gap-1 px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50" data-testid="workspace-open">
+                    <button onClick={open} disabled={opening} className="flex items-center gap-1 px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="workspace-open">
                       <ExternalLink className="w-3.5 h-3.5" /> {s.runtime === "external" ? t("labs.open_sandbox") : t("labs.open_workspace")}
                     </button>
                   )}
                   {live && (
-                    <button onClick={stop} className="flex items-center gap-1 px-3 py-1.5 bg-[#D93636] hover:bg-[#B91C1C] text-white text-xs font-bold rounded-lg" data-testid="workspace-stop"><StopCircle className="w-3.5 h-3.5" /> {t("labs.stop")}</button>
+                    <button onClick={stop} className="flex items-center gap-1 px-3 py-1.5 bg-danger hover:bg-danger text-white text-xs font-semibold rounded-tile" data-testid="workspace-stop"><StopCircle className="w-3.5 h-3.5" /> {t("labs.stop")}</button>
                   )}
                 </div>
               </div>
 
               {s.status === "starting" && (
-                <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 text-center text-xs text-[#475569] flex items-center justify-center gap-2" data-testid="workspace-starting">
+                <div className="bg-white rounded-card border border-line p-6 text-center text-xs text-ink-soft flex items-center justify-center gap-2" data-testid="workspace-starting">
                   <Loader2 className="w-4 h-4 animate-spin" />{t("labs.starting")}
                 </div>
               )}
@@ -199,27 +199,27 @@ export default function LabWorkspacePage() {
               )}
 
               {s.status === "running" && s.runtime !== "browser" && s.provider === "fake" && (
-                <div className="bg-[#1B2236] rounded-xl border border-[#2D3748] overflow-hidden">
-                  <div className="px-4 py-2 border-b border-[#2D3748] text-xs text-[#CBD5E1] flex items-center gap-2"><Terminal className="w-3.5 h-3.5 text-[#2BB3A0]" /> {t("labs.workspace_terminal")}</div>
-                  <div className="p-4 font-mono text-xs text-[#E2E8F0] h-72 overflow-y-auto space-y-0.5" data-testid="terminal">
-                    {lines.map((l, i) => <div key={i} className={l.startsWith("irep@") ? "text-[#2BB3A0]" : ""}>{l}</div>)}
+                <div className="bg-[#1B2236] rounded-card border border-[#2D3748] overflow-hidden">
+                  <div className="px-4 py-2 border-b border-[#2D3748] text-xs text-line-strong flex items-center gap-2"><Terminal className="w-3.5 h-3.5 text-teal" /> {t("labs.workspace_terminal")}</div>
+                  <div className="p-4 font-mono text-xs text-line h-72 overflow-y-auto space-y-0.5" data-testid="terminal">
+                    {lines.map((l, i) => <div key={i} className={l.startsWith("irep@") ? "text-teal" : ""}>{l}</div>)}
                     <div ref={endRef} />
                   </div>
                   <form onSubmit={run} className="border-t border-[#2D3748] flex">
-                    <span className="px-3 py-2 font-mono text-xs text-[#2BB3A0]">$</span>
+                    <span className="px-3 py-2 font-mono text-xs text-teal">$</span>
                     <input value={cmd} onChange={(e) => setCmd(e.target.value)} aria-label={t("labs.workspace_terminal")} className="flex-1 bg-transparent font-mono text-xs text-white py-2 focus:outline-none" data-testid="terminal-input" />
                   </form>
                 </div>
               )}
               {s.status === "running" && s.runtime !== "browser" && s.provider !== "fake" && (
-                <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 text-center text-xs text-[#475569]" data-testid="workspace-remote">
+                <div className="bg-white rounded-card border border-line p-6 text-center text-xs text-ink-soft" data-testid="workspace-remote">
                   {s.runtime === "external" ? t("labs.external_hint") : t("labs.server_hint")}
                 </div>
               )}
 
-              {!live && <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 text-center text-xs text-[#64748B]">{t("labs.workspace_ended")}</div>}
-              {s.provider === "fake" && s.runtime === "server" && <p className="text-[11px] text-[#64748B] flex items-start gap-1.5"><Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />{t("labs.workspace_hint")}</p>}
-              {s.runtime === "browser" && <p className="text-[11px] text-[#64748B] flex items-start gap-1.5"><Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />{t("labs.browser_hint")}</p>}
+              {!live && <div className="bg-white rounded-card border border-line p-6 text-center text-xs text-muted">{t("labs.workspace_ended")}</div>}
+              {s.provider === "fake" && s.runtime === "server" && <p className="text-caption text-muted flex items-start gap-1.5"><Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />{t("labs.workspace_hint")}</p>}
+              {s.runtime === "browser" && <p className="text-caption text-muted flex items-start gap-1.5"><Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />{t("labs.browser_hint")}</p>}
             </>
           )}
         </div>

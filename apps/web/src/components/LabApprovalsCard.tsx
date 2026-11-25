@@ -39,30 +39,30 @@ export const LabApprovalsCard: React.FC = () => {
 
   if (!loaded) return null;
   return (
-    <div id="lab-approvals" className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm space-y-3 scroll-mt-4" data-testid="lab-approvals">
+    <div id="lab-approvals" className="bg-white rounded-card border border-line p-4 shadow-card space-y-3 scroll-mt-4" data-testid="lab-approvals">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-[#0F1F3A] flex items-center gap-2"><FlaskConical className="w-4 h-4 text-[#7C5CE0]" />{t("lab_approvals.title")}</h3>
-        {items.length > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#D93636] text-white text-[10px] font-bold flex items-center justify-center">{items.length}</span>}
+        <h3 className="text-sm font-semibold text-ink flex items-center gap-2"><FlaskConical className="w-4 h-4 text-violet" />{t("lab_approvals.title")}</h3>
+        {items.length > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-danger text-white text-caption font-semibold flex items-center justify-center">{items.length}</span>}
       </div>
-      {message && <p role="status" className={`text-xs ${message.ok ? "text-[#15803D]" : "text-[#B91C1C]"}`}>{message.text}</p>}
-      {items.length === 0 ? <p className="text-xs text-[#64748B]">{t("lab_approvals.empty")}</p> : (
+      {message && <p role="status" className={`text-xs ${message.ok ? "text-success" : "text-danger"}`}>{message.text}</p>}
+      {items.length === 0 ? <p className="text-xs text-muted">{t("lab_approvals.empty")}</p> : (
         <div className="space-y-2">
           {items.map((a) => (
-            <div key={a.id} className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs space-y-2" data-testid={`approval-${a.id}`}>
+            <div key={a.id} className="p-3 bg-surface-2 border border-line rounded-tile text-xs space-y-2" data-testid={`approval-${a.id}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <span className="font-bold text-[#0F1F3A]">{a.student_name}</span> <span className="text-[#64748B]">· {a.batch}</span>
-                  <div className="text-[#334155]">{t("lab_approvals.wants")} <strong>{a.lab_name}</strong>{a.aup_accepted && <span className="ml-1.5 chip-green text-[10px]">{t("lab_approvals.aup")}</span>}</div>
+                  <span className="font-semibold text-ink">{a.student_name}</span> <span className="text-muted">· {a.batch}</span>
+                  <div className="text-ink-soft">{t("lab_approvals.wants")} <strong>{a.lab_name}</strong>{a.aup_accepted && <span className="ml-1.5 chip-green text-caption">{t("lab_approvals.aup")}</span>}</div>
                 </div>
                 <div className="flex gap-1.5">
-                  <button onClick={() => decide(a, "approve")} disabled={busy === a.id} data-testid="approve" className="px-3 py-1.5 bg-[#15803D] hover:bg-[#166534] text-white font-bold rounded-lg flex items-center gap-1 disabled:opacity-50"><Check className="w-3.5 h-3.5" />{t("lab_approvals.approve")}</button>
-                  <button onClick={() => { setDenying(denying === a.id ? null : a.id); setReason(""); }} className="px-3 py-1.5 bg-white border border-[#E2E8F0] text-[#B91C1C] font-bold rounded-lg flex items-center gap-1"><X className="w-3.5 h-3.5" />{t("lab_approvals.deny")}</button>
+                  <button onClick={() => decide(a, "approve")} disabled={busy === a.id} data-testid="approve" className="px-3 py-1.5 bg-success hover:bg-success text-white font-semibold rounded-tile flex items-center gap-1 disabled:opacity-50"><Check className="w-3.5 h-3.5" />{t("lab_approvals.approve")}</button>
+                  <button onClick={() => { setDenying(denying === a.id ? null : a.id); setReason(""); }} className="px-3 py-1.5 bg-white border border-line text-danger font-semibold rounded-tile flex items-center gap-1"><X className="w-3.5 h-3.5" />{t("lab_approvals.deny")}</button>
                 </div>
               </div>
               {denying === a.id && (
                 <div className="flex gap-1.5">
-                  <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("lab_approvals.reason")} aria-label={t("lab_approvals.reason")} className="flex-1 min-w-0 px-2 py-1.5 border border-[#E2E8F0] rounded-lg bg-white focus:outline-none focus:border-[#2B5CD0]" />
-                  <button onClick={() => decide(a, "deny")} disabled={busy === a.id} className="px-3 py-1.5 bg-[#B91C1C] text-white font-bold rounded-lg disabled:opacity-50">{t("lab_approvals.confirm_deny")}</button>
+                  <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("lab_approvals.reason")} aria-label={t("lab_approvals.reason")} className="flex-1 min-w-0 px-2 py-1.5 border border-line rounded-tile bg-white focus:outline-none focus:border-brand" />
+                  <button onClick={() => decide(a, "deny")} disabled={busy === a.id} className="px-3 py-1.5 bg-danger text-white font-semibold rounded-tile disabled:opacity-50">{t("lab_approvals.confirm_deny")}</button>
                 </div>
               )}
             </div>

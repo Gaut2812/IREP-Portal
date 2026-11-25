@@ -103,13 +103,13 @@ export const NotificationBell: React.FC = () => {
         onClick={openPanel}
         aria-label={t("notifications.title")}
         data-testid="notification-bell"
-        className="relative cursor-pointer p-1.5 hover:bg-[#F1F5F9] rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD0]"
+        className="relative cursor-pointer p-1.5 hover:bg-line-soft rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
-        <Bell className="w-4 h-4 text-[#64748B]" />
+        <Bell className="w-4 h-4 text-muted" />
         {unread > 0 && (
           <span
             data-testid="notification-unread"
-            className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#D93636] text-white text-[9px] font-bold flex items-center justify-center"
+            className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-caption font-semibold flex items-center justify-center"
           >
             {unread > 99 ? "99+" : unread}
           </span>
@@ -117,36 +117,36 @@ export const NotificationBell: React.FC = () => {
       </button>
 
       {open && (
-        <div data-testid="notification-panel" className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:top-auto sm:right-0 sm:mt-1.5 sm:w-80 bg-white rounded-xl shadow-xl border border-[#E2E8F0] z-50 text-xs overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-[#E2E8F0]">
-            <span className="font-bold text-[#0F1F3A]">{t("notifications.title")}</span>
-            <button type="button" onClick={markAll} className="flex items-center gap-1 text-[11px] font-semibold text-[#2B5CD0] hover:underline">
+        <div data-testid="notification-panel" className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:top-auto sm:right-0 sm:mt-1.5 sm:w-80 bg-white rounded-card shadow-pop border border-line z-50 text-xs overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-line">
+            <span className="font-semibold text-ink">{t("notifications.title")}</span>
+            <button type="button" onClick={markAll} className="flex items-center gap-1 text-caption font-semibold text-brand hover:underline">
               <CheckCheck className="w-3.5 h-3.5" /> {t("notifications.mark_all_read")}
             </button>
           </div>
           <div className="max-h-80 overflow-y-auto">
             {loading && (
               <div className="p-3 space-y-2 animate-pulse">
-                {[1, 2, 3].map((i) => <div key={i} className="h-9 bg-[#F1F5F9] rounded-lg" />)}
+                {[1, 2, 3].map((i) => <div key={i} className="h-9 bg-line-soft rounded-tile" />)}
               </div>
             )}
             {!loading && error && (
-              <div className="p-3 text-[#D93636]">{error}</div>
+              <div className="p-3 text-danger">{error}</div>
             )}
             {!loading && !error && items.length === 0 && (
-              <div className="p-5 text-center text-[#64748B] flex flex-col items-center gap-1.5">
-                <Inbox className="w-5 h-5 text-[#94A3B8]" />
+              <div className="p-5 text-center text-muted flex flex-col items-center gap-1.5">
+                <Inbox className="w-5 h-5 text-subtle" />
                 <span>{t("notifications.empty")}</span>
               </div>
             )}
             {!loading && !error && items.map((item) => {
               const content = (
-                <div className={`px-3 py-2.5 border-b border-[#F1F5F9] ${item.read ? "bg-white" : "bg-[#EFF6FF]"} hover:bg-[#F8FAFC]`}>
+                <div className={`px-3 py-2.5 border-b border-line-soft ${item.read ? "bg-white" : "bg-brand-soft"} hover:bg-surface-2`}>
                   <div className="flex items-start justify-between gap-2">
-                    <div className="font-semibold text-[#0F1F3A] leading-snug">{item.title}</div>
-                    {!item.read && <span className="w-2 h-2 rounded-full bg-[#2B5CD0] mt-1 flex-shrink-0" />}
+                    <div className="font-semibold text-ink leading-snug">{item.title}</div>
+                    {!item.read && <span className="w-2 h-2 rounded-full bg-brand mt-1 flex-shrink-0" />}
                   </div>
-                  {item.body && <div className="text-[11px] text-[#64748B] mt-0.5 leading-snug">{item.body}</div>}
+                  {item.body && <div className="text-caption text-muted mt-0.5 leading-snug">{item.body}</div>}
                 </div>
               );
               return item.link ? (
@@ -161,7 +161,7 @@ export const NotificationBell: React.FC = () => {
             })}
           </div>
           <Link href="/notifications" onClick={() => setOpen(false)} data-testid="notifications-see-all"
-            className="block text-center px-3 py-2 border-t border-[#E2E8F0] text-[11px] font-semibold text-[#2B5CD0] hover:bg-[#F8FAFC]">
+            className="block text-center px-3 py-2 border-t border-line text-caption font-semibold text-brand hover:bg-surface-2">
             {t("notifications.see_all")}
           </Link>
         </div>

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
+import { Badge, Button, Card, CardHeader, EmptyState, ProgressBar, StatTile, buttonClass, type Tone } from "@/components/ui";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import {
@@ -36,7 +37,10 @@ interface WhyScore {
   history: { date: string; score: number }[];
 }
 
-const COLOR_HEX: Record<string, string> = { teal: "#2BB3A0", blue: "#2B5CD0", purple: "#7C5CE0", orange: "#F59E0B", green: "#15803D" };
+const BAND_TONE: Record<string, Tone> = { "Placement Ready": "success", "Nearly Ready": "warning", "Needs Support": "danger" };
+
+/** Skill bars: brand blue, green when strong, amber when it needs work (same rule as readiness components). */
+const skillTone = (pct: number): Tone => (pct < 60 ? "warning" : pct >= 80 ? "success" : "brand");
 
 function fill(template: string, vars: Record<string, string | number>) {
   return Object.entries(vars).reduce((acc, [k, v]) => acc.replace(`{${k}}`, String(v)), template);
@@ -64,16 +68,19 @@ export default function StudentDashboardPage() {
   const [why, setWhy] = useState<WhyScore | null>(null);
   const [whyLoading, setWhyLoading] = useState(false);
 
+  // only the latest request may set state: a slower reply for the old language must not overwrite the new one
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const req = ++latest.current;
     setLoading(true);
     setError(null);
     try {
       const res = await fetchApi<DashboardData>(`/student/dashboard?lang=${language}`);
-      setData(res);
+      if (req === latest.current) setData(res);
     } catch (err: any) {
-      setError(err?.detail || err?.message || "error");
+      if (req === latest.current) setError(err?.detail || err?.message || "error");
     } finally {
-      setLoading(false);
+      if (req === latest.current) setLoading(false);
     }
   }, [language]);
 
@@ -98,225 +105,206 @@ export default function StudentDashboardPage() {
     return t("dashboard.band_needs_support");
   };
 
-  const card = "bg-white p-4 rounded-card border border-line shadow-card";
+  const tile = "bg-surface p-5 rounded-card border border-line shadow-card min-w-0";
 
   return (
     <RoleGuard allowedRoles={["student", "trainer"]}>
       <AppShell pageTitle={t("dashboard.title")}>
-        <div className="space-y-6 max-w-7xl mx-auto" data-testid="student-dashboard">
+        <div className="space-y-6 max-w-7xl" data-testid="student-dashboard">
           {loading && (
             <div className="space-y-6 animate-pulse" aria-busy="true" aria-label={t("dashboard.loading")}>
-              <div className="h-8 w-64 bg-white rounded-tile" />
+              <div className="h-8 w-64 bg-surface rounded-tile" />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map((i) => <div key={i} className="h-28 bg-white rounded-card border border-line" />)}
+                {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 bg-surface rounded-card border border-line" />)}
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="h-64 bg-white rounded-card border border-line" />
-                <div className="h-64 bg-white rounded-card border border-line" />
+                <div className="h-64 bg-surface rounded-card border border-line" />
+                <div className="h-64 bg-surface rounded-card border border-line" />
               </div>
             </div>
           )}
 
           {!loading && error && (
-            <div className="bg-white rounded-card border border-danger-line p-8 text-center space-y-3 max-w-md mx-auto">
+            <Card className="text-center space-y-3 max-w-md mx-auto border-danger-line">
               <AlertCircle className="w-8 h-8 text-danger mx-auto" />
-              <h2 className="text-base font-semibold text-ink">{t("dashboard.error_title")}</h2>
-              <p className="text-xs text-muted">{error}</p>
-              <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand text-white text-xs font-semibold rounded-tile">
-                <RefreshCw className="w-3.5 h-3.5" /> {t("dashboard.retry")}
-              </button>
-            </div>
+              <h2 className="text-heading font-semibold text-ink">{t("dashboard.error_title")}</h2>
+              <p className="text-body text-muted">{error}</p>
+              <Button onClick={load}><RefreshCw className="w-4 h-4" /> {t("dashboard.retry")}</Button>
+            </Card>
           )}
 
           {!loading && !error && data && (
             <>
               {/* Greeting */}
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold text-ink">{data.student.greeting}</h2>
-                  <p className="text-xs text-muted mt-0.5">
+                <div className="min-w-0">
+                  <h2 className="text-heading font-semibold text-ink">{data.student.greeting}</h2>
+                  <p className="text-label text-muted mt-0.5">
                     {t("dashboard.semester")} {data.student.semester} · {data.student.track}{data.student.week_label ? ` · ${data.student.week_label}` : ""}
                   </p>
                 </div>
-                <Link href="/student/coding/prob_connected_components" className="flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-tile shadow-card">
+                <Link href="/student/coding/prob_connected_components" className={buttonClass("primary", "md")}>
                   <span>{t("dashboard.resume_practice")}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
 
               {/* Row 1: four KPI cards (PDF 2) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <button type="button" onClick={openWhy} data-testid="readiness-card" className={`${card} text-left space-y-2 hover:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand cursor-pointer`}>
-                  <div className="flex items-center justify-between text-xs text-muted font-medium">
+                <button type="button" onClick={openWhy} data-testid="readiness-card"
+                  className={`${tile} text-left hover:border-brand transition-colors cursor-pointer`}>
+                  <div className="flex items-center justify-between gap-2 text-label font-medium text-muted">
                     <span>{t("dashboard.readiness_score")}</span>
-                    {data.student.has_snapshot && <span className={bandChipClass(data.student.readiness_band)}>{bandLabel(data.student.readiness_band)}</span>}
+                    {data.student.has_snapshot && <Badge tone={BAND_TONE[data.student.readiness_band] ?? "neutral"}>{bandLabel(data.student.readiness_band)}</Badge>}
                   </div>
                   {data.student.has_snapshot ? (
                     <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-semibold text-ink">{data.student.readiness_score}<span className="text-base text-muted">/100</span></span>
-                        <span className={`text-xs font-semibold ${data.student.readiness_delta >= 0 ? "text-success" : "text-danger"}`}>
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-kpi font-semibold text-ink tabular">{data.student.readiness_score}<span className="text-heading text-muted font-normal">/100</span></span>
+                        <span className={`text-label font-medium ${data.student.readiness_delta >= 0 ? "text-success" : "text-danger"}`}>
                           {data.student.readiness_delta >= 0 ? "+" : ""}{data.student.readiness_delta} {t("dashboard.this_month")}
                         </span>
                       </div>
-                      <div className="text-caption text-brand flex items-center gap-1 font-semibold">
-                        <Info className="w-3 h-3" /> {t("dashboard.why_score")}
+                      <div className="mt-1.5 text-label text-brand flex items-center gap-1 font-medium">
+                        <Info className="w-4 h-4" /> {t("dashboard.why_score")}
                       </div>
                     </>
                   ) : (
-                    <div className="text-xs text-muted">{t("dashboard.empty_desc")}</div>
+                    <div className="mt-2 text-label text-muted">{t("dashboard.empty_desc")}</div>
                   )}
                 </button>
 
-                <div className={`${card} space-y-2`}>
-                  <div className="text-xs text-muted font-medium">{t("dashboard.problems_solved")}</div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-semibold text-ink">{data.student.problems_solved}</span>
-                    {data.student.problems_delta > 0 && <span className="text-xs font-semibold text-success">▲ {data.student.problems_delta} {t("dashboard.this_month")}</span>}
-                  </div>
-                  <div className="text-caption text-muted flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-brand" /> {data.student.batch}</div>
-                </div>
+                <StatTile label={t("dashboard.problems_solved")}
+                  value={<span className="flex items-baseline gap-2">
+                    {data.student.problems_solved}
+                    {data.student.problems_delta > 0 && <span className="text-label font-medium text-success">▲ {data.student.problems_delta} {t("dashboard.this_month")}</span>}
+                  </span>}
+                  hint={<span className="flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-brand" /> {data.student.batch}</span>} />
 
-                <div className={`${card} space-y-2`}>
-                  <div className="flex items-center justify-between text-xs text-muted font-medium">
+                <div className={tile}>
+                  <div className="flex items-center justify-between gap-2 text-label font-medium text-muted">
                     <span>{t("dashboard.attendance")}</span>
-                    <span className={data.student.attendance_pct >= data.student.attendance_target ? "chip-green" : "chip-amber"}>
+                    <Badge tone={data.student.attendance_pct >= data.student.attendance_target ? "success" : "warning"}>
                       {data.student.attendance_pct >= data.student.attendance_target ? t("dashboard.on_track") : t("dashboard.below_target")}
-                    </span>
+                    </Badge>
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-semibold text-ink">{data.student.attendance_pct}%</span>
-                    <span className="text-xs text-muted">{t("dashboard.target")} {data.student.attendance_target}%</span>
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <span className="text-kpi font-semibold text-ink tabular">{data.student.attendance_pct}%</span>
+                    <span className="text-label text-muted">{t("dashboard.target")} {data.student.attendance_target}%</span>
                   </div>
-                  <div className="text-caption text-muted flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-teal" />
+                  <div className="mt-1.5 text-label text-muted flex items-center gap-1">
+                    <Calendar className="w-4 h-4 text-teal" />
                     {fill(t("dashboard.sessions_attended"), { a: data.student.sessions_attended, b: data.student.sessions_total })}
                   </div>
                 </div>
 
-                <div className={`${card} space-y-2`}>
-                  <div className="text-xs text-muted font-medium">{t("dashboard.practice_streak")}</div>
-                  <div className="text-3xl font-semibold text-ink">🔥 {data.student.streak_days} {t("dashboard.days")}</div>
-                  <div className="text-caption text-muted flex items-center gap-1"><Flame className="w-3 h-3 text-warning-fill" /> {t("dashboard.best")}: {data.student.streak_best} {t("dashboard.days")}</div>
-                </div>
+                <StatTile label={t("dashboard.practice_streak")}
+                  value={`🔥 ${data.student.streak_days} ${t("dashboard.days")}`}
+                  hint={<span className="flex items-center gap-1"><Flame className="w-4 h-4 text-warning-fill" /> {t("dashboard.best")}: {data.student.streak_best} {t("dashboard.days")}</span>} />
               </div>
 
               {/* Row 2: skills + this week */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-4">
-                  <div className="flex items-center justify-between border-b border-line pb-3">
-                    <h3 className="font-semibold text-sm text-ink">{t("dashboard.skill_progress")}</h3>
-                    <span className="text-caption font-semibold text-muted">{t("dashboard.semester")} {data.student.semester}</span>
-                  </div>
-                  <div className="space-y-3.5" data-testid="skill-progress">
+                <Card>
+                  <CardHeader title={t("dashboard.skill_progress")} subtitle={`${t("dashboard.semester")} ${data.student.semester}`} />
+                  <div className="space-y-4" data-testid="skill-progress">
                     {data.skill_progress.map((item) => (
-                      <div key={item.key} className="space-y-1">
-                        <div className="flex justify-between text-xs font-semibold">
+                      <div key={item.key}>
+                        <div className="flex justify-between gap-3 text-body mb-1.5">
                           <span className="text-ink">{item.skill}</span>
-                          <span className="text-muted">{item.percentage}%</span>
+                          <span className="text-ink font-medium tabular">{item.percentage}%</span>
                         </div>
-                        <div className="w-full bg-line-soft rounded-full h-2 overflow-hidden" role="progressbar" aria-valuenow={item.percentage} aria-valuemin={0} aria-valuemax={100} aria-label={item.skill}>
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.percentage}%`, backgroundColor: COLOR_HEX[item.color] || COLOR_HEX.teal }} />
-                        </div>
+                        <ProgressBar value={item.percentage} tone={skillTone(item.percentage)} label={item.skill} />
                       </div>
                     ))}
                   </div>
-                </div>
+                </Card>
 
-                <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-4">
-                  <div className="flex items-center justify-between border-b border-line pb-3">
-                    <h3 className="font-semibold text-sm text-ink">{t("dashboard.this_week")}</h3>
-                    <span className="text-caption font-semibold text-muted">{data.student.week_label}</span>
-                  </div>
+                <Card>
+                  <CardHeader title={t("dashboard.this_week")} subtitle={data.student.week_label} />
                   {data.this_week.length === 0 ? (
-                    <p className="text-xs text-muted py-6 text-center">{t("dashboard.no_sessions")}</p>
+                    <EmptyState title={t("dashboard.no_sessions")} />
                   ) : (
-                    <div className="space-y-2.5" data-testid="this-week">
+                    <ul className="divide-y divide-line-soft -my-2" data-testid="this-week">
                       {data.this_week.map((row) => (
-                        <Link key={row.id} href="/student/live" className="flex items-center justify-between p-2.5 rounded-tile bg-surface-2 border border-line hover:bg-line-soft transition-all">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="w-10 text-center font-semibold text-xs text-ink bg-white py-1 rounded border border-line flex-shrink-0">{row.day}</span>
-                            <span className="text-xs font-medium text-ink truncate">{row.topic}</span>
-                          </div>
-                          <span className={`text-caption font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${row.is_lab ? "bg-violet-soft text-violet" : "bg-brand-soft text-info"}`}>{row.duration}</span>
-                        </Link>
+                        <li key={row.id}>
+                          <Link href="/student/live" className="flex items-center justify-between gap-3 py-2.5 group">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="w-11 text-center text-label font-medium text-ink-soft bg-surface-2 py-1 rounded-tile border border-line flex-shrink-0">{row.day}</span>
+                              <span className="text-body text-ink truncate group-hover:text-brand">{row.topic}</span>
+                            </div>
+                            <Badge tone={row.is_lab ? "violet" : "brand"} className="flex-shrink-0">{row.duration}</Badge>
+                          </Link>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
-                </div>
+                </Card>
               </div>
 
               {/* Row 3: project, upcoming, badges */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-3 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between text-xs text-muted font-medium mb-1">
-                      <span>{t("dashboard.current_project")}</span>
-                      {data.current_project && <span className="chip-purple">{data.current_project.progress_pct}% {t("dashboard.complete")}</span>}
-                    </div>
+                <Card className="flex flex-col">
+                  <CardHeader title={t("dashboard.current_project")}
+                    actions={data.current_project ? <Badge tone="violet">{data.current_project.progress_pct}% {t("dashboard.complete")}</Badge> : undefined} />
+                  <div className="flex-1">
                     {data.current_project ? (
                       <>
-                        <h4 className="font-semibold text-sm text-ink">{data.current_project.title}</h4>
-                        <p className="text-xs text-muted mt-0.5">{data.current_project.subtitle}</p>
-                        <div className="mt-4 space-y-1.5">
-                          <div className="w-full bg-line-soft rounded-full h-2"><div className="h-full bg-teal rounded-full" style={{ width: `${data.current_project.progress_pct}%` }} /></div>
-                          <div className="text-caption text-muted pt-1">
-                            {fill(t("dashboard.tasks_open"), { n: data.current_project.open_tasks })}
-                            {data.current_project.pending_prs > 0 && ` · ${fill(t("dashboard.prs_pending"), { n: data.current_project.pending_prs })}`}
-                          </div>
+                        <div className="text-body font-medium text-ink">{data.current_project.title}</div>
+                        <p className="text-label text-muted mt-0.5">{data.current_project.subtitle}</p>
+                        <ProgressBar value={data.current_project.progress_pct} tone="brand" className="mt-4" />
+                        <div className="text-label text-muted mt-2">
+                          {fill(t("dashboard.tasks_open"), { n: data.current_project.open_tasks })}
+                          {data.current_project.pending_prs > 0 && ` · ${fill(t("dashboard.prs_pending"), { n: data.current_project.pending_prs })}`}
                         </div>
                       </>
                     ) : (
-                      <p className="text-xs text-muted py-4">{t("dashboard.no_project")}</p>
+                      <EmptyState title={t("dashboard.no_project")} />
                     )}
                   </div>
-                  <Link href="/student/projects/board" className="text-xs font-semibold text-brand hover:underline flex items-center gap-1 pt-2">
-                    <span>{t("dashboard.open_board")}</span><ExternalLink className="w-3 h-3" />
+                  <Link href="/student/projects/board" className="mt-4 text-body font-medium text-brand hover:underline underline-offset-2 inline-flex items-center gap-1">
+                    <span>{t("dashboard.open_board")}</span><ExternalLink className="w-4 h-4" />
                   </Link>
-                </div>
+                </Card>
 
-                <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-3">
-                  <div className="flex items-center justify-between text-xs text-muted font-medium border-b border-line pb-2">
-                    <span>{t("dashboard.upcoming")}</span><Clock className="w-3.5 h-3.5 text-muted" />
-                  </div>
+                <Card>
+                  <CardHeader title={t("dashboard.upcoming")} actions={<Clock className="w-4 h-4 text-subtle" />} />
                   {data.upcoming_events.length === 0 ? (
-                    <p className="text-xs text-muted py-4 text-center">{t("dashboard.no_upcoming")}</p>
+                    <EmptyState title={t("dashboard.no_upcoming")} />
                   ) : (
-                    <div className="space-y-2.5" data-testid="upcoming-events">
+                    <ul className="divide-y divide-line-soft -my-2" data-testid="upcoming-events">
                       {data.upcoming_events.map((e) => (
-                        <div key={e.id} className="flex items-center justify-between text-xs gap-2">
-                          <span className="font-semibold text-ink truncate">{e.title}</span>
+                        <li key={e.id} className="flex items-center justify-between gap-3 py-2.5">
+                          <span className="text-body text-ink truncate">{e.title}</span>
                           <span className={`${kindChipClass(e.kind)} flex-shrink-0`}>{e.date}</span>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
-                </div>
+                </Card>
 
-                <div className="bg-white p-5 rounded-card border border-line shadow-card space-y-3">
-                  <div className="flex items-center justify-between text-xs text-muted font-medium border-b border-line pb-2">
-                    <span>{t("dashboard.badges_earned")}</span><Award className="w-3.5 h-3.5 text-teal" />
-                  </div>
+                <Card>
+                  <CardHeader title={t("dashboard.badges_earned")} actions={<Award className="w-4 h-4 text-teal" />} />
                   {data.badges.length === 0 ? (
-                    <p className="text-xs text-muted py-4 text-center">{t("dashboard.no_badges")}</p>
+                    <EmptyState title={t("dashboard.no_badges")} />
                   ) : (
                     <>
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-card bg-gradient-to-tr from-teal to-brand flex items-center justify-center text-white text-xl shadow-pop">{data.badges[0].icon}</div>
-                        <div>
-                          <div className="text-caption text-muted font-semibold">{t("dashboard.latest")}</div>
-                          <div className="text-xs font-semibold text-ink">{data.badges[0].name}</div>
-                          <div className="text-caption text-muted">{data.badges[0].description}</div>
+                        <div className="w-12 h-12 rounded-card bg-gradient-to-tr from-teal to-brand flex items-center justify-center text-white text-xl flex-shrink-0">{data.badges[0].icon}</div>
+                        <div className="min-w-0">
+                          <div className="text-caption text-muted">{t("dashboard.latest")}</div>
+                          <div className="text-body font-medium text-ink">{data.badges[0].name}</div>
+                          <div className="text-label text-muted">{data.badges[0].description}</div>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 pt-1">
+                      <div className="flex flex-wrap gap-2 pt-4">
                         {data.badges.slice(1).map((b) => (
-                          <span key={b.id} title={`${b.name} – ${b.description}`} className="w-7 h-7 rounded-tile bg-line-soft border border-line flex items-center justify-center text-xs">{b.icon}</span>
+                          <span key={b.id} title={`${b.name} – ${b.description}`} className="w-8 h-8 rounded-tile bg-surface-2 border border-line flex items-center justify-center text-body">{b.icon}</span>
                         ))}
                       </div>
                     </>
                   )}
-                </div>
+                </Card>
               </div>
             </>
           )}

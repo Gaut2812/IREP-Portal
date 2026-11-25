@@ -6,7 +6,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import {
-  Briefcase, Calendar, CheckCircle2, ExternalLink,
+  Calendar, CheckCircle2, ExternalLink,
   Award, Sparkles, UserCheck, Clock, MapPin, Users,
   AlertCircle, RefreshCw, ThumbsUp, XCircle, HeartHandshake,
   Laptop
@@ -229,18 +229,8 @@ export default function ParentPortfolioPage() {
 
   return (
     <RoleGuard allowedRoles={["parent"]}>
-      <AppShell pageTitle={t("parent_portfolio.title")} header={false}>
-        <div className="max-w-5xl mx-auto space-y-8 pb-16">
-          {/* Header & Subtitle */}
-          <div>
-            <h1 className="text-2xl font-semibold text-ink tracking-tight flex items-center gap-2.5">
-              <Briefcase className="w-6 h-6 text-brand" />
-              <span>{t("parent_portfolio.title")}</span>
-            </h1>
-            <p className="text-sm text-muted mt-1 font-medium">
-              {t("parent_portfolio.subtitle")}
-            </p>
-          </div>
+      <AppShell pageTitle={t("parent_portfolio.title")} pageSubtitle={t("parent_portfolio.subtitle")}>
+        <div className="max-w-5xl space-y-6 pb-16">
 
           {/* Loading Skeleton */}
           {loading && !data && (

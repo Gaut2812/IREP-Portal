@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
+import { Button } from "@/components/ui";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import {
@@ -304,28 +305,9 @@ export default function StudentPortfolioPage() {
 
   return (
     <RoleGuard allowedRoles={["student"]}>
-      <AppShell pageTitle={t("portfolio.title")} header={false}>
-        <div className="max-w-7xl mx-auto space-y-8 pb-16">
-          {/* Header & Subtitle */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-ink tracking-tight flex items-center gap-2.5">
-                <Briefcase className="w-6 h-6 text-brand" />
-                <span>{t("portfolio.title")}</span>
-              </h1>
-              <p className="text-sm text-muted mt-1 font-medium">
-                {t("portfolio.subtitle")}
-              </p>
-            </div>
-
-            <button
-              onClick={openCreateModal}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-card shadow-card transition-all cursor-pointer hover:shadow-pop"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{t("portfolio.add_project")}</span>
-            </button>
-          </div>
+      <AppShell pageTitle={t("portfolio.title")} pageSubtitle={t("portfolio.subtitle")}
+        pageActions={<Button onClick={openCreateModal}><Plus className="w-4 h-4" /><span>{t("portfolio.add_project")}</span></Button>}>
+        <div className="max-w-7xl space-y-6 pb-16">
 
           {/* Loading Skeleton */}
           {loading && !data && (

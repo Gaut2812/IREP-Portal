@@ -6,7 +6,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import {
-  Code2, GitPullRequest, CheckCircle2, XCircle, AlertCircle,
+  GitPullRequest, CheckCircle2, XCircle, AlertCircle,
   Clock, Search, FileCode, Check, RefreshCw, MessageSquare,
   ChevronRight, Sparkles, ShieldCheck, GitBranch, ArrowRight,
   Sliders, User, Users, FolderGit2
@@ -452,20 +452,8 @@ export default function TrainerCodeReviewsPage() {
 
   return (
     <RoleGuard allowedRoles={["trainer", "college"]}>
-      <AppShell pageTitle={t("trainer_reviews.title")} header={false}>
-        <div className="max-w-[1600px] mx-auto space-y-6 pb-12">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-ink tracking-tight flex items-center gap-2.5">
-                <Code2 className="w-6 h-6 text-brand" />
-                <span>{t("trainer_reviews.title")}</span>
-              </h1>
-              <p className="text-sm text-muted mt-1 font-medium">
-                {t("trainer_reviews.subtitle")}
-              </p>
-            </div>
-          </div>
+      <AppShell pageTitle={t("trainer_reviews.title")} pageSubtitle={t("trainer_reviews.subtitle")}>
+        <div className="max-w-[1600px] space-y-6 pb-12">
 
           {/* Main Two-Panel Workspace */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

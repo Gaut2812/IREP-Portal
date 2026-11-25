@@ -75,7 +75,7 @@ export default function ParentEventsPage() {
   return (
     <RoleGuard allowedRoles={["parent"]}>
       <AppShell pageTitle={t("events.parent_title")}>
-        <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-3">
           {data && <p className="text-xs text-[#64748B]">{t("events.for_child")} {data.ward.name}</p>}
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {data && data.upcoming.length === 0 && <p className="text-xs text-[#64748B] bg-white rounded-2xl border border-dashed border-[#CBD5E1] p-6 text-center" data-testid="no-events">{t("events.none_upcoming")}</p>}

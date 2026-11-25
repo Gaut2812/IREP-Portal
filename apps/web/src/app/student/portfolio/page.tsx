@@ -304,7 +304,7 @@ export default function StudentPortfolioPage() {
 
   return (
     <RoleGuard allowedRoles={["student"]}>
-      <AppShell pageTitle={t("portfolio.title")}>
+      <AppShell pageTitle={t("portfolio.title")} header={false}>
         <div className="max-w-7xl mx-auto space-y-8 pb-16">
           {/* Header & Subtitle */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

@@ -71,7 +71,7 @@ export default function AtRiskPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("at_risk.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           {data && (
             <div className="grid grid-cols-3 gap-3" data-testid="risk-summary">
               {([["open", data.summary.open], ["high", data.summary.high], ["parents_alerted", data.summary.parents_alerted]] as const).map(([k, v]) => (

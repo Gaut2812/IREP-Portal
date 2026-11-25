@@ -107,7 +107,7 @@ export default function NotificationCentrePage() {
   return (
     <RoleGuard allowedRoles={["student", "trainer", "college", "parent", "admin"]}>
       <AppShell pageTitle={t("notifications.title")}>
-        <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
           <section className="lg:col-span-2 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <select value={kind} onChange={(e) => setKind(e.target.value)} data-testid="filter-kind" aria-label={t("notifications.filter_kind")}

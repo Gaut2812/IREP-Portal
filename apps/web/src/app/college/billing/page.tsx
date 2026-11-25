@@ -27,7 +27,7 @@ export default function CollegeBillingPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("billing.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-5xl">
+        <div className="space-y-4 max-w-5xl">
           <p className="text-xs text-[#64748B]">{t("billing.college_help")}</p>
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {data && (

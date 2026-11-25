@@ -55,7 +55,7 @@ export default function CollegeTimetablePage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("schedule.college_title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="timetable-error">{error}</p>}
           <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-2" data-testid="pending-requests">
             <h2 className="text-sm font-black text-[#0F1F3A]">{t("schedule.pending")} ({pending.length})</h2>

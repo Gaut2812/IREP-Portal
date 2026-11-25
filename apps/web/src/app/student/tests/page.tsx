@@ -24,7 +24,7 @@ export default function StudentTestsPage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={t("assess.tests_title")}>
-        <div className="p-4 md:p-6 max-w-3xl space-y-3">
+        <div className="max-w-3xl space-y-3">
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {tests?.length === 0 && <p className="text-xs text-[#64748B] bg-white rounded-xl border border-dashed border-[#CBD5E1] p-6 text-center">{t("assess.no_tests")}</p>}
           <ul className="space-y-2" data-testid="student-tests">

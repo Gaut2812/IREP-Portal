@@ -452,7 +452,7 @@ export default function TrainerCodeReviewsPage() {
 
   return (
     <RoleGuard allowedRoles={["trainer", "college"]}>
-      <AppShell pageTitle={t("trainer_reviews.title")}>
+      <AppShell pageTitle={t("trainer_reviews.title")} header={false}>
         <div className="max-w-[1600px] mx-auto space-y-6 pb-12">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

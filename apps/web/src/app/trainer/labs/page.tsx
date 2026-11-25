@@ -44,7 +44,7 @@ export default function TrainerLabBoard() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("lab_board.title")}>
-        <div className="p-4 md:p-6 space-y-3 max-w-5xl">
+        <div className="space-y-3 max-w-5xl">
           {data && (
             <p className="text-xs text-[#475569]" data-testid="lab-board-summary">{data.summary.live} {t("lab_board.live")} · {data.summary.idle} {t("lab_board.idle")}</p>
           )}

@@ -73,7 +73,7 @@ export default function TrainerSchedulePage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("schedule.trainer_title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="schedule-error">{error}</p>}
           {data && <WeekView week={data.week} sessions={data.sessions} onWeek={setWeek} />}
 

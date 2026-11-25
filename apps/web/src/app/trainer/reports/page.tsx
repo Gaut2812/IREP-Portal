@@ -87,7 +87,7 @@ export default function TrainerReportsPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("reports.trainer_title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           <div className="flex flex-wrap items-center gap-2">
             <input type="month" value={month} onChange={(e) => { setMonth(e.target.value); setCard(null); }} aria-label={t("reports.month")} data-testid="report-month"
               className="px-2.5 py-1.5 border border-[#CBD5E1] rounded-lg text-xs" />

@@ -60,7 +60,7 @@ export default function ApprovalsPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("approvals.title")}>
-        <div className="p-4 md:p-6 space-y-3 max-w-4xl">
+        <div className="space-y-3 max-w-4xl">
           <div className="flex gap-2" role="tablist">
             {["pending", "decided"].map((s) => (
               <button key={s} type="button" role="tab" aria-selected={status === s} onClick={() => setStatus(s)} data-testid={`tab-${s}`}

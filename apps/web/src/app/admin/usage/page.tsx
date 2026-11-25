@@ -37,7 +37,7 @@ export default function UsagePage() {
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("usage.title")}>
-        <div className="p-4 md:p-6 space-y-3 max-w-6xl">
+        <div className="space-y-3 max-w-6xl">
           <p className="text-xs text-[#64748B]">{t("usage.help")}</p>
           <div className="flex flex-wrap items-center gap-3">
             <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} aria-label={t("usage.month")} data-testid="usage-month"

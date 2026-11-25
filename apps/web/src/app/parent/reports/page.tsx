@@ -43,7 +43,7 @@ export default function ParentReportsPage() {
   return (
     <RoleGuard allowedRoles={["parent"]}>
       <AppShell pageTitle={t("reports.parent_title")}>
-        <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-3">
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {data?.consent_required && (
             <div className="bg-white rounded-2xl border border-[#BFDBFE] p-4 text-xs" data-testid="reports-consent">

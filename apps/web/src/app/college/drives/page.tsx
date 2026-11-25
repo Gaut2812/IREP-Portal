@@ -75,7 +75,7 @@ export default function DrivesPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("drives.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           <p className="text-xs text-[#64748B]">{t("drives.help")} <Link href="/college/events" className="text-[#2B5CD0] font-bold underline">{t("drives.go_events")}</Link></p>
           {error && <p className="text-xs text-red-600" role="alert" data-testid="drives-error">{error}</p>}
           {msg && <p className="text-xs text-[#166534]" role="status" data-testid="drives-msg">{msg}</p>}

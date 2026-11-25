@@ -77,7 +77,7 @@ export default function SuperAdminPage() {
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("super_admin.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-5xl">
+        <div className="space-y-4 max-w-5xl">
           {forbidden ? (
             <div className={card} data-testid="super-forbidden">
               <p className="text-sm font-bold text-[#0F1F3A]">{t("super_admin.only_title")}</p>

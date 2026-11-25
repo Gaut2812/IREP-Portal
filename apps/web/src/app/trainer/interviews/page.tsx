@@ -108,7 +108,7 @@ export default function TrainerInterviewsPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("trainer_interviews.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-5xl">
+        <div className="space-y-4 max-w-5xl">
           <p className="text-xs text-[#64748B]">{t("trainer_interviews.help")}</p>
           {error && <p className="text-xs text-red-600" role="alert" data-testid="ti-error">{error}</p>}
           {msg && <p className="text-xs text-[#166534]" role="status" data-testid="ti-msg">{msg}</p>}

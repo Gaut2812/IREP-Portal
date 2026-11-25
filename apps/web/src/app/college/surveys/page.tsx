@@ -61,7 +61,7 @@ export default function SurveysPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("surveys.title")}>
-        <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-6xl">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-6xl">
           <form onSubmit={create} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-3 space-y-2 h-fit" data-testid="survey-form">
             <p className="text-[11px] text-[#64748B]">{t("surveys.help")}</p>
             <input className={cls} placeholder={t("surveys.title_en")} value={title.en} onChange={(e) => setTitle({ ...title, en: e.target.value })} data-testid="survey-title" />

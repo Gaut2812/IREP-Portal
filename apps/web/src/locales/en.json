@@ -1950,7 +1950,12 @@
     "student": "Student",
     "score": "Score",
     "band": "Band",
-    "aggregates_note": "Score, band and change only. Trainer notes and chats are never shown to the college."
+    "aggregates_note": "Score, band and change only. Trainer notes and chats are never shown to the college.",
+    "branch": "Branch",
+    "batch": "Batch",
+    "avg_col": "Avg. score",
+    "distribution": "Readiness distribution",
+    "open_hint": "Select a row to see its batches or students."
   },
   "billing": {
     "title": "Billing",

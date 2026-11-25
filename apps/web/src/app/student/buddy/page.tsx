@@ -65,7 +65,7 @@ export default function StudyBuddyPage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={t("buddy.title")}>
-        <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-3">
+        <div className="max-w-3xl mx-auto space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-[#475569] flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#2BB3A0]" />{t("buddy.privacy")}</p>
             {usage && <span className="text-[11px] font-bold text-[#2B5CD0]" data-testid="buddy-usage">{usage.left_today}/{usage.daily_cap} {t("buddy.left_today")}</span>}

@@ -66,7 +66,7 @@ export default function DataRequestsPage() {
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("admin_audit.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           <AuditTabs />
           <p className="text-[11px] text-[#64748B]">{t("admin_audit.requests_note")}</p>
           {error && <p className="text-xs text-red-600" role="alert" data-testid="requests-error">{error}</p>}

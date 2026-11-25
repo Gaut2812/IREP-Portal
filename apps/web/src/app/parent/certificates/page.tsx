@@ -25,7 +25,7 @@ export default function ParentCertificatesPage() {
   return (
     <RoleGuard allowedRoles={["parent"]}>
       <AppShell pageTitle={t("certs.parent_title")}>
-        <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-3">
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {data?.consent_required && (
             <div className="bg-white rounded-2xl border border-[#BFDBFE] p-4 text-xs">{t("reports.consent_needed")} <Link href="/parent" className="text-[#2B5CD0] font-bold">{t("reports.open_overview")}</Link></div>

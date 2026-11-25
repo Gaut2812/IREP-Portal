@@ -229,7 +229,7 @@ export default function ParentPortfolioPage() {
 
   return (
     <RoleGuard allowedRoles={["parent"]}>
-      <AppShell pageTitle={t("parent_portfolio.title")}>
+      <AppShell pageTitle={t("parent_portfolio.title")} header={false}>
         <div className="max-w-5xl mx-auto space-y-8 pb-16">
           {/* Header & Subtitle */}
           <div>

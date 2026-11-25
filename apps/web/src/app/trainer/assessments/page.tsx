@@ -135,7 +135,7 @@ export default function AssessmentsPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("assess.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           <div className="flex flex-wrap gap-2 items-center" role="tablist">
             {(["problems", "tests", "bank"] as const).map((k) => (
               <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setSel(null); setCreating(false); }} data-testid={`assess-tab-${k}`}

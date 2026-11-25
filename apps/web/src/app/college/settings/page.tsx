@@ -112,7 +112,7 @@ export default function CollegeSettingsPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("college_settings.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="settings-error">{error}</p>}
           {s && (
             <p className="text-xs text-[#64748B]">{s.college.name} · {s.college.code} · {[s.college.city, s.college.state].filter(Boolean).join(", ")} — {t("college_settings.profile_note")}</p>

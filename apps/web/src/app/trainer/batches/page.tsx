@@ -44,7 +44,7 @@ export default function TrainerBatchesPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("trainer_batches.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {batches && batches.length === 0 && (
             <div className="bg-white rounded-xl border border-dashed border-[#CBD5E1] p-6 text-center text-xs text-[#64748B]" data-testid="no-batches">{t("trainer_batches.no_batches")}</div>

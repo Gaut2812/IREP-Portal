@@ -69,7 +69,7 @@ export default function TrainerAttendancePage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("attendance.title")}>
-        <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
           <section className="bg-white rounded-xl border border-[#E2E8F0] p-3 space-y-1 h-fit" data-testid="att-sessions">
             {error && <p className="text-xs text-red-600" role="alert" data-testid="att-error">{error}</p>}
             {sessions?.length === 0 && <p className="text-xs text-[#64748B]">{t("attendance.no_sessions")}</p>}

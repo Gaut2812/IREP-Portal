@@ -44,7 +44,7 @@ export default function ModerationTermsPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("mod.title")}>
-        <div className="p-4 md:p-6 max-w-2xl space-y-3">
+        <div className="max-w-2xl space-y-3">
           <p className="text-xs text-[#475569]">{t("mod.help")}</p>
           <form onSubmit={add} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-3 flex flex-wrap gap-2" data-testid="mod-form">
             <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder={t("mod.term_ph")} aria-label={t("mod.term_ph")} maxLength={64}

@@ -37,7 +37,7 @@ export default function ParentSurveysPage() {
   return (
     <RoleGuard allowedRoles={["parent"]}>
       <AppShell pageTitle={t("psurvey.title")}>
-        <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-3">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="psurvey-error">{error}</p>}
           {surveys?.length === 0 && <p className="text-xs text-[#64748B] bg-white rounded-2xl border border-dashed border-[#CBD5E1] p-6 text-center">{t("psurvey.none")}</p>}
           {surveys?.map((s) => (

@@ -54,7 +54,7 @@ export default function ConsentPage() {
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("admin_audit.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           <AuditTabs />
           <div className="flex items-center gap-2 flex-wrap">
             <label className="text-xs font-bold text-[#0F1F3A]" htmlFor="consent-college">{t("admin_audit.college")}</label>

@@ -35,7 +35,7 @@ export default function StudentPrivacyPage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={t("privacy.student_title")}>
-        <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-3">
           <p className="text-xs text-[#475569]">{data?.is_minor ? t("privacy.student_intro_minor") : t("privacy.student_intro")}</p>
           {data && !data.dob_known && <p className="text-[11px] text-[#92400E]" data-testid="dob-unknown">{t("privacy.dob_unknown")}</p>}
           {note && <p className="text-xs text-[#166534] font-bold" data-testid="consent-note">{note}</p>}

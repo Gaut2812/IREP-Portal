@@ -64,7 +64,7 @@ export default function AuditTrailPage() {
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("admin_audit.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           <AuditTabs />
           <form onSubmit={apply} className="bg-white rounded-xl border border-[#E2E8F0] p-3 grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
             {f("college_id", t("admin_audit.college"))}

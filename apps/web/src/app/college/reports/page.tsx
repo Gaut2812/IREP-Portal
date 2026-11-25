@@ -56,7 +56,7 @@ export default function CollegeReportsPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("reports.mou_title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-4xl">
+        <div className="space-y-4 max-w-4xl">
           <p className="text-xs text-[#64748B]">{t("reports.mou_help")}</p>
           <div className="flex flex-wrap gap-2 items-center">
             <select value={type} onChange={(e) => setType(e.target.value)} aria-label={t("reports.type")} data-testid="mou-type" className="px-2.5 py-1.5 border border-[#CBD5E1] rounded-lg text-xs">

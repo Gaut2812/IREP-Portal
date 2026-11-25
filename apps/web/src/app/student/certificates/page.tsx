@@ -78,7 +78,7 @@ export default function StudentCertificatesPage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={t("certs.title")}>
-        <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
           <section className="lg:col-span-2 space-y-2">
             {msg && <p className="text-xs text-[#166534] font-bold" role="status" data-testid="certs-msg">{msg}</p>}
             {error && <p className="text-xs text-red-600" role="alert" data-testid="certs-error">{error}</p>}

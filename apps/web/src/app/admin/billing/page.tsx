@@ -57,7 +57,7 @@ export default function AdminBillingPage() {
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("billing.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           {forbidden ? (
             <div className={card} data-testid="billing-forbidden"><p className="text-sm font-bold">{t("billing.super_only")}</p></div>
           ) : (

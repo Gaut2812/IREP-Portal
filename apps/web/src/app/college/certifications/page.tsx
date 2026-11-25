@@ -33,7 +33,7 @@ export default function CollegeCertificationsPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("certs.college_title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-5xl">
+        <div className="space-y-4 max-w-5xl">
           <p className="text-xs text-[#64748B]">{t("certs.college_help")}</p>
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3" data-testid="cert-tiles">

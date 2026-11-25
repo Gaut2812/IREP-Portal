@@ -123,7 +123,7 @@ export default function CollegeStructurePage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("structure.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           <p className="text-xs text-[#64748B]">{t("structure.subtitle")}</p>
           {error && <p className="text-xs text-red-600" role="alert" data-testid="structure-error">{error}</p>}
 

@@ -34,7 +34,7 @@ export default function StudentCheckinPage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={t("checkin.title")}>
-        <div className="p-4 md:p-6 max-w-md">
+        <div className="max-w-md">
           <form onSubmit={submit} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-3" data-testid="checkin-form">
             <p className="text-xs text-[#64748B]">{t("checkin.help")}</p>
             <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={8} autoComplete="off" inputMode="text"

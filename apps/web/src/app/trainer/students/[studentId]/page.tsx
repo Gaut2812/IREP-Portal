@@ -65,7 +65,7 @@ export default function TrainerStudentPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("trainer_batches.profile_title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-5xl">
+        <div className="space-y-4 max-w-5xl">
           <Link href="/trainer/batches" className="inline-flex items-center gap-1 text-xs text-[#2B5CD0] font-bold"><ArrowLeft className="w-3.5 h-3.5" />{t("trainer_batches.back")}</Link>
           {error && <p className="text-xs text-red-600" role="alert" data-testid="profile-error">{error}</p>}
           {s && p && (

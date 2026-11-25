@@ -123,7 +123,7 @@ export default function AdminCollegeDetailPage() {
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("admin_colleges.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-4 max-w-6xl">
           <Link href="/admin/colleges" className="inline-flex items-center gap-1 text-xs text-[#2B5CD0] font-bold">
             <ArrowLeft className="w-3.5 h-3.5" /> {t("admin_colleges.back")}
           </Link>

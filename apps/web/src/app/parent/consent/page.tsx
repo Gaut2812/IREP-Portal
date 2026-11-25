@@ -35,7 +35,7 @@ export default function ParentConsentPage() {
   return (
     <RoleGuard allowedRoles={["parent"]}>
       <AppShell pageTitle={t("privacy.parent_title")}>
-        <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-3">
           <p className="text-xs text-[#475569]">{t("privacy.parent_intro")}</p>
           {data && !data.identity_fresh && (
             <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl p-3 text-xs text-[#1E3A8A] space-y-2" data-testid="reauth-note">

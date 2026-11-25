@@ -43,7 +43,7 @@ export default function CoursePage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={data?.course.title || t("courses.title")}>
-        <div className="p-4 md:p-6 space-y-3 max-w-3xl">
+        <div className="space-y-3 max-w-3xl">
           <Link href="/student/courses" className="inline-flex items-center gap-1 text-xs text-[#2B5CD0] font-bold"><ArrowLeft className="w-3.5 h-3.5" />{t("courses.back")}</Link>
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {skill !== null && <p className="text-xs text-[#166534] font-bold" data-testid="skill-updated">{t("courses.skill_now")} {skill}%</p>}

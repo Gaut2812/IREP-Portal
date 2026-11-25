@@ -1,8 +1,77 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------
+ * IREP design tokens (docs/UI_STANDARDS.md).
+ * Use the classes these generate (text-ink, bg-surface, border-line,
+ * rounded-card, shadow-card, text-title ...) instead of hex values.
+ * ------------------------------------------------------------------ */
+@theme {
+  /* Inter for Latin, Noto Sans Tamil picks up Tamil glyphs (set in layout.tsx) */
+  --font-sans: var(--font-inter), var(--font-tamil), ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+
+  /* text */
+  --color-ink: #0F1F3A;          /* headings, values */
+  --color-ink-soft: #334155;     /* body text */
+  --color-muted: #64748B;        /* labels, help text */
+  --color-subtle: #94A3B8;       /* placeholders, ids */
+
+  /* surfaces and lines */
+  --color-canvas: #F4F6FA;       /* page background */
+  --color-surface: #FFFFFF;      /* cards */
+  --color-surface-2: #F8FAFC;    /* table head, tiles, hover */
+  --color-line: #E2E8F0;         /* card and input borders */
+  --color-line-soft: #EEF2F6;    /* row dividers, bar tracks */
+
+  /* brand */
+  --color-navy: #14284B;         /* sidebar */
+  --color-navy-2: #1E3A6E;       /* sidebar hover, dividers */
+  --color-brand: #2B5CD0;        /* primary actions, links, bars */
+  --color-brand-hover: #234BB0;
+  --color-brand-soft: #EAF0FD;
+  --color-teal: #2BB3A0;
+
+  /* status: text / fill / soft background */
+  --color-success: #15803D;
+  --color-success-fill: #1F9D6B;
+  --color-success-soft: #DCFCE7;
+  --color-warning: #B45309;
+  --color-warning-fill: #E6A23C;
+  --color-warning-soft: #FEF3C7;
+  --color-danger: #DC2626;
+  --color-danger-fill: #E05252;
+  --color-danger-soft: #FEE2E2;
+  --color-info: #1D4ED8;
+  --color-info-soft: #DBEAFE;
+  --color-violet: #6D28D9;
+  --color-violet-soft: #EDE9FE;
+
+  /* type scale: nothing below 12px */
+  --text-caption: 0.75rem;       /* 12px  table heads, captions */
+  --text-caption--line-height: 1.125rem;
+  --text-label: 0.8125rem;       /* 13px  field and KPI labels */
+  --text-label--line-height: 1.25rem;
+  --text-body: 0.875rem;         /* 14px  body, table cells, nav */
+  --text-body--line-height: 1.375rem;
+  --text-heading: 1rem;          /* 16px  card titles */
+  --text-heading--line-height: 1.5rem;
+  --text-title: 1.5rem;          /* 24px  page title */
+  --text-title--line-height: 2rem;
+  --text-title--letter-spacing: -0.015em;
+  --text-kpi: 1.875rem;          /* 30px  big numbers */
+  --text-kpi--line-height: 2.25rem;
+  --text-kpi--letter-spacing: -0.02em;
+
+  /* shape */
+  --radius-card: 0.75rem;        /* cards, panels, dialogs */
+  --radius-tile: 0.5rem;         /* tiles inside cards, inputs, buttons */
+  --shadow-card: 0 1px 2px 0 rgb(15 31 58 / 0.04), 0 1px 3px 0 rgb(15 31 58 / 0.03);
+  --shadow-pop: 0 10px 30px -10px rgb(15 31 58 / 0.25);
+}
+
+/* legacy names kept until every screen moves to the tokens above */
 :root {
   --sidebar-navy: #14284B;
-  --page-bg: #F1F5F9;
+  --page-bg: #F4F6FA;
   --card-white: #FFFFFF;
   --card-border: #E2E8F0;
   --heading-text: #0F1F3A;
@@ -15,82 +84,45 @@
   --dark-surface: #1B2236;
 }
 
-body {
-  background-color: var(--page-bg);
-  color: var(--heading-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  margin: 0;
-  padding: 0;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    margin: 0;
+    padding: 0;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Tamil script needs more room above and below */
+  html:lang(ta) body {
+    line-height: 1.65;
+  }
+  /* numbers line up in tables and KPIs */
+  table, .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
 }
 
-/* Custom design token utility classes */
-.bg-sidebar { background-color: var(--sidebar-navy); }
-.bg-page { background-color: var(--page-bg); }
-.bg-dark-surface { background-color: var(--dark-surface); }
-.text-heading { color: var(--heading-text); }
-.text-muted-custom { color: var(--muted-text); }
-.text-primary-blue { color: var(--primary-blue); }
-.bg-primary-blue { background-color: var(--primary-blue); }
-.text-teal-accent { color: var(--teal-accent); }
-.bg-teal-accent { background-color: var(--teal-accent); }
-
-/* Common chips */
-.chip-green {
-  background-color: #DCFCE7;
-  color: #15803D;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
+/* Chips (legacy; new code uses <Badge>) */
+.chip-green, .chip-amber, .chip-red, .chip-blue, .chip-purple {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  padding: 1px 8px;
   border-radius: 9999px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
-
-.chip-amber {
-  background-color: #FEF3C7;
-  color: #B45309;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.chip-red {
-  background-color: #FDE8E8;
-  color: #D93636;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.chip-blue {
-  background-color: #DBEAFE;
-  color: #1D4ED8;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.chip-purple {
-  background-color: #EDE9FE;
-  color: #6D28D9;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
+.chip-green { background-color: var(--color-success-soft); color: var(--color-success); }
+.chip-amber { background-color: var(--color-warning-soft); color: var(--color-warning); }
+.chip-red { background-color: var(--color-danger-soft); color: var(--color-danger); }
+.chip-blue { background-color: var(--color-info-soft); color: var(--color-info); }
+.chip-purple { background-color: var(--color-violet-soft); color: var(--color-violet); }

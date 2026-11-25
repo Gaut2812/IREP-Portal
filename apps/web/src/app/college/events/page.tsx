@@ -75,7 +75,7 @@ export default function CollegeEventsPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("events.college_title")}>
-        <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
           <form onSubmit={save} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-2 h-fit" data-testid="event-form">
             <h2 className="text-sm font-black flex items-center gap-2"><CalendarPlus className="w-4 h-4 text-[#2B5CD0]" />{t("events.new")}</h2>
             <input className={cls} placeholder={t("events.title_en")} value={form.title_en} data-testid="event-title-en" onChange={(e) => setForm({ ...form, title_en: e.target.value })} />

@@ -403,20 +403,20 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         {/* LOADING SKELETON */}
         {loading && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-120px)] animate-pulse">
-            <div className="lg:col-span-4 bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4">
+            <div className="lg:col-span-4 bg-white rounded-card border border-line p-5 space-y-4">
               <div className="h-6 w-1/3 bg-slate-200 rounded"></div>
               <div className="h-8 w-3/4 bg-slate-200 rounded"></div>
-              <div className="h-32 bg-slate-100 rounded-xl"></div>
-              <div className="h-20 bg-slate-100 rounded-xl"></div>
+              <div className="h-32 bg-slate-100 rounded-card"></div>
+              <div className="h-20 bg-slate-100 rounded-card"></div>
             </div>
             <div className="lg:col-span-5 flex flex-col gap-4">
-              <div className="flex-1 bg-slate-800 rounded-xl"></div>
-              <div className="h-44 bg-white rounded-xl border border-[#E2E8F0]"></div>
+              <div className="flex-1 bg-slate-800 rounded-card"></div>
+              <div className="h-44 bg-white rounded-card border border-line"></div>
             </div>
-            <div className="lg:col-span-3 bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-4">
+            <div className="lg:col-span-3 bg-white rounded-card border border-line p-4 space-y-4">
               <div className="h-6 w-1/2 bg-slate-200 rounded"></div>
-              <div className="h-20 bg-blue-50 rounded-xl"></div>
-              <div className="h-20 bg-amber-50 rounded-xl"></div>
+              <div className="h-20 bg-blue-50 rounded-card"></div>
+              <div className="h-20 bg-amber-50 rounded-card"></div>
             </div>
           </div>
         )}
@@ -424,27 +424,27 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         {/* 404 NOT FOUND STATE */}
         {!loading && notFound && (
           <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="max-w-md w-full bg-white rounded-2xl border border-[#E2E8F0] p-8 shadow-sm text-center space-y-4">
-              <div className="w-14 h-14 mx-auto rounded-full bg-[#FEF3C7] flex items-center justify-center text-[#B45309]">
+            <div className="max-w-md w-full bg-white rounded-card border border-line p-8 shadow-card text-center space-y-4">
+              <div className="w-14 h-14 mx-auto rounded-full bg-warning-soft flex items-center justify-center text-warning">
                 <AlertCircle className="w-8 h-8" />
               </div>
-              <h2 className="text-xl font-bold text-[#0F1F3A]">
+              <h2 className="text-xl font-semibold text-ink">
                 {t("coding.not_found_title") || "Problem Not Found"}
               </h2>
-              <p className="text-sm text-[#64748B]">
+              <p className="text-sm text-muted">
                 {t("coding.not_found_desc") || "The requested coding problem could not be found for your college tenant."}
               </p>
               <div className="pt-2 flex justify-center gap-2">
                 <button
                   onClick={() => setIsDrawerOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2BB3A0] hover:bg-[#249B8A] text-white text-xs font-bold rounded-xl shadow cursor-pointer transition-all"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal hover:bg-teal-hover text-white text-xs font-semibold rounded-card shadow-card cursor-pointer transition-all"
                 >
                   <Layers className="w-3.5 h-3.5" />
                   <span>Browse 20 Problems</span>
                 </button>
                 <Link
                   href="/student"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2B5CD0] hover:bg-[#2049AA] text-white text-xs font-bold rounded-xl shadow transition-all"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-card shadow-card transition-all"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>{t("coding.back_to_dashboard") || "Dashboard"}</span>
@@ -457,18 +457,18 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         {/* ERROR STATE WITH RETRY */}
         {!loading && error && !problem && (
           <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="max-w-md w-full bg-white rounded-2xl border border-[#FDE8E8] p-8 shadow-sm text-center space-y-4">
-              <div className="w-14 h-14 mx-auto rounded-full bg-[#FDE8E8] flex items-center justify-center text-[#D93636]">
+            <div className="max-w-md w-full bg-white rounded-card border border-danger-soft p-8 shadow-card text-center space-y-4">
+              <div className="w-14 h-14 mx-auto rounded-full bg-danger-soft flex items-center justify-center text-danger">
                 <AlertCircle className="w-8 h-8" />
               </div>
-              <h2 className="text-xl font-bold text-[#0F1F3A]">
+              <h2 className="text-xl font-semibold text-ink">
                 {t("coding.error_title") || "Failed to load coding challenge"}
               </h2>
-              <p className="text-sm text-[#64748B]">{error}</p>
+              <p className="text-sm text-muted">{error}</p>
               <div className="pt-2">
                 <button
                   onClick={loadProblem}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#2BB3A0] hover:bg-[#249B8A] text-white text-xs font-bold rounded-xl shadow transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal hover:bg-teal-hover text-white text-xs font-semibold rounded-card shadow-card transition-all cursor-pointer"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>{t("coding.retry") || "Retry"}</span>
@@ -483,19 +483,19 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-120px)]">
 
             {/* LEFT COLUMN: Problem Statement (4 cols) */}
-            <div className="lg:col-span-4 bg-white rounded-xl border border-[#E2E8F0] shadow-sm flex flex-col justify-between overflow-hidden">
+            <div className="lg:col-span-4 bg-white rounded-card border border-line shadow-card flex flex-col justify-between overflow-hidden">
               <div className="p-5 overflow-y-auto space-y-4">
                 {/* Curriculum Problem Switcher Bar */}
-                <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+                <div className="flex items-center justify-between pb-3 border-b border-line">
                   <button
                     onClick={() => setIsDrawerOpen(true)}
                     data-testid="problem-switcher-button"
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-[#F8FAFC] hover:bg-slate-100 text-[#0F1F3A] text-xs font-bold rounded-lg border border-[#CBD5E1] transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-2 hover:bg-slate-100 text-ink text-xs font-semibold rounded-tile border border-line-strong transition-all cursor-pointer"
                     title="Browse all 20 curriculum problems"
                   >
-                    <Layers className="w-3.5 h-3.5 text-[#2B5CD0]" />
+                    <Layers className="w-3.5 h-3.5 text-brand" />
                     <span>Problem {problem.curriculum_index || 18} of {problem.total_problems || 20}</span>
-                    <ChevronDown className="w-3 h-3 text-[#64748B]" />
+                    <ChevronDown className="w-3 h-3 text-muted" />
                   </button>
 
                   <div className="flex items-center gap-1">
@@ -503,7 +503,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                       <Link
                         href={`/student/coding/${problem.prev_problem.id}`}
                         data-testid="prev-problem-button"
-                        className="p-1 rounded hover:bg-slate-100 text-[#64748B] hover:text-[#0F1F3A] transition-colors"
+                        className="p-1 rounded hover:bg-slate-100 text-muted hover:text-ink transition-colors"
                         title={`Previous: ${problem.prev_problem.title}`}
                       >
                         <ChevronLeft className="w-4 h-4" />
@@ -513,7 +513,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                       <Link
                         href={`/student/coding/${problem.next_problem.id}`}
                         data-testid="next-problem-button-header"
-                        className="p-1 rounded hover:bg-slate-100 text-[#64748B] hover:text-[#0F1F3A] transition-colors"
+                        className="p-1 rounded hover:bg-slate-100 text-muted hover:text-ink transition-colors"
                         title={`Next: ${problem.next_problem.title}`}
                       >
                         <ChevronRight className="w-4 h-4" />
@@ -532,40 +532,40 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 </div>
 
                 {/* Title */}
-                <h2 className="text-base font-bold text-[#0F1F3A]">
+                <h2 className="text-base font-semibold text-ink">
                   {problem.title}
                 </h2>
 
                 {/* Description */}
-                <p className="text-xs text-[#334155] leading-relaxed whitespace-pre-line">
+                <p className="text-xs text-ink-soft leading-relaxed whitespace-pre-line">
                   {problem.statement}
                 </p>
 
                 {/* Example Box */}
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 space-y-2 text-xs">
-                  <div className="font-bold text-[#0F1F3A]">{t("coding.example") || "Example"}:</div>
-                  <div className="font-mono text-[11px] text-[#334155] space-y-0.5">
-                    <div><span className="text-[#64748B]">Input:</span> {problem.example_input}</div>
-                    <div><span className="text-[#64748B]">Output:</span> {problem.example_output}</div>
+                <div className="bg-surface-2 border border-line rounded-card p-3.5 space-y-2 text-xs">
+                  <div className="font-semibold text-ink">{t("coding.example") || "Example"}:</div>
+                  <div className="font-mono text-caption text-ink-soft space-y-0.5">
+                    <div><span className="text-muted">Input:</span> {problem.example_input}</div>
+                    <div><span className="text-muted">Output:</span> {problem.example_output}</div>
                   </div>
                 </div>
 
                 {/* Constraints */}
                 <div className="space-y-1.5 pt-2">
-                  <div className="text-xs font-bold text-[#0F1F3A]">{t("coding.constraints") || "Constraints"}:</div>
-                  <pre className="font-mono text-[11px] text-[#64748B] whitespace-pre-wrap leading-relaxed bg-[#F8FAFC] p-2.5 rounded-lg border border-[#E2E8F0]">
+                  <div className="text-xs font-semibold text-ink">{t("coding.constraints") || "Constraints"}:</div>
+                  <pre className="font-mono text-caption text-muted whitespace-pre-wrap leading-relaxed bg-surface-2 p-2.5 rounded-tile border border-line">
                     {problem.constraints}
                   </pre>
                 </div>
               </div>
 
               {/* Footer Status with 20 Problems Drawer Trigger */}
-              <div className="p-3 bg-[#F8FAFC] border-t border-[#E2E8F0] flex items-center justify-between text-[11px] font-semibold text-[#64748B]">
+              <div className="p-3 bg-surface-2 border-t border-line flex items-center justify-between text-caption font-semibold text-muted">
                 <div>{problem.week_info}</div>
                 <button
                   onClick={() => setIsDrawerOpen(true)}
                   data-testid="browse-problems-footer-button"
-                  className="inline-flex items-center gap-1 text-[#2B5CD0] hover:text-[#1E46B0] font-bold text-[11px] px-2 py-0.5 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 text-brand hover:text-brand-hover font-semibold text-caption px-2 py-0.5 rounded-tile hover:bg-blue-50 transition-colors cursor-pointer"
                 >
                   <Layers className="w-3 h-3" />
                   <span>All 20 Problems</span>
@@ -577,16 +577,16 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
             {/* MIDDLE COLUMN: Code Editor + Test Results / Terminal Drawer (5 cols) */}
             <div className="lg:col-span-5 flex flex-col gap-4 overflow-hidden">
               {/* Editor Container */}
-              <div className="flex-1 bg-[#1B2236] rounded-xl border border-[#2D3748] shadow-sm flex flex-col overflow-hidden">
+              <div className="flex-1 bg-[#1B2236] rounded-card border border-[#2D3748] shadow-card flex flex-col overflow-hidden">
                 {/* Editor Header Bar */}
                 <div className="h-10 bg-[#141A29] px-4 flex items-center justify-between border-b border-[#2D3748] flex-shrink-0">
                   <div className="flex items-center gap-2">
-                    <Code2 className="w-3.5 h-3.5 text-[#2BB3A0]" />
+                    <Code2 className="w-3.5 h-3.5 text-teal" />
                     <div className="relative inline-block">
                       <select
                         value={language}
                         onChange={(e) => handleLanguageChange(e.target.value)}
-                        className="bg-[#1E293B] text-[#CBD5E1] text-xs font-mono px-2.5 py-1 pr-6 rounded border border-[#334155] appearance-none focus:outline-none cursor-pointer"
+                        className="bg-[#1E293B] text-line-strong text-xs font-mono px-2.5 py-1 pr-6 rounded border border-ink-soft appearance-none focus:outline-none cursor-pointer"
                         data-testid="language-selector"
                       >
                         <option value="python">solution.py (Python 3.12)</option>
@@ -594,7 +594,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                         <option value="cpp">solution.cpp (C++ 20)</option>
                         <option value="javascript">solution.js (Node.js)</option>
                       </select>
-                      <ChevronDown className="w-3 h-3 text-[#94A3B8] absolute right-2 top-2 pointer-events-none" />
+                      <ChevronDown className="w-3 h-3 text-subtle absolute right-2 top-2 pointer-events-none" />
                     </div>
                   </div>
 
@@ -602,20 +602,20 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                     <button
                       onClick={handleRun}
                       disabled={isRunning || isSubmitting}
-                      className="flex items-center gap-1.5 px-3 py-1 bg-transparent border border-[#475569] hover:bg-[#2D3748] text-white text-xs font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1 bg-transparent border border-ink-soft hover:bg-[#2D3748] text-white text-xs font-semibold rounded-tile transition-all cursor-pointer disabled:opacity-50"
                       data-testid="run-button"
                     >
                       {isRunning ? (
-                        <RefreshCw className="w-3 h-3 text-[#2BB3A0] animate-spin" />
+                        <RefreshCw className="w-3 h-3 text-teal animate-spin" />
                       ) : (
-                        <Play className="w-3 h-3 text-[#2BB3A0]" />
+                        <Play className="w-3 h-3 text-teal" />
                       )}
                       <span>{isRunning ? (t("coding.running") || "Running...") : (t("coding.run") || "Run")}</span>
                     </button>
                     <button
                       onClick={handleSubmit}
                       disabled={isRunning || isSubmitting}
-                      className="flex items-center gap-1.5 px-3.5 py-1 bg-[#2BB3A0] hover:bg-[#249B8A] text-white text-xs font-bold rounded-lg shadow transition-all cursor-pointer disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3.5 py-1 bg-teal hover:bg-teal-hover text-white text-xs font-semibold rounded-tile shadow-card transition-all cursor-pointer disabled:opacity-50"
                       data-testid="submit-button"
                     >
                       {isSubmitting ? (
@@ -639,27 +639,27 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
               </div>
 
               {/* Test Results + Terminal Drawer */}
-              <div className="h-48 bg-white rounded-xl border border-[#E2E8F0] shadow-sm flex flex-col flex-shrink-0 overflow-hidden" data-testid="test-results-drawer">
+              <div className="h-48 bg-white rounded-card border border-line shadow-card flex flex-col flex-shrink-0 overflow-hidden" data-testid="test-results-drawer">
                 {/* Drawer Header with Dual Tabs */}
-                <div className="flex items-center justify-between px-4 py-2 border-b border-[#E2E8F0] flex-shrink-0">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-line flex-shrink-0">
                   <div className="flex items-center gap-3">
                     {/* Tab: Test Cases */}
                     <button
                       onClick={() => setActiveTab("cases")}
                       data-testid="tab-test-cases"
-                      className={`flex items-center gap-1.5 text-xs font-bold pb-1 border-b-2 transition-all cursor-pointer ${
+                      className={`flex items-center gap-1.5 text-xs font-semibold pb-1 border-b-2 transition-all cursor-pointer ${
                         activeTab === "cases"
-                          ? "border-[#2B5CD0] text-[#2B5CD0]"
-                          : "border-transparent text-[#64748B] hover:text-[#0F1F3A]"
+                          ? "border-brand text-brand"
+                          : "border-transparent text-muted hover:text-ink"
                       }`}
                     >
                       <FlaskConical className="w-3.5 h-3.5" />
                       <span>{t("coding.test_results") || "Test Results"}</span>
                       {runResult?.status && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 ${
+                        <span className={`text-caption font-semibold px-1.5 py-0.5 rounded-full ml-1 ${
                           runResult.status === "Passed" || runResult.status === "Accepted"
-                            ? "bg-[#DCFCE7] text-[#15803D]"
-                            : "bg-[#FEE2E2] text-[#DC2626]"
+                            ? "bg-success-soft text-success"
+                            : "bg-danger-soft text-danger"
                         }`}>
                           {runResult.status}
                         </span>
@@ -669,10 +669,10 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                     <button
                       onClick={() => setActiveTab("terminal")}
                       data-testid="tab-terminal"
-                      className={`flex items-center gap-1.5 text-xs font-bold pb-1 border-b-2 transition-all cursor-pointer ${
+                      className={`flex items-center gap-1.5 text-xs font-semibold pb-1 border-b-2 transition-all cursor-pointer ${
                         activeTab === "terminal"
-                          ? "border-[#10B981] text-[#10B981]"
-                          : "border-transparent text-[#64748B] hover:text-[#0F1F3A]"
+                          ? "border-success-fill text-success-fill"
+                          : "border-transparent text-muted hover:text-ink"
                       }`}
                     >
                       <Terminal className="w-3.5 h-3.5" />
@@ -680,13 +680,13 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-3 text-[11px] font-mono text-[#64748B]">
+                  <div className="flex items-center gap-3 text-caption font-mono text-muted">
                     <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-[#2B5CD0]" />
+                      <Clock className="w-3 h-3 text-brand" />
                       {t("coding.runtime") || "Runtime"} {runResult?.runtime_ms ?? 42} ms
                     </span>
                     <span className="flex items-center gap-1">
-                      <Cpu className="w-3 h-3 text-[#7C5CE0]" />
+                      <Cpu className="w-3 h-3 text-violet" />
                       {t("coding.memory") || "Memory"} {runResult?.memory_mb ?? 16.1} MB
                     </span>
                   </div>
@@ -698,7 +698,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   {activeTab === "cases" && (
                     <div className="h-full flex flex-col p-3 gap-2 overflow-y-auto">
                       {runResult?.error_message ? (
-                        <div className="p-2.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#991B1B] font-mono">
+                        <div className="p-2.5 rounded-tile bg-danger-faint border border-danger-line text-xs text-danger font-mono">
                           {runResult.error_message}
                         </div>
                       ) : (
@@ -715,14 +715,14 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                                 key={i}
                                 onClick={() => setSelectedCase(i)}
                                 data-testid={`case-pill-${i}`}
-                                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold cursor-pointer transition-all border ${
+                                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-caption font-semibold cursor-pointer transition-all border ${
                                   selectedCase === i
                                     ? c.status === "Passed"
-                                      ? "bg-[#DCFCE7] border-[#86EFAC] text-[#15803D] ring-1 ring-[#15803D]"
-                                      : "bg-[#FEE2E2] border-[#FCA5A5] text-[#DC2626] ring-1 ring-[#DC2626]"
+                                      ? "bg-success-soft border-success-line text-success ring-1 ring-success"
+                                      : "bg-danger-soft border-danger-line text-danger ring-1 ring-danger"
                                     : c.status === "Passed"
-                                      ? "bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]"
-                                      : "bg-[#FFF5F5] border-[#FECACA] text-[#DC2626]"
+                                      ? "bg-success-faint border-success-line text-success"
+                                      : "bg-danger-faint border-danger-line text-danger"
                                 }`}
                               >
                                 {c.status === "Passed" ? (
@@ -737,26 +737,26 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
 
                           {/* Case Detail — strictly public sample cases only */}
                           {activeCaseData && (activeCaseData.input_data || activeCaseData.expected_output) && (
-                            <div className="flex gap-2 text-[11px] font-mono">
+                            <div className="flex gap-2 text-caption font-mono">
                               {activeCaseData.input_data && (
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[10px] font-bold text-[#64748B] mb-0.5">Input</div>
-                                  <pre className="bg-[#F8FAFC] border border-[#E2E8F0] rounded p-1.5 text-[#334155] overflow-x-auto whitespace-pre-wrap">{activeCaseData.input_data}</pre>
+                                  <div className="text-caption font-semibold text-muted mb-0.5">Input</div>
+                                  <pre className="bg-surface-2 border border-line rounded p-1.5 text-ink-soft overflow-x-auto whitespace-pre-wrap">{activeCaseData.input_data}</pre>
                                 </div>
                               )}
                               {activeCaseData.expected_output && (
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[10px] font-bold text-[#64748B] mb-0.5">Expected</div>
-                                  <pre className="bg-[#F0FDF4] border border-[#BBF7D0] rounded p-1.5 text-[#15803D] overflow-x-auto">{activeCaseData.expected_output}</pre>
+                                  <div className="text-caption font-semibold text-muted mb-0.5">Expected</div>
+                                  <pre className="bg-success-faint border border-success-line rounded p-1.5 text-success overflow-x-auto">{activeCaseData.expected_output}</pre>
                                 </div>
                               )}
                               {activeCaseData.actual_output && (
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[10px] font-bold text-[#64748B] mb-0.5">Output</div>
+                                  <div className="text-caption font-semibold text-muted mb-0.5">Output</div>
                                   <pre className={`border rounded p-1.5 overflow-x-auto ${
                                     activeCaseData.actual_output === activeCaseData.expected_output
-                                      ? "bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]"
-                                      : "bg-[#FEF2F2] border-[#FECACA] text-[#DC2626]"
+                                      ? "bg-success-faint border-success-line text-success"
+                                      : "bg-danger-faint border-danger-line text-danger"
                                   }`}>{activeCaseData.actual_output}</pre>
                                 </div>
                               )}
@@ -764,7 +764,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                           )}
 
                           {/* Hidden tests aggregate & Next Problem Action */}
-                          <div className="text-xs font-extrabold text-[#15803D] flex items-center justify-between mt-auto pt-1">
+                          <div className="text-xs font-semibold text-success flex items-center justify-between mt-auto pt-1">
                             <div className="flex items-center gap-1.5">
                               <CheckCircle2 className="w-4 h-4" />
                               <span>
@@ -778,13 +778,13 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                               <button
                                 onClick={handleGoToNextProblem}
                                 data-testid="next-problem-button"
-                                className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#15803D] hover:bg-[#166534] text-white text-[11px] font-bold rounded-lg shadow-sm transition-all cursor-pointer animate-pulse"
+                                className="inline-flex items-center gap-1.5 px-3 py-1 bg-success hover:bg-success text-white text-caption font-semibold rounded-tile shadow-card transition-all cursor-pointer animate-pulse"
                               >
                                 <span>Next Problem: {nextTarget.title}</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
                               </button>
                             ) : (
-                              <span className="text-[11px] font-normal text-[#64748B]">
+                              <span className="text-caption font-normal text-muted">
                                 {runResult?.is_submit ? "Official Submission Recorded" : "Sample Run Verified"}
                               </span>
                             )}
@@ -796,19 +796,19 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
 
                   {/* TERMINAL TAB */}
                   {activeTab === "terminal" && (
-                    <div className="h-full bg-[#0B0F19] p-3 font-mono text-xs text-[#10B981] overflow-y-auto" data-testid="terminal-output">
-                      <div className="text-[#475569] text-[10px] mb-1 select-none">
+                    <div className="h-full bg-[#0B0F19] p-3 font-mono text-xs text-success-fill overflow-y-auto" data-testid="terminal-output">
+                      <div className="text-ink-soft text-caption mb-1 select-none">
                         $ irep-judge &gt; run {language} solution
                       </div>
                       {runResult?.stdout ? (
                         <pre className="whitespace-pre-wrap leading-relaxed">{runResult.stdout}</pre>
                       ) : (
-                        <span className="text-[#334155] italic text-[11px]">
+                        <span className="text-ink-soft italic text-caption">
                           {isRunning ? "Running code..." : "Press Run to see output here."}
                         </span>
                       )}
                       {isRunning && (
-                        <span className="inline-block w-2 h-3 bg-[#10B981] animate-pulse ml-1 align-middle" />
+                        <span className="inline-block w-2 h-3 bg-success-fill animate-pulse ml-1 align-middle" />
                       )}
                     </div>
                   )}
@@ -817,17 +817,17 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
             </div>
 
             {/* RIGHT COLUMN: AI Code Reviewer + Trainer Notes (3 cols) */}
-            <div className="lg:col-span-3 bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-4 flex flex-col justify-between overflow-y-auto space-y-4">
+            <div className="lg:col-span-3 bg-white rounded-card border border-line shadow-card p-4 flex flex-col justify-between overflow-y-auto space-y-4">
               <div className="space-y-4">
                 {/* AI Reviewer Header */}
-                <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+                <div className="flex items-center justify-between border-b border-line pb-3">
                   <div className="flex items-center gap-1.5">
-                    <Bot className="w-4 h-4 text-[#2B5CD0]" />
-                    <h3 className="font-bold text-xs text-[#0F1F3A]">
+                    <Bot className="w-4 h-4 text-brand" />
+                    <h3 className="font-semibold text-xs text-ink">
                       {t("coding.ai_reviewer") || "AI Code Reviewer"}
                     </h3>
                   </div>
-                  <span className="chip-purple text-[10px]">
+                  <span className="chip-purple text-caption">
                     {t("coding.future_skills") || "Future Skills"}
                   </span>
                 </div>
@@ -837,7 +837,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   onClick={handleRunReview}
                   disabled={isReviewing || !code.trim()}
                   data-testid="run-ai-review-button"
-                  className="w-full flex items-center justify-center gap-1.5 py-2 bg-[#2B5CD0] hover:bg-[#2049AA] disabled:bg-[#94A3B8] text-white text-xs font-bold rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed shadow-sm"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 bg-brand hover:bg-brand-hover disabled:bg-subtle text-white text-xs font-semibold rounded-tile transition-all cursor-pointer disabled:cursor-not-allowed shadow-card"
                 >
                   {isReviewing ? (
                     <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Analyzing...</span></>
@@ -850,49 +850,49 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 {reviewResult ? (
                   <div className="space-y-2">
                     {/* Complexity Badges */}
-                    <div className="flex gap-2 text-[11px]">
-                      <div className="flex-1 bg-[#F0FDF4] border border-[#BBF7D0] rounded-lg p-2 text-center">
-                        <div className="text-[10px] text-[#64748B] font-semibold flex items-center justify-center gap-1">
+                    <div className="flex gap-2 text-caption">
+                      <div className="flex-1 bg-success-faint border border-success-line rounded-tile p-2 text-center">
+                        <div className="text-caption text-muted font-semibold flex items-center justify-center gap-1">
                           <TrendingUp className="w-2.5 h-2.5" />
                           {t("coding.time_complexity") || "Time Complexity"}
                         </div>
-                        <div className="font-bold text-[#15803D] text-[10px] mt-0.5 leading-tight">{reviewResult.time_complexity}</div>
+                        <div className="font-semibold text-success text-caption mt-0.5 leading-tight">{reviewResult.time_complexity}</div>
                       </div>
-                      <div className="flex-1 bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg p-2 text-center">
-                        <div className="text-[10px] text-[#64748B] font-semibold flex items-center justify-center gap-1">
+                      <div className="flex-1 bg-brand-soft border border-brand-line rounded-tile p-2 text-center">
+                        <div className="text-caption text-muted font-semibold flex items-center justify-center gap-1">
                           <Cpu className="w-2.5 h-2.5" />
                           {t("coding.space_complexity") || "Space Complexity"}
                         </div>
-                        <div className="font-bold text-[#1D4ED8] text-[10px] mt-0.5 leading-tight">{reviewResult.space_complexity}</div>
+                        <div className="font-semibold text-info text-caption mt-0.5 leading-tight">{reviewResult.space_complexity}</div>
                       </div>
                     </div>
 
                     {/* Good Practice (dynamic) */}
-                    <div className="p-3 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-xs space-y-1" data-testid="ai-good-practice">
-                      <div className="font-bold text-[#1D4ED8] flex items-center gap-1.5">
+                    <div className="p-3 rounded-card bg-brand-soft border border-brand-line text-xs space-y-1" data-testid="ai-good-practice">
+                      <div className="font-semibold text-info flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5" /> {t("coding.good_practice") || "Good Practice"}
                       </div>
                       {reviewResult.good_practices.slice(0, 2).map((p, i) => (
-                        <p key={i} className="text-[#1E3A8A] text-[11px] leading-relaxed">{p}</p>
+                        <p key={i} className="text-info text-caption leading-relaxed">{p}</p>
                       ))}
                     </div>
 
                     {/* Try Next (dynamic) */}
-                    <div className="p-3 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-xs space-y-1">
-                      <div className="font-bold text-[#B45309]">{t("coding.try_next") || "Try next:"}</div>
-                      <p className="text-[#92400E] text-[11px] leading-relaxed">{reviewResult.try_next}</p>
+                    <div className="p-3 rounded-card bg-warning-soft border border-warning-line text-xs space-y-1">
+                      <div className="font-semibold text-warning">{t("coding.try_next") || "Try next:"}</div>
+                      <p className="text-warning text-caption leading-relaxed">{reviewResult.try_next}</p>
                     </div>
 
                     {/* Interview Tip (dynamic) */}
-                    <div className="p-3 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-xs space-y-1">
-                      <div className="font-bold text-[#1D4ED8]">{t("coding.interview_tip") || "Interview tip:"}</div>
-                      <p className="text-[#1E3A8A] text-[11px] leading-relaxed font-mono">{reviewResult.interview_tip}</p>
+                    <div className="p-3 rounded-card bg-brand-soft border border-brand-line text-xs space-y-1">
+                      <div className="font-semibold text-info">{t("coding.interview_tip") || "Interview tip:"}</div>
+                      <p className="text-info text-caption leading-relaxed font-mono">{reviewResult.interview_tip}</p>
                     </div>
 
                     {/* Code Smells (if any) */}
                     {reviewResult.code_smells && reviewResult.code_smells.length > 0 && (
-                      <div className="p-2.5 rounded-lg bg-[#FFF7ED] border border-[#FED7AA] text-[11px] text-[#92400E]">
-                        <div className="font-bold mb-1">Notice:</div>
+                      <div className="p-2.5 rounded-tile bg-warning-faint border border-warning-line text-caption text-warning">
+                        <div className="font-semibold mb-1">Notice:</div>
                         {reviewResult.code_smells.map((s, i) => (
                           <div key={i}>• {s}</div>
                         ))}
@@ -903,27 +903,27 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   /* Static content preserving exact E2E selectors */
                   <div className="space-y-2">
                     {/* Reviewer Note 1 (Good - Blue) */}
-                    <div className="p-3 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-xs space-y-1">
-                      <div className="font-bold text-[#1D4ED8] flex items-center gap-1.5">
+                    <div className="p-3 rounded-card bg-brand-soft border border-brand-line text-xs space-y-1">
+                      <div className="font-semibold text-info flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5" /> {t("coding.good_practice") || "Good Practice"}
                       </div>
-                      <p className="text-[#1E3A8A] text-[11px] leading-relaxed">
+                      <p className="text-info text-caption leading-relaxed">
                         Path compression flattens the tree during find(), keeping subsequent lookups near constant time.
                       </p>
                     </div>
 
                     {/* Reviewer Note 2 (Try Next - Amber) */}
-                    <div className="p-3 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-xs space-y-1">
-                      <div className="font-bold text-[#B45309]">{t("coding.try_next") || "Try next:"}</div>
-                      <p className="text-[#92400E] text-[11px] leading-relaxed">
+                    <div className="p-3 rounded-card bg-warning-soft border border-warning-line text-xs space-y-1">
+                      <div className="font-semibold text-warning">{t("coding.try_next") || "Try next:"}</div>
+                      <p className="text-warning text-caption leading-relaxed">
                         Add union by rank. Can you explain why it helps achieve the inverse Ackermann worst-case time?
                       </p>
                     </div>
 
                     {/* Reviewer Note 3 (Interview Tip - Blue) */}
-                    <div className="p-3 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-xs space-y-1">
-                      <div className="font-bold text-[#1D4ED8]">{t("coding.interview_tip") || "Interview tip:"}</div>
-                      <p className="text-[#1E3A8A] text-[11px] leading-relaxed font-mono">
+                    <div className="p-3 rounded-card bg-brand-soft border border-brand-line text-xs space-y-1">
+                      <div className="font-semibold text-info">{t("coding.interview_tip") || "Interview tip:"}</div>
+                      <p className="text-info text-caption leading-relaxed font-mono">
                         State the complexity aloud: near O(E · α(n)), where α is the inverse Ackermann function.
                       </p>
                     </div>
@@ -931,15 +931,15 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 )}
 
                 {/* Problem Attribution Card */}
-                <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-xs space-y-1" data-testid="problem-attribution">
+                <div className="p-3 rounded-card bg-surface-2 border border-line text-xs space-y-1" data-testid="problem-attribution">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-[#2B5CD0] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">AK</div>
+                    <div className="w-7 h-7 rounded-full bg-brand text-white text-caption font-semibold flex items-center justify-center flex-shrink-0">AK</div>
                     <div>
-                      <div className="font-bold text-[#0F1F3A] text-[11px]">Trainer Arun Kumar</div>
-                      <div className="text-[10px] text-[#64748B]">Lead Technical Trainer · IREP Placement Cell</div>
+                      <div className="font-semibold text-ink text-caption">Trainer Arun Kumar</div>
+                      <div className="text-caption text-muted">Lead Technical Trainer · IREP Placement Cell</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-[10px] text-[#64748B] pt-0.5">
+                  <div className="flex items-center gap-1 text-caption text-muted pt-0.5">
                     <BookOpen className="w-3 h-3" />
                     <span>Assigned for Placement Training · Week 8</span>
                   </div>
@@ -948,16 +948,16 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 {/* Unlocked Hints Section */}
                 {hints.length > 0 && (
                   <div className="space-y-2 pt-1">
-                    <div className="text-[11px] font-bold text-[#0F1F3A] flex items-center gap-1">
-                      <HelpCircle className="w-3.5 h-3.5 text-[#2B5CD0]" />
+                    <div className="text-caption font-semibold text-ink flex items-center gap-1">
+                      <HelpCircle className="w-3.5 h-3.5 text-brand" />
                       <span>Unlocked Hints ({hints.length}/3)</span>
                     </div>
                     {hints.map((hint, index) => (
                       <div
                         key={index}
-                        className="p-2.5 rounded-lg bg-[#F8FAFC] border border-[#CBD5E1] text-[11px] text-[#0F1F3A] leading-relaxed"
+                        className="p-2.5 rounded-tile bg-surface-2 border border-line-strong text-caption text-ink leading-relaxed"
                       >
-                        <strong className="text-[#2B5CD0]">Hint {index + 1}:</strong> {hint}
+                        <strong className="text-brand">Hint {index + 1}:</strong> {hint}
                       </div>
                     ))}
                   </div>
@@ -968,33 +968,33 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   <button
                     onClick={handleRequestHint}
                     disabled={isRequestingHint}
-                    className="w-full py-2 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#2B5CD0] text-xs font-bold rounded-lg border border-[#CBD5E1] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full py-2 bg-line-soft hover:bg-line text-brand text-xs font-semibold rounded-tile border border-line-strong transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     data-testid="request-hint-button"
                   >
                     {isRequestingHint && <RefreshCw className="w-3 h-3 animate-spin" />}
                     <span>{t("coding.ask_hint") || "+ Ask for another hint"}</span>
                   </button>
                 ) : (
-                  <div className="text-center py-1.5 text-[11px] font-bold text-[#15803D] bg-[#DCFCE7] rounded-lg">
+                  <div className="text-center py-1.5 text-caption font-semibold text-success bg-success-soft rounded-tile">
                     ✓ {t("coding.hints_exhausted") || "All hints unlocked"}
                   </div>
                 )}
 
                 {/* Policy note */}
-                <div className="text-[10px] text-[#64748B] italic leading-tight">
+                <div className="text-caption text-muted italic leading-tight">
                   {t("coding.hint_policy") || "Hints only, no full solutions. AI help used in this problem"}:{" "}
                   {hints.length} {hints.length === 1 ? (t("coding.hint_singular") || "hint") : (t("coding.hint_plural") || "hints")}
                 </div>
 
                 {/* Trainer Notes Section */}
-                <div className="pt-2 border-t border-[#E2E8F0] space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#0F1F3A]">
-                    <MessageSquareQuote className="w-3.5 h-3.5 text-[#2BB3A0]" />
+                <div className="pt-2 border-t border-line space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+                    <MessageSquareQuote className="w-3.5 h-3.5 text-teal" />
                     <span>{t("coding.trainer_note") || "Trainer note"}</span>
                   </div>
-                  <blockquote className="text-[11px] text-[#475569] italic bg-[#F8FAFC] p-2.5 rounded-lg border-l-2 border-[#2BB3A0]">
+                  <blockquote className="text-caption text-ink-soft italic bg-surface-2 p-2.5 rounded-tile border-l-2 border-teal">
                     "{problem.trainer_notes || "Notice how path compression in find() flattens the tree. For best worst-case complexity, add union-by-rank."}"
-                    <div className="text-right font-bold text-[10px] text-[#0F1F3A] not-italic mt-1">
+                    <div className="text-right font-semibold text-caption text-ink not-italic mt-1">
                       – {problem.trainer_author || "Arun K."}
                     </div>
                   </blockquote>
@@ -1008,48 +1008,48 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         {/* 20-PROBLEM CURRICULUM NAVIGATOR SLIDE-OVER DRAWER */}
         {isDrawerOpen && (
           <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity" data-testid="curriculum-drawer">
-            <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+            <div className="w-full max-w-md bg-white h-full shadow-pop flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
               {/* Drawer Header */}
-              <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between bg-[#F8FAFC]">
+              <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-[#2B5CD0]" />
-                    <h3 className="font-bold text-sm text-[#0F1F3A]">20 Weekly DSA Problems</h3>
+                    <Layers className="w-4 h-4 text-brand" />
+                    <h3 className="font-semibold text-sm text-ink">20 Weekly DSA Problems</h3>
                   </div>
-                  <p className="text-[11px] text-[#64748B] mt-0.5">
+                  <p className="text-caption text-muted mt-0.5">
                     Weeks 1–8 Curriculum · {solvedCount} of 20 Solved
                   </p>
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 text-[#64748B] hover:text-[#0F1F3A] transition-colors"
+                  className="p-1.5 rounded-tile hover:bg-slate-200 text-muted hover:text-ink transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Search & Week Filter Controls */}
-              <div className="p-3 border-b border-[#E2E8F0] space-y-2 bg-white">
+              <div className="p-3 border-b border-line space-y-2 bg-white">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-2.5" />
+                  <Search className="w-3.5 h-3.5 text-subtle absolute left-3 top-2.5" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search problems, topics..."
-                    className="w-full pl-9 pr-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#2B5CD0]"
+                    className="w-full pl-9 pr-3 py-1.5 bg-surface-2 border border-line rounded-tile text-xs focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
                 {/* Week pills */}
-                <div className="flex gap-1 overflow-x-auto pb-1 text-[11px]">
+                <div className="flex gap-1 overflow-x-auto pb-1 text-caption">
                   {["All", "1", "2", "3", "4", "5", "6", "7", "8"].map((wk) => (
                     <button
                       key={wk}
                       onClick={() => setSelectedWeekFilter(wk)}
                       className={`px-2.5 py-0.5 rounded-full font-semibold transition-all cursor-pointer whitespace-nowrap ${
                         selectedWeekFilter === wk
-                          ? "bg-[#2B5CD0] text-white"
-                          : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"
+                          ? "bg-brand text-white"
+                          : "bg-line-soft text-muted hover:bg-line"
                       }`}
                     >
                       {wk === "All" ? "All Weeks" : `Week ${wk}`}
@@ -1059,7 +1059,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
               </div>
 
               {/* Problems List */}
-              <div className="flex-1 overflow-y-auto divide-y divide-[#E2E8F0] p-2">
+              <div className="flex-1 overflow-y-auto divide-y divide-line p-2">
                 {filteredProblems.map((p, idx) => {
                   const isCurrent = p.id === problemId;
                   return (
@@ -1068,28 +1068,28 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                       href={`/student/coding/${p.id}`}
                       onClick={() => setIsDrawerOpen(false)}
                       data-testid={`drawer-problem-${p.id}`}
-                      className={`block p-3 rounded-xl transition-all cursor-pointer ${
+                      className={`block p-3 rounded-card transition-all cursor-pointer ${
                         isCurrent
-                          ? "bg-blue-50/80 border border-[#BFDBFE]"
-                          : "hover:bg-[#F8FAFC]"
+                          ? "bg-blue-50/80 border border-brand-line"
+                          : "hover:bg-surface-2"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2.5 min-w-0">
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5 ${
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-caption font-semibold flex-shrink-0 mt-0.5 ${
                             p.is_solved
-                              ? "bg-[#DCFCE7] text-[#15803D]"
+                              ? "bg-success-soft text-success"
                               : isCurrent
-                                ? "bg-[#2B5CD0] text-white"
-                                : "bg-slate-100 text-[#64748B]"
+                                ? "bg-brand text-white"
+                                : "bg-slate-100 text-muted"
                           }`}>
                             {p.is_solved ? <CheckCircle2 className="w-3.5 h-3.5" /> : (p.curriculum_index || idx + 1)}
                           </div>
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-[#0F1F3A] truncate">
+                            <div className="text-xs font-semibold text-ink truncate">
                               {p.title}
                             </div>
-                            <div className="text-[10px] text-[#64748B] flex items-center gap-1.5 mt-0.5">
+                            <div className="text-caption text-muted flex items-center gap-1.5 mt-0.5">
                               <span>{p.week_info?.split("·")[0]?.trim() || "Week"}</span>
                               <span>•</span>
                               <span className="truncate">{p.topic}</span>
@@ -1099,10 +1099,10 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
 
                         <span className={
                           p.difficulty === "Easy"
-                            ? "chip-green text-[9px] flex-shrink-0"
+                            ? "chip-green text-caption flex-shrink-0"
                             : p.difficulty === "Medium"
-                              ? "chip-amber text-[9px] flex-shrink-0"
-                              : "chip-red text-[9px] flex-shrink-0"
+                              ? "chip-amber text-caption flex-shrink-0"
+                              : "chip-red text-caption flex-shrink-0"
                         }>
                           {p.difficulty}
                         </span>
@@ -1113,7 +1113,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
               </div>
 
               {/* Drawer Footer */}
-              <div className="p-3 bg-[#F8FAFC] border-t border-[#E2E8F0] text-center text-[11px] text-[#64748B]">
+              <div className="p-3 bg-surface-2 border-t border-line text-center text-caption text-muted">
                 Curriculum Trainer: Arun Kumar · IREP Placement Cell
               </div>
             </div>
@@ -1123,28 +1123,28 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         {/* COMPLETION CELEBRATION MODAL */}
         {showSuccessModal && nextTarget && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs" data-testid="completion-modal">
-            <div className="max-w-md w-full bg-white rounded-2xl border border-[#BBF7D0] p-6 shadow-2xl space-y-4 text-center mx-4 animate-in zoom-in-95 duration-200">
-              <div className="w-14 h-14 mx-auto rounded-full bg-[#DCFCE7] flex items-center justify-center text-[#15803D]">
+            <div className="max-w-md w-full bg-white rounded-card border border-success-line p-6 shadow-pop space-y-4 text-center mx-4 animate-in zoom-in-95 duration-200">
+              <div className="w-14 h-14 mx-auto rounded-full bg-success-soft flex items-center justify-center text-success">
                 <Trophy className="w-7 h-7" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-extrabold text-[#0F1F3A]">
+                <h3 className="text-base font-semibold text-ink">
                   🎉 Problem Accepted!
                 </h3>
-                <p className="text-xs text-[#64748B]">
+                <p className="text-xs text-muted">
                   All 18 hidden test cases passed. Excellent work on mastering this pattern!
                 </p>
               </div>
 
               {/* Next Problem Card */}
-              <div className="p-3.5 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl text-left space-y-1.5">
-                <div className="text-[10px] font-bold text-[#15803D] uppercase tracking-wider">
+              <div className="p-3.5 bg-success-faint border border-success-line rounded-card text-left space-y-1.5">
+                <div className="text-caption font-semibold text-success">
                   Up Next in Curriculum:
                 </div>
-                <div className="font-bold text-xs text-[#0F1F3A]">
+                <div className="font-semibold text-xs text-ink">
                   {nextTarget.title}
                 </div>
-                <div className="text-[11px] text-[#64748B]">
+                <div className="text-caption text-muted">
                   {nextTarget.week_info || "Next DSA Pattern Drill"}
                 </div>
               </div>
@@ -1153,14 +1153,14 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setShowSuccessModal(false)}
-                  className="flex-1 py-2 text-xs font-semibold text-[#64748B] hover:text-[#0F1F3A] rounded-xl border border-[#CBD5E1] transition-colors cursor-pointer"
+                  className="flex-1 py-2 text-xs font-semibold text-muted hover:text-ink rounded-card border border-line-strong transition-colors cursor-pointer"
                 >
                   Stay on Problem
                 </button>
                 <button
                   onClick={handleGoToNextProblem}
                   data-testid="modal-next-problem-button"
-                  className="flex-1 py-2 bg-[#15803D] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 bg-success hover:bg-success text-white text-xs font-semibold rounded-card shadow-card transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <span>Solve Next</span>
                   <ArrowRight className="w-3.5 h-3.5" />

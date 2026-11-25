@@ -27,9 +27,9 @@ export default function MyTeamBoardRedirect() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={t("nav.sprint_board")}>
-        <div className="max-w-md mx-auto mt-10 bg-white rounded-2xl border border-[#E2E8F0] p-8 text-center space-y-3">
-          <Users className="w-8 h-8 text-[#2B5CD0] mx-auto" />
-          <p className="text-xs text-[#64748B]">{noTeam ? t("board.no_team") : error ? `${t("board.error_title")}: ${error}` : t("board.loading")}</p>
+        <div className="max-w-md mx-auto mt-10 bg-white rounded-card border border-line p-8 text-center space-y-6">
+          <Users className="w-8 h-8 text-brand mx-auto" />
+          <p className="text-xs text-muted">{noTeam ? t("board.no_team") : error ? `${t("board.error_title")}: ${error}` : t("board.loading")}</p>
         </div>
       </AppShell>
     </RoleGuard>

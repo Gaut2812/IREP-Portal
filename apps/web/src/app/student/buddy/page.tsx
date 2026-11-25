@@ -65,42 +65,42 @@ export default function StudyBuddyPage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={t("buddy.title")}>
-        <div className="max-w-3xl mx-auto space-y-3">
+        <div className="max-w-3xl mx-auto space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-[#475569] flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#2BB3A0]" />{t("buddy.privacy")}</p>
-            {usage && <span className="text-[11px] font-bold text-[#2B5CD0]" data-testid="buddy-usage">{usage.left_today}/{usage.daily_cap} {t("buddy.left_today")}</span>}
+            <p className="text-xs text-ink-soft flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-teal" />{t("buddy.privacy")}</p>
+            {usage && <span className="text-caption font-semibold text-brand" data-testid="buddy-usage">{usage.left_today}/{usage.daily_cap} {t("buddy.left_today")}</span>}
           </div>
-          {locked && <div className="bg-[#FEF3C7] border border-[#FDE68A] text-[#92400E] text-xs rounded-xl p-3" data-testid="buddy-locked">{t("buddy.locked")}</div>}
-          <div className="bg-white rounded-xl border border-[#E2E8F0] h-[55vh] overflow-y-auto p-4 space-y-3" data-testid="buddy-chat" aria-live="polite">
+          {locked && <div className="bg-warning-soft border border-warning-line text-warning text-xs rounded-card p-3" data-testid="buddy-locked">{t("buddy.locked")}</div>}
+          <div className="bg-white rounded-card border border-line h-[55vh] overflow-y-auto p-4 space-y-3" data-testid="buddy-chat" aria-live="polite">
             {msgs.length === 0 && (
-              <div className="text-center text-xs text-[#64748B] pt-16 space-y-2">
-                <Bot className="w-8 h-8 mx-auto text-[#2B5CD0]" />
+              <div className="text-center text-xs text-muted pt-16 space-y-2">
+                <Bot className="w-8 h-8 mx-auto text-brand" />
                 <p>{t("buddy.empty")}</p>
               </div>
             )}
             {msgs.map((m) => (
               <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${m.role === "user" ? "bg-[#2B5CD0] text-white" : "bg-[#F1F5F9] text-[#0F1F3A]"}`}
+                <div className={`max-w-[85%] rounded-card px-3 py-2 text-sm whitespace-pre-wrap ${m.role === "user" ? "bg-brand text-white" : "bg-line-soft text-ink"}`}
                   data-testid={m.role === "user" ? "buddy-question" : "buddy-answer"}>{m.content}</div>
               </div>
             ))}
-            {busy && <div className="text-xs text-[#64748B]" data-testid="buddy-thinking">{t("buddy.thinking")}</div>}
+            {busy && <div className="text-xs text-muted" data-testid="buddy-thinking">{t("buddy.thinking")}</div>}
             <div ref={endRef} />
           </div>
           {error && <p className="text-xs text-red-600" role="alert" data-testid="buddy-error">{error}</p>}
-          <form onSubmit={ask} className="bg-white rounded-xl border border-[#E2E8F0] p-2 space-y-2">
+          <form onSubmit={ask} className="bg-white rounded-card border border-line p-2 space-y-2">
             <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder={t("buddy.topic_ph")} maxLength={64}
-              className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs" aria-label={t("buddy.topic_ph")} data-testid="buddy-topic" />
+              className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs" aria-label={t("buddy.topic_ph")} data-testid="buddy-topic" />
             <div className="flex gap-2">
               <textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={2} maxLength={2000} disabled={locked || busy}
                 placeholder={t("buddy.ask_ph")} aria-label={t("buddy.ask_ph")} data-testid="buddy-input"
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.currentTarget.form as HTMLFormElement).requestSubmit(); } }}
-                className="flex-1 px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-sm resize-none" />
+                className="flex-1 px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-sm resize-none" />
               <button type="submit" disabled={locked || busy || question.trim().length < 2} data-testid="buddy-send"
-                className="px-3 bg-[#2B5CD0] text-white rounded-lg disabled:opacity-40" aria-label={t("buddy.send")}><Send className="w-4 h-4" /></button>
+                className="px-3 bg-brand text-white rounded-tile disabled:opacity-40" aria-label={t("buddy.send")}><Send className="w-4 h-4" /></button>
             </div>
           </form>
-          <div className="flex justify-between items-center text-[11px] text-[#64748B]">
+          <div className="flex justify-between items-center text-caption text-muted">
             <span>{t("buddy.disclaimer")}</span>
             {msgs.length > 0 && <button type="button" onClick={clear} className="inline-flex items-center gap-1 hover:text-red-600" data-testid="buddy-clear"><Trash2 className="w-3.5 h-3.5" />{t("buddy.clear")}</button>}
           </div>

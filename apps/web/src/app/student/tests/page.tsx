@@ -24,15 +24,15 @@ export default function StudentTestsPage() {
   return (
     <RoleGuard allowedRoles={["student"]}>
       <AppShell pageTitle={t("assess.tests_title")}>
-        <div className="max-w-3xl space-y-3">
+        <div className="max-w-3xl space-y-6">
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
-          {tests?.length === 0 && <p className="text-xs text-[#64748B] bg-white rounded-xl border border-dashed border-[#CBD5E1] p-6 text-center">{t("assess.no_tests")}</p>}
+          {tests?.length === 0 && <p className="text-xs text-muted bg-white rounded-card border border-dashed border-line-strong p-6 text-center">{t("assess.no_tests")}</p>}
           <ul className="space-y-2" data-testid="student-tests">
             {tests?.map((r) => (
               <li key={r.id}>
-                <Link href={`/student/tests/${r.id}`} className="block bg-white rounded-xl border border-[#E2E8F0] p-4 hover:border-[#2B5CD0]" data-testid="student-test">
-                  <div className="flex items-center gap-2 text-sm font-black text-[#0F1F3A]"><FileCheck2 className="w-4 h-4 text-[#2B5CD0]" />{r.title}</div>
-                  <div className="text-[11px] text-[#64748B] mt-1">
+                <Link href={`/student/tests/${r.id}`} className="block bg-white rounded-card border border-line p-4 hover:border-brand" data-testid="student-test">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-ink"><FileCheck2 className="w-4 h-4 text-brand" />{r.title}</div>
+                  <div className="text-caption text-muted mt-1">
                     {r.questions} {t("assess.questions")} · {r.duration_min} {t("assess.minutes")}
                     {r.due_at ? ` · ${t("assess.due_on")} ${new Date(r.due_at).toLocaleString()}` : ""}
                     {r.best_score ? ` · ${t("assess.best")} ${r.best_score}` : ""}

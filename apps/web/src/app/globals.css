@@ -26,9 +26,7 @@
   /* brand */
   --color-navy: #14284B;         /* sidebar */
   --color-navy-2: #1E3A6E;       /* sidebar hover, dividers */
-  --color-side: #1E4887;         /* app sidebar gradient: top left */
-  --color-side-2: #226494;       /* app sidebar gradient: bottom right */
-  --color-brand: #2B5CD0;        /* primary actions, links, bars */
+  --color-brand: #2B5CD0;        /* primary actions, links, bars, app sidebar */
   --color-brand-hover: #234BB0;
   --color-brand-soft: #EFF6FF;
   --color-brand-line: #BFDBFE;
@@ -150,6 +148,3 @@
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass-bar { background: rgb(255 255 255 / 0.96); }
 }
-
-/* app sidebar: the brand gradient (tokens side / side-2) */
-.side-gradient { background: linear-gradient(160deg, var(--color-side) 0%, var(--color-side-2) 100%); }

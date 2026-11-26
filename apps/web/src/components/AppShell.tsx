@@ -165,7 +165,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
             {!compact && (
               <>
                 <span className="font-semibold text-heading text-white truncate">IREP Portal</span>
-                <PanelLeftClose className="ml-auto w-4 h-4 flex-shrink-0 text-white/60 group-hover:text-white" aria-hidden />
+                <PanelLeftClose className="ml-auto w-4 h-4 flex-shrink-0 text-white/80 group-hover:text-white" aria-hidden />
               </>
             )}
           </button>
@@ -183,8 +183,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
               title={compact ? item.label : undefined} aria-label={compact ? item.label : undefined}
               className={cn("flex items-center min-h-9 py-2 rounded-tile text-body leading-5 font-medium transition-colors",
                 compact ? "justify-center px-0" : "gap-3 px-3",
-                isActive ? "bg-white/15 text-white shadow-card ring-1 ring-white/15" : "text-white/75 hover:bg-white/10 hover:text-white")}>
-              <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-white" : "text-white/70")} />
+                isActive ? "bg-white/20 text-white shadow-card ring-1 ring-white/25" : "text-white/90 hover:bg-white/15 hover:text-white")}>
+              <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-white" : "text-white/85")} />
               {!compact && <span className="min-w-0 break-words">{item.label}</span>}
             </Link>
           );
@@ -196,7 +196,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
         {!compact && (
           <div className="min-w-0">
             <div className="text-label font-semibold text-white truncate">{user?.name || ""}</div>
-            <div className="text-caption text-white/60 truncate">{roleLabel[role]} · {t("shell.college_name")}</div>
+            <div className="text-caption text-white/80 truncate">{roleLabel[role]} · {t("shell.college_name")}</div>
           </div>
         )}
       </div>
@@ -207,7 +207,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     <div className="flex h-screen bg-canvas overflow-hidden">
       {/* Desktop sidebar */}
       <aside data-testid="desktop-sidebar" data-collapsed={collapsed ? "true" : "false"}
-        className={cn("hidden lg:flex flex-shrink-0 side-gradient text-white flex-col z-20 transition-[width] duration-300 ease-out", collapsed ? "w-[72px]" : "w-[240px]")}>
+        className={cn("hidden lg:flex flex-shrink-0 bg-brand text-white flex-col z-20 transition-[width] duration-300 ease-out", collapsed ? "w-[72px]" : "w-[240px]")}>
         {sidebar(collapsed)}
       </aside>
 
@@ -215,7 +215,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
       {navOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label={t("shell.main_menu")}>
           <div className="absolute inset-0 bg-ink/50" onClick={() => setNavOpen(false)} />
-          <aside className="relative w-[260px] max-w-[80vw] side-gradient text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar(false, true)}</aside>
+          <aside className="relative w-[260px] max-w-[80vw] bg-brand text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar(false, true)}</aside>
         </div>
       )}
 

@@ -13,8 +13,10 @@ import { KeyRound,
   LayoutDashboard, BookOpen, Code2, FileCheck2, Cpu,
   KanbanSquare, Video, Bot, Award, Briefcase, Radio,
   MessageSquare, Calendar, Users, ClipboardCheck,
-  Search, ChevronDown, Languages, LogOut, Menu, X, Mail, ShieldCheck, Building2,
+  Search, ChevronDown, Languages, LogOut, Menu, X, Mail, ShieldCheck, Building2, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
+
+const COLLAPSE_KEY = "irep_sidebar_collapsed";
 import { BrandMark } from "@/components/ui/BrandMark";
 
 interface AppShellProps {
@@ -35,7 +37,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
   const { language, toggleLanguage, t } = useLanguage();
   const [profileOpen, setProfileOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // desktop sidebar: full (labels) or a narrow icon rail; remembered in this browser
+  const [collapsed, setCollapsed] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1"); }, []);
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1");
+      return !c;
+    });
+  };
 
   const role: Role = user?.role || "student";
 
@@ -134,37 +146,53 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
   const currentNav = role === "admin" ? adminNav : role === "trainer" ? trainerNav : role === "college" ? collegeNav : role === "parent" ? parentNav : studentNav;
   const homes = ["/student", "/trainer", "/college", "/parent", "/admin/colleges"];
 
-  const sidebar = (
+  /** compact = the desktop icon rail; the phone drawer always shows labels. */
+  const sidebar = (compact: boolean) => (
     <>
-      <div className="flex items-center justify-between gap-2 h-16 px-5 flex-shrink-0">
+      <div className={cn("flex items-center gap-2 h-16 flex-shrink-0", compact ? "justify-center px-3" : "justify-between px-5")}>
         <div className="flex items-center gap-2.5 min-w-0">
           <BrandMark className="w-8 h-8" />
-          <span className="font-semibold text-heading text-white truncate">IREP Portal</span>
+          {!compact && <span className="font-semibold text-heading text-white truncate">IREP Portal</span>}
         </div>
         <button onClick={() => setNavOpen(false)} className="lg:hidden p-1.5 rounded-tile text-white/70 hover:bg-navy-2 hover:text-white" aria-label={t("shell.close_menu")}>
           <X className="w-4 h-4" />
         </button>
       </div>
-      <nav className="flex-1 min-h-0 px-3 py-2 space-y-0.5 overflow-y-auto scrollbar-none" aria-label={t("shell.main_menu")}>
+      <nav className={cn("flex-1 min-h-0 py-2 space-y-0.5 overflow-y-auto scrollbar-none", compact ? "px-2" : "px-3")} aria-label={t("shell.main_menu")}>
         {currentNav.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || (!homes.includes(item.href) && pathname.startsWith(item.href));
           return (
             <Link key={item.href} href={item.href} aria-current={isActive ? "page" : undefined}
-              className={cn("flex items-center gap-3 min-h-9 py-2 px-3 rounded-tile text-body leading-5 font-medium transition-colors",
+              title={compact ? item.label : undefined} aria-label={compact ? item.label : undefined}
+              className={cn("flex items-center min-h-9 py-2 rounded-tile text-body leading-5 font-medium transition-colors",
+                compact ? "justify-center px-0" : "gap-3 px-3",
                 isActive ? "bg-navy-2 text-white" : "text-white/70 hover:bg-white/5 hover:text-white")}>
               <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-white" : "text-white/60")} />
-              <span className="min-w-0 break-words">{item.label}</span>
+              {!compact && <span className="min-w-0 break-words">{item.label}</span>}
             </Link>
           );
         })}
       </nav>
-      <div className="flex items-center gap-3 px-5 py-4 border-t border-white/10 flex-shrink-0" data-testid="sidebar-user">
+      {/* desktop only: switch between the full sidebar and the icon rail */}
+      <div className={cn("hidden lg:flex border-t border-white/10 flex-shrink-0 py-2", compact ? "justify-center px-2" : "px-3")}>
+        <button onClick={toggleCollapsed} data-testid="sidebar-toggle" aria-pressed={compact}
+          aria-label={compact ? t("shell.expand_menu") : t("shell.collapse_menu")} title={compact ? t("shell.expand_menu") : t("shell.collapse_menu")}
+          className={cn("flex items-center min-h-9 py-2 rounded-tile text-label font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors",
+            compact ? "justify-center w-full" : "gap-3 px-3 w-full")}>
+          {compact ? <PanelLeftOpen className="w-4 h-4 flex-shrink-0" /> : <PanelLeftClose className="w-4 h-4 flex-shrink-0" />}
+          {!compact && <span>{t("shell.collapse_menu")}</span>}
+        </button>
+      </div>
+      <div className={cn("flex items-center gap-3 py-4 border-t border-white/10 flex-shrink-0", compact ? "justify-center px-2" : "px-5")}
+        data-testid="sidebar-user" title={compact ? `${user?.name || ""} · ${roleLabel[role]}` : undefined}>
         <span className="w-9 h-9 rounded-full bg-navy-2 text-white flex items-center justify-center font-semibold text-label flex-shrink-0">{user?.avatar || "?"}</span>
-        <div className="min-w-0">
-          <div className="text-label font-semibold text-white truncate">{user?.name || ""}</div>
-          <div className="text-caption text-white/60 truncate">{roleLabel[role]} · {t("shell.college_name")}</div>
-        </div>
+        {!compact && (
+          <div className="min-w-0">
+            <div className="text-label font-semibold text-white truncate">{user?.name || ""}</div>
+            <div className="text-caption text-white/60 truncate">{roleLabel[role]} · {t("shell.college_name")}</div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -172,13 +200,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
   return (
     <div className="flex h-screen bg-canvas overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-[240px] flex-shrink-0 bg-navy text-white flex-col z-20">{sidebar}</aside>
+      <aside data-testid="desktop-sidebar" data-collapsed={collapsed ? "true" : "false"}
+        className={cn("hidden lg:flex flex-shrink-0 bg-navy text-white flex-col z-20 transition-[width] duration-200", collapsed ? "w-[72px]" : "w-[240px]")}>
+        {sidebar(collapsed)}
+      </aside>
 
       {/* Mobile / tablet drawer */}
       {navOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label={t("shell.main_menu")}>
           <div className="absolute inset-0 bg-ink/50" onClick={() => setNavOpen(false)} />
-          <aside className="relative w-[260px] max-w-[80vw] bg-navy text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar}</aside>
+          <aside className="relative w-[260px] max-w-[80vw] bg-navy text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar(false)}</aside>
         </div>
       )}
 

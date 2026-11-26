@@ -972,6 +972,8 @@
     "college_name": "Demo Engineering College",
     "open_menu": "Open menu",
     "close_menu": "Close menu",
+    "collapse_menu": "Collapse menu",
+    "expand_menu": "Expand menu",
     "main_menu": "Main menu",
     "search": "Search courses, tests, students...",
     "restricted_title": "Access restricted",

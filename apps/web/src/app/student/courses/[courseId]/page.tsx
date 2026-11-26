@@ -24,7 +24,8 @@ export default function CoursePage() {
     try {
       setData(await fetchApi(`/student/courses/${courseId}?lang=${language}`));
     } catch (e) {
-      setError(e instanceof ApiError ? e.detail : t("courses.load_failed"));
+      // a course that was unpublished after its "new course" notification went out answers 404
+      setError(e instanceof ApiError && e.status === 404 ? t("courses.not_available") : e instanceof ApiError ? e.detail : t("courses.load_failed"));
     }
   }, [courseId, language, t]);
 
@@ -45,7 +46,7 @@ export default function CoursePage() {
       <AppShell pageTitle={data?.course.title || t("courses.title")}>
         <div className="space-y-6 max-w-3xl">
           <Link href="/student/courses" className="inline-flex items-center gap-1 text-xs text-brand font-semibold"><ArrowLeft className="w-3.5 h-3.5" />{t("courses.back")}</Link>
-          {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+          {error && <p className="text-xs text-danger" role="alert">{error}</p>}
           {skill !== null && <p className="text-xs text-success font-semibold" data-testid="skill-updated">{t("courses.skill_now")} {skill}%</p>}
           <ol className="space-y-2" data-testid="lessons">
             {data?.lessons.map((l) => (

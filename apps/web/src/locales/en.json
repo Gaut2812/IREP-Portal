@@ -120,6 +120,8 @@
     "rsvp_btn": "RSVP – Attend"
   },
   "coding": {
+    "all_weeks": "All weeks",
+    "week_n": "Week {n}",
     "title": "Coding Lab",
     "run": "Run",
     "submit": "Submit",
@@ -1412,6 +1414,7 @@
     "bank_imports": "imported by colleges:"
   },
   "courses": {
+    "not_available": "This course is no longer available. It may have been withdrawn by IREP.",
     "title": "My courses",
     "load_failed": "Could not load courses. Try again.",
     "save_failed": "Could not save. Try again.",

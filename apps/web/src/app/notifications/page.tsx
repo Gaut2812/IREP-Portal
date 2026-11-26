@@ -54,8 +54,10 @@ export default function NotificationCentrePage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    fetchApi<Prefs>("/notifications/preferences").then(setPrefs).catch(() => setError(t("notifications.load_error")));
-  }, [t]);
+    // one language per user for screens and messages: start the form from the language on screen, so
+    // saving quiet hours or channels never flips the page (the stored value can lag, e.g. Tamil chosen before sign-in)
+    fetchApi<Prefs>("/notifications/preferences").then((p) => setPrefs({ ...p, language })).catch(() => setError(t("notifications.load_error")));
+  }, [t, language]);
 
   const more = async () => {
     if (!next) return;

@@ -1020,7 +1020,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                           : "bg-line-soft text-muted hover:bg-line"
                       }`}
                     >
-                      {wk === "All" ? "All Weeks" : `Week ${wk}`}
+                      {wk === "All" ? t("coding.all_weeks") : t("coding.week_n").replace("{n}", String(wk))}
                     </button>
                   ))}
                 </div>

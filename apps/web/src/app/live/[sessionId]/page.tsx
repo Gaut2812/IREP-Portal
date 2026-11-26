@@ -383,7 +383,7 @@ export default function LiveClassroomPage() {
               ) : (
                 <a href="#poll" aria-label={t("live_class.poll")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white"><BarChart2 className="w-4 h-4" /></a>
               )}
-              <Link href="/student/labs" aria-label={t("live_class.lab")} className="p-2 rounded-tile bg-[#1E293B] text-teal hover:text-white"><Cpu className="w-4 h-4" /></Link>
+              <Link href={isTrainer ? "/trainer/labs" : "/student/labs"} aria-label={t("live_class.lab")} className="p-2 rounded-tile bg-[#1E293B] text-teal hover:text-white"><Cpu className="w-4 h-4" /></Link>
             </div>
             <div className="flex items-center gap-2">
               {isTrainer && (

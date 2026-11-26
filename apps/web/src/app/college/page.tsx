@@ -171,12 +171,12 @@ export default function CollegeDashboardPage() {
 
                 <Card padded={false} className="lg:col-span-7">
                   <CardHeader className="px-5 pt-5" title={t("college_dashboard.branch_readiness")}
-                    subtitle={`${data.branch_readiness.length} ${t("college_dashboard.branch")}`} />
+                    subtitle={fill(t("college_dashboard.branch_count"), { n: data.branch_readiness.length })} />
                   <Table data-testid="branch-table">
                     <THead>
                       <tr>
                         <Th>{t("college_dashboard.branch")}</Th>
-                        <Th align="right">{t("college_dashboard.students")}</Th>
+                        <Th align="right">{t("college_dashboard.students_col")}</Th>
                         <Th align="right">{t("college_dashboard.attendance")}</Th>
                         <Th align="right">{t("college_dashboard.avg_score")}</Th>
                         <Th align="right">{t("college_dashboard.trend")}</Th>

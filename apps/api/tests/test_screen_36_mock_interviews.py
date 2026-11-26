@@ -150,3 +150,16 @@ def test_guards():
     finally:
         db.close()
     assert client.post("/api/v1/student/interview-slots/slot_does_not_exist/book", headers=PRIYA).status_code == 404
+
+
+def test_booking_notification_reads_well_in_english_and_tamil():
+    bid = client.post("/api/v1/student/interview-slots/slot_demo_hr/book", headers=PRIYA).json()["booking_id"]
+    try:
+        en = client.get("/api/v1/notifications?lang=en", headers=PRIYA).json()["items"]
+        ta = client.get("/api/v1/notifications?lang=ta", headers=PRIYA).json()["items"]
+        booked_en = next(n for n in en if n["title"] == "Mock interview booked")
+        booked_ta = next(n for n in ta if n["title"] == "மாதிரி நேர்காணல் பதிவு செய்யப்பட்டது")
+        assert booked_en["body"].startswith("Your mock interview (HR round) is on ")
+        assert booked_ta["body"].startswith("உங்கள் மாதிரி நேர்காணல் (HR சுற்று)")
+    finally:
+        client.delete(f"/api/v1/student/bookings/{bid}", headers=PRIYA)

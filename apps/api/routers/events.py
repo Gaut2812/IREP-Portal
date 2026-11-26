@@ -244,22 +244,52 @@ def parent_events(lang: str = "en", child_id: Optional[str] = None, current_user
 @router.post("/parent/events/{event_id}/rsvp")
 def rsvp_event(event_id: str, req: RsvpIn, current_user: TokenPayload = Depends(PARENT), db: Session = Depends(get_db)):
     """L05 RSVP up. Upcoming published events that take RSVPs, for the parent's child; else 404."""
-    if req.status not in ("yes", "no", "maybe"):
+    rsvp = save_parent_rsvp(db, current_user, event_id, req.status, req.guests, req.child_id)
+    db.commit()
+    return {"success": True, "event_id": event_id, "rsvp_status": rsvp.status, "guests": rsvp.guests}
+
+
+def save_parent_rsvp(db: Session, current_user: TokenPayload, event_id: str, status_: str, guests: int,
+                     child_id: Optional[str] = None) -> Rsvp:
+    """One RSVP per parent per event (also used by the portfolio's Demo Day card). Caller commits."""
+    if status_ not in ("yes", "no", "maybe"):
         raise HTTPException(status_code=422, detail="status must be yes, no or maybe")
-    if req.guests < 0 or req.guests > 10:
+    if guests < 0 or guests > 10:
         raise HTTPException(status_code=422, detail="guests must be between 0 and 10")
-    child = get_child_for_parent(current_user, db, req.child_id)
+    child = get_child_for_parent(current_user, db, child_id)
     event = db.execute(_parent_events_q(child).where(Event.id == event_id)).scalar_one_or_none()
     if not event or not event.rsvp_enabled or event.starts_at <= datetime.datetime.now():
         raise HTTPException(status_code=404, detail="Event not found or does not take RSVPs")
     rsvp = db.execute(select(Rsvp).where(Rsvp.event_id == event.id, Rsvp.parent_user_id == current_user.sub,
                                          Rsvp.college_id == current_user.college_id)).scalar_one_or_none()
     if rsvp:
-        rsvp.status, rsvp.guests, rsvp.student_id = req.status, req.guests, child.id
+        rsvp.status, rsvp.guests, rsvp.student_id = status_, guests, child.id
     else:
         rsvp = Rsvp(id=f"rsvp_{uuid.uuid4().hex[:16]}", college_id=current_user.college_id, event_id=event.id,
-                    parent_user_id=current_user.sub, student_id=child.id, status=req.status, guests=req.guests)
+                    parent_user_id=current_user.sub, student_id=child.id, status=status_, guests=guests)
         db.add(rsvp)
-    record_audit(db, current_user, "event.rsvp", "event", event.id, {"status": req.status, "guests": req.guests})
-    db.commit()
-    return {"success": True, "event_id": event.id, "rsvp_status": rsvp.status, "guests": rsvp.guests}
+    record_audit(db, current_user, "event.rsvp", "event", event.id, {"status": status_, "guests": guests})
+    return rsvp
+
+
+def next_demo_day_for_parent(db: Session, current_user: TokenPayload, child: Student, lang: str = "en") -> Optional[dict]:
+    """The next upcoming event that takes RSVPs for this child (a demo day first), with this parent's own answer."""
+    upcoming = db.execute(_parent_events_q(child).where(Event.rsvp_enabled.is_(True), Event.starts_at > datetime.datetime.now())
+                          .order_by(Event.starts_at)).scalars().all()
+    event = next((e for e in upcoming if e.kind == "demo_day"), upcoming[0] if upcoming else None)
+    if event is None:
+        return None
+    mine = db.execute(select(Rsvp).where(Rsvp.event_id == event.id, Rsvp.parent_user_id == current_user.sub,
+                                         Rsvp.college_id == current_user.college_id)).scalar_one_or_none()
+    ta = lang == "ta"
+    when = event.starts_at.strftime("%a, %b %d · %I:%M %p") + (f" – {event.ends_at.strftime('%I:%M %p')}" if event.ends_at else "")
+    return {
+        "id": event.id,
+        "title": (event.title_ta if ta and event.title_ta else event.title_en),
+        "event_date": when,
+        "venue": event.location or "",
+        "description": (event.description_ta if ta and event.description_ta else event.description_en) or "",
+        # the web card speaks attending / declined; the RSVP table stores yes / no / maybe
+        "rsvp_status": {"yes": "attending", "no": "declined", "maybe": "maybe"}.get(mine.status, "none") if mine else "none",
+        "guest_count": mine.guests if mine else 1,
+    }

@@ -19,6 +19,7 @@ test.describe("Screen 19: College Dashboard (/college)", () => {
     const table = page.getByTestId("branch-table");
     await expect(table).toContainText("CSE");
     await expect(table).toContainText("Cybersecurity");
+    await expect(page.getByText(`${expected.branch_readiness.length} branches`, { exact: true })).toBeVisible();
     await expect(table).toContainText(String(expected.branch_readiness[0].students));
 
     await expect(page.getByTestId("cert-chart")).toBeVisible();

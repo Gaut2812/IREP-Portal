@@ -136,8 +136,8 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
   // Results state
   const [runResult, setRunResult] = useState<{
     status: string;
-    runtime_ms: number;
-    memory_mb: number;
+    runtime_ms?: number;
+    memory_mb?: number;
     cases: TestCaseResult[];
     error_message?: string;
     is_submit?: boolean;
@@ -154,6 +154,8 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
   // AI Review state
   const [isReviewing, setIsReviewing] = useState<boolean>(false);
   const [reviewResult, setReviewResult] = useState<ReviewResult | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [hintError, setHintError] = useState<string | null>(null);
 
   // Hints state
   const [hints, setHints] = useState<string[]>([]);
@@ -171,10 +173,10 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         if (res?.problems && Array.isArray(res.problems)) {
           setAllProblems(res.problems);
         } else {
-          setAllProblems(getFallbackCurriculumProblems());
+          setAllProblems([]);
         }
       } catch (e) {
-        setAllProblems(getFallbackCurriculumProblems());
+        setAllProblems([]);
       }
     }
     fetchCurriculumProblems();
@@ -202,25 +204,15 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
           tests_passed: data.last_submission.tests_passed,
           tests_total: data.last_submission.tests_total,
           next_problem: data.next_problem,
-          cases: [
-            { name: "Sample case 1", status: "Passed" },
-            { name: "Sample case 2", status: "Passed" },
-            { name: "Edge: no edges", status: "Passed" },
-            { name: "Large graph (n=2000)", status: "Passed" }
-          ]
+          cases: [],
         });
       }
     } catch (err: any) {
       if (err?.message?.includes("404")) {
         setNotFound(true);
       } else {
-        setError(err?.message || "Failed to load problem details");
-        const fallback = getDemoFallbackProblem();
-        setProblem(fallback);
-        setCode(fallback.starter_codes["python"]);
-        setHints([
-          "Think of this as a connectivity problem. Each edge connects two nodes. Can you maintain the count of disjoint components starting from n?"
-        ]);
+        setError(err?.message || t("coding.error_title"));
+        setProblem(null);
       }
     } finally {
       setLoading(false);
@@ -259,15 +251,10 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
       });
     } catch (err: any) {
       setRunResult({
-        status: "Passed",
-        runtime_ms: 42,
-        memory_mb: 16.1,
+        status: "Error",
         is_submit: false,
-        stdout: "# Sample run output (Mock)\nStatus: Passed\nAll 2 sample test cases passed.",
-        cases: [
-          { name: "Sample case 1", status: "Passed", time_ms: 12, input_data: "5\n[[0,1],[1,2],[3,4]]", expected_output: "2", actual_output: "2" },
-          { name: "Sample case 2", status: "Passed", time_ms: 14, input_data: "5\n[[0,1],[1,2],[2,3],[3,4]]", expected_output: "1", actual_output: "1" }
-        ]
+        cases: [],
+        error_message: `${t("coding.request_failed")} (${err?.message || "network"})`,
       });
     } finally {
       setIsRunning(false);
@@ -299,26 +286,11 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
       }
     } catch (err: any) {
       setRunResult({
-        status: "Accepted",
-        runtime_ms: 42,
-        memory_mb: 16.1,
+        status: "Error",
         is_submit: true,
-        tests_passed: 18,
-        tests_total: 18,
-        stdout: "# Submission verified (Mock)\nAll 18 hidden tests evaluated successfully.\nStatus: Accepted",
-        next_problem: problem?.next_problem || {
-          id: "prob_redundant_connection",
-          title: "Redundant Connection",
-          week_info: "Week 8 · Pattern drill · 4 of 6"
-        },
-        cases: [
-          { name: "Sample case 1", status: "Passed" },
-          { name: "Sample case 2", status: "Passed" },
-          { name: "Edge: no edges", status: "Passed" },
-          { name: "Large graph (n=2000)", status: "Passed" }
-        ]
+        cases: [],
+        error_message: `${t("coding.submit_failed")} (${err?.message || "network"})`,
       });
-      setShowSuccessModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -328,26 +300,16 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
   const handleRunReview = async () => {
     if (!code.trim()) return;
     setIsReviewing(true);
+    setReviewError(null);
     try {
       const res = await fetchApi<ReviewResult>(`/student/coding/${problemId}/review`, {
         method: "POST",
         body: JSON.stringify({ code, language })
       });
       setReviewResult(res);
-    } catch (e) {
-      setReviewResult({
-        overall_evaluation: "Good implementation foundation with Union-Find pattern.",
-        time_complexity: "O(E · α(V)) ≈ O(E) (Heuristic estimate)",
-        space_complexity: "O(V) (Heuristic estimate)",
-        good_practices: [
-          "Path compression flattens the tree during find(), keeping subsequent lookups near constant time."
-        ],
-        try_next: "Add union by rank. Can you explain why it helps achieve the inverse Ackermann worst-case time?",
-        interview_tip: "State the complexity aloud: near O(E · α(n)), where α is the inverse Ackermann function.",
-        code_smells: [],
-        detected_patterns: ["Disjoint Set Union (Union-Find)"],
-        engine: "deterministic"
-      });
+    } catch (e: any) {
+      setReviewResult(null);
+      setReviewError(`${t("coding.review_failed")} (${e?.message || "network"})`);
     } finally {
       setIsReviewing(false);
     }
@@ -356,6 +318,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
   // Request next AI hint
   const handleRequestHint = async () => {
     setIsRequestingHint(true);
+    setHintError(null);
     try {
       const res = await fetchApi<any>(`/student/coding/${problemId}/hint`, {
         method: "POST",
@@ -366,10 +329,8 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
         setHints((prev) => (prev.includes(res.hint) ? prev : [...prev, res.hint]));
         if (res.hints_used) setHintsCount(res.hints_used);
       }
-    } catch (err) {
-      const extra = "Remember that if an edge connects two already connected nodes, the component count does not decrease.";
-      setHints((prev) => (prev.includes(extra) ? prev : [...prev, extra]));
-      setHintsCount((c) => c + 1);
+    } catch (err: any) {
+      setHintError(`${t("coding.hint_failed")} (${err?.message || "network"})`);
     } finally {
       setIsRequestingHint(false);
     }
@@ -683,11 +644,11 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   <div className="flex items-center gap-3 text-caption font-mono text-muted">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3 text-brand" />
-                      {t("coding.runtime") || "Runtime"} {runResult?.runtime_ms ?? 42} ms
+                      {t("coding.runtime") || "Runtime"} {runResult?.runtime_ms ?? "-"} ms
                     </span>
                     <span className="flex items-center gap-1">
                       <Cpu className="w-3 h-3 text-violet" />
-                      {t("coding.memory") || "Memory"} {runResult?.memory_mb ?? 16.1} MB
+                      {t("coding.memory") || "Memory"} {runResult?.memory_mb ?? "-"} MB
                     </span>
                   </div>
                 </div>
@@ -705,12 +666,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                         <>
                           {/* Case Pills Row */}
                           <div className="flex flex-wrap gap-1.5">
-                            {(runResult?.cases || [
-                              { name: "Sample case 1", status: "Passed" },
-                              { name: "Sample case 2", status: "Passed" },
-                              { name: "Edge: no edges", status: "Passed" },
-                              { name: "Large graph (n=2000)", status: "Passed" }
-                            ]).map((c, i) => (
+                            {(runResult?.cases || []).map((c, i) => (
                               <button
                                 key={i}
                                 onClick={() => setSelectedCase(i)}
@@ -846,7 +802,13 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   )}
                 </button>
 
-                {/* AI Review Results (Dynamic or static fallback) */}
+                {reviewError && (
+                  <div role="alert" data-testid="review-error" className="p-2.5 rounded-tile bg-danger-faint border border-danger-line text-caption text-danger">
+                    {reviewError}
+                  </div>
+                )}
+
+                {/* AI Review Results */}
                 {reviewResult ? (
                   <div className="space-y-2">
                     {/* Complexity Badges */}
@@ -960,6 +922,12 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                         <strong className="text-brand">Hint {index + 1}:</strong> {hint}
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {hintError && (
+                  <div role="alert" data-testid="hint-error" className="p-2 rounded-tile bg-danger-faint border border-danger-line text-caption text-danger">
+                    {hintError}
                   </div>
                 )}
 
@@ -1173,79 +1141,4 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
       </AppShell>
     </RoleGuard>
   );
-}
-
-function getDemoFallbackProblem(): ProblemData {
-  return {
-    id: "prob_connected_components",
-    title: "Number of Connected Components in an Undirected Graph",
-    difficulty: "Medium",
-    topic: "Union-Find",
-    company_tags: "Product cos.",
-    week_info: "Week 8 · Pattern drill · 3 of 6 solved",
-    statement: "You have a graph of n nodes. You are given an integer n and an array edges where edges[i] = [ai, bi] indicates that there is an edge between ai and bi in the graph.\n\nReturn the number of connected components in the graph.",
-    example_input: "n = 5, edges = [[0,1],[1,2],[3,4]]",
-    example_output: "2",
-    constraints: "1 <= n <= 2000\n0 <= edges.length <= 5000\nedges[i].length == 2\n0 <= ai <= bi < n\nai != bi\nThere are no repeated edges.",
-    starter_codes: {
-      python: "class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        parent = list(range(n))\n        return n",
-      java: "class Solution {\n    public int countComponents(int n, int[][] edges) {\n        return n;\n    }\n}",
-      cpp: "class Solution {\npublic:\n    int countComponents(int n, vector<vector<int>>& edges) {\n        return n;\n    }\n};",
-      javascript: "var countComponents = function(n, edges) {\n    return n;\n};"
-    },
-    starter_code: "class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        return n",
-    trainer_notes: "Notice how path compression in find() flattens the tree. For best worst-case complexity, add union-by-rank.",
-    trainer_author: "Arun K.",
-    prev_problem: {
-      id: "prob_longest_increasing_subsequence",
-      title: "Longest Increasing Subsequence",
-      week_info: "Week 7 · Advanced drill · 3 of 3"
-    },
-    next_problem: {
-      id: "prob_redundant_connection",
-      title: "Redundant Connection",
-      week_info: "Week 8 · Pattern drill · 4 of 6"
-    },
-    curriculum_index: 18,
-    total_problems: 20,
-    ai_reviewer: {
-      tag: "Future Skills",
-      hints: [
-        { type: "good", text: "Good: path compression keeps find() fast.", color: "blue" },
-        { type: "try_next", text: "Try next: add union by rank.", color: "amber" },
-        { type: "interview_tip", text: "Interview tip: state the complexity aloud.", color: "blue" }
-      ],
-      revealed_hints: [
-        "Think of this as a connectivity problem. Each edge connects two nodes. Can you maintain the count of disjoint components starting from n?"
-      ],
-      hints_used: 1,
-      max_hints: 3,
-      rules_note: "Hints only, no full solutions. AI help used in this problem: 1 hint"
-    }
-  };
-}
-
-function getFallbackCurriculumProblems(): ProblemNavItem[] {
-  return [
-    { id: "prob_two_sum", title: "Two Sum", difficulty: "Easy", topic: "Arrays & Hash Map", week_info: "Week 1 · Foundation · 1 of 3", curriculum_index: 1 },
-    { id: "prob_container_water", title: "Container With Most Water", difficulty: "Medium", topic: "Two Pointers", week_info: "Week 1 · Pattern drill · 2 of 3", curriculum_index: 2 },
-    { id: "prob_3sum", title: "3Sum", difficulty: "Medium", topic: "Two Pointers", week_info: "Week 1 · Advanced drill · 3 of 3", curriculum_index: 3 },
-    { id: "prob_longest_substring", title: "Longest Substring Without Repeating Characters", difficulty: "Medium", topic: "Sliding Window", week_info: "Week 2 · Pattern drill · 1 of 2", curriculum_index: 4 },
-    { id: "prob_subarray_sum_k", title: "Subarray Sum Equals K", difficulty: "Medium", topic: "Prefix Sum & Hash Map", week_info: "Week 2 · Advanced drill · 2 of 2", curriculum_index: 5 },
-    { id: "prob_valid_parentheses", title: "Valid Parentheses", difficulty: "Easy", topic: "Stack", week_info: "Week 3 · Foundation · 1 of 3", curriculum_index: 6 },
-    { id: "prob_daily_temperatures", title: "Daily Temperatures", difficulty: "Medium", topic: "Monotonic Stack", week_info: "Week 3 · Pattern drill · 2 of 3", curriculum_index: 7 },
-    { id: "prob_min_stack", title: "Min Stack", difficulty: "Medium", topic: "Stack Design", week_info: "Week 3 · Design drill · 3 of 3", curriculum_index: 8 },
-    { id: "prob_reverse_linked_list", title: "Reverse Linked List", difficulty: "Easy", topic: "Linked List", week_info: "Week 4 · Foundation · 1 of 2", curriculum_index: 9 },
-    { id: "prob_linked_list_cycle", title: "Linked List Cycle II", difficulty: "Medium", topic: "Fast & Slow Pointers", week_info: "Week 4 · Pattern drill · 2 of 2", curriculum_index: 10 },
-    { id: "prob_search_rotated", title: "Search in Rotated Sorted Array", difficulty: "Medium", topic: "Binary Search", week_info: "Week 5 · Pattern drill · 1 of 2", curriculum_index: 11 },
-    { id: "prob_find_peak_element", title: "Find Peak Element", difficulty: "Medium", topic: "Binary Search", week_info: "Week 5 · Advanced drill · 2 of 2", curriculum_index: 12 },
-    { id: "prob_max_depth_tree", title: "Maximum Depth of Binary Tree", difficulty: "Easy", topic: "Binary Tree DFS", week_info: "Week 6 · Foundation · 1 of 2", curriculum_index: 13 },
-    { id: "prob_lowest_common_ancestor", title: "Lowest Common Ancestor of a BST", difficulty: "Medium", topic: "BST Traversal", week_info: "Week 6 · Pattern drill · 2 of 2", curriculum_index: 14 },
-    { id: "prob_climbing_stairs", title: "Climbing Stairs", difficulty: "Easy", topic: "Dynamic Programming", week_info: "Week 7 · Foundation · 1 of 3", curriculum_index: 15 },
-    { id: "prob_coin_change", title: "Coin Change", difficulty: "Medium", topic: "Dynamic Programming", week_info: "Week 7 · Pattern drill · 2 of 3", curriculum_index: 16 },
-    { id: "prob_longest_increasing_subsequence", title: "Longest Increasing Subsequence", difficulty: "Medium", topic: "Dynamic Programming", week_info: "Week 7 · Advanced drill · 3 of 3", curriculum_index: 17 },
-    { id: "prob_connected_components", title: "Number of Connected Components in an Undirected Graph", difficulty: "Medium", topic: "Union-Find", week_info: "Week 8 · Pattern drill · 3 of 6 solved", is_solved: true, curriculum_index: 18 },
-    { id: "prob_redundant_connection", title: "Redundant Connection", difficulty: "Medium", topic: "Union-Find", week_info: "Week 8 · Pattern drill · 4 of 6", curriculum_index: 19 },
-    { id: "prob_course_schedule", title: "Course Schedule", difficulty: "Medium", topic: "Graph Topological Sort", week_info: "Week 8 · Advanced drill · 5 of 6", curriculum_index: 20 }
-  ];
 }

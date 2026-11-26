@@ -221,7 +221,7 @@ def list_code_reviews(
     status: Optional[str] = "all",
     team: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
     db: Session = Depends(get_db)
 ):
     college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
@@ -291,7 +291,7 @@ def list_code_reviews(
 @router.get("/reviews/{pr_id}")
 def get_code_review_detail(
     pr_id: str,
-    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
     db: Session = Depends(get_db)
 ):
     college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
@@ -391,11 +391,28 @@ def get_code_review_detail(
         }
     }
 
+def _record_review_decision(db: Session, current_user: TokenPayload, pr: "PullRequest", action: str) -> None:
+    """Audit the decision (rule 4) and tell the PR's author in-app, in the same transaction."""
+    from services.notifications import notify_user
+    record_audit(db, current_user, f"code_review.{action}", "pull_request", pr.id, {"pr_number": pr.pr_number})
+    author_user = db.execute(select(StudentModel.user_id).where(
+        StudentModel.id == pr.author_id, StudentModel.college_id == pr.college_id)).scalar_one_or_none()
+    if not author_user:
+        return
+    if action == "approve":
+        notify_user(db, author_user, f"PR {pr.pr_number} approved", pr.title, title_ta=f"PR {pr.pr_number} ஒப்புதல் பெற்றது",
+                    body_ta=pr.title, kind="approval", link="/student/projects/board", college_id=pr.college_id)
+    else:
+        notify_user(db, author_user, f"Changes requested on PR {pr.pr_number}", pr.title,
+                    title_ta=f"PR {pr.pr_number}: மாற்றங்கள் தேவை", body_ta=pr.title, kind="approval",
+                    link="/student/projects/board", college_id=pr.college_id)
+
+
 @router.post("/reviews/{pr_id}/action")
 def submit_review_action(
     pr_id: str,
     req: ReviewActionRequest,
-    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
     db: Session = Depends(get_db)
 ):
     college_id = current_user.college_id if isinstance(current_user, TokenPayload) else "col_demo_001"
@@ -439,6 +456,7 @@ def submit_review_action(
                 if req.score_percent:
                     project.score_percent = req.score_percent
 
+        _record_review_decision(db, current_user, pr, "approve")
         db.commit()
         _publish_board_for_task(db, pr.task_id)
         return {
@@ -465,6 +483,7 @@ def submit_review_action(
             if task:
                 task.column_name = "in_progress"
 
+        _record_review_decision(db, current_user, pr, "request_changes")
         db.commit()
         _publish_board_for_task(db, pr.task_id)
         return {
@@ -480,7 +499,7 @@ def submit_review_action(
 def add_inline_review_comment(
     pr_id: str,
     req: InlineCommentRequest,
-    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_role(["trainer"])),
     db: Session = Depends(get_db)
 ):
     import uuid

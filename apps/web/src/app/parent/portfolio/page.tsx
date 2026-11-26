@@ -71,7 +71,7 @@ interface ParentPortfolioData {
     title: string;
     remark: string;
   };
-  demo_day_invitation: DemoDayInfo;
+  demo_day_invitation: DemoDayInfo | null;   // null when no upcoming event takes RSVPs
   practical_skills: PracticalSkill[];
 }
 
@@ -82,6 +82,7 @@ export default function ParentPortfolioPage() {
   const [error, setError] = useState<string | null>(null);
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [rsvpFeedback, setRsvpFeedback] = useState<string | null>(null);
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -90,98 +91,9 @@ export default function ParentPortfolioPage() {
       const res = await fetchApi<ParentPortfolioData>(`/parent/portfolio?lang=${language}`);
       setData(res);
     } catch (err: any) {
-      console.warn("API fetch failed, falling back to offline defaults:", err);
-      setData({
-        ward: {
-          name: "Priya R",
-          details: "Sem 5 · AI & DS",
-          college: "Demo Engineering College",
-          readiness_score: 74,
-          readiness_band: language === "ta" ? "கிட்டத்தட்ட தயார்" : "Nearly Ready"
-        },
-        milestone_progress: {
-          sprint_name: "Sprint 2 of 3",
-          active_project: "Clinic Appointment & Token System",
-          progress_percent: 58,
-          completed_points: 21,
-          total_points: 36,
-          status_text: language === "ta" ? "சரியான பாதையில் உள்ளது" : "On Track",
-          deadline: "Week 8 Capstone Deadline",
-          build_status: "Passing · Deployed to Staging"
-        },
-        featured_projects: [
-          {
-            id: "proj_crop_01",
-            title: "Crop Price Predictor",
-            tagline: "Machine learning system for forecasting agricultural market prices",
-            category: "machine_learning",
-            what_ward_built: "Priya led the machine learning forecasting model for this farming tool, helping farmers predict market selling prices before harvesting.",
-            role_description: "Led ML pipeline development and FastAPI prediction endpoints.",
-            team_size: 3,
-            team_name: "Team AgriVision",
-            tech_stack: ["Python", "FastAPI", "Scikit-Learn", "Streamlit"],
-            live_demo_url: "https://crop-price-demo.demo.edu",
-            github_url: "https://github.com/priya-r/crop-price-predictor",
-            status: "deployed",
-            score_percent: 94,
-            trainer_feedback: "Exceptional model validation and clear modular structure. Priya demonstrated deep grasp of cross-validation.",
-            is_featured: true
-          },
-          {
-            id: "proj_clinic_02",
-            title: "Clinic Appointment & Token System",
-            tagline: "Real-time patient scheduling and digital queue management portal",
-            category: "fullstack",
-            what_ward_built: "Priya developed the secure patient appointment engine and doctor availability schedule.",
-            role_description: "Architected backend REST APIs and Next.js patient booking UI.",
-            team_size: 4,
-            team_name: "Team Phoenix",
-            tech_stack: ["React", "Next.js", "FastAPI", "PostgreSQL"],
-            live_demo_url: "https://clinic-demo.demo.edu",
-            github_url: "https://github.com/priya-r/clinic-appointment-portal",
-            status: "in_progress",
-            score_percent: 88,
-            trainer_feedback: "Clean separation of concerns between appointment scheduling and notification queues.",
-            is_featured: true
-          }
-        ],
-        mentor_evaluation: {
-          trainer_name: "Arun Kumar",
-          title: "Lead Software Architecture Trainer",
-          remark: language === "ta"
-            ? "பயிர் விலை கணிப்பு மற்றும் கிளினிக் நியமனத் திட்டங்கள் இரண்டிலும் பிரியா பாராட்டத்தக்க தலைமைப் பாத்திரத்தை வகித்துள்ளார்."
-            : "Priya has taken an admirable leadership role in both the Crop Price Predictor and Clinic Appointment projects. Her code passes all automated unit tests."
-        },
-        demo_day_invitation: {
-          id: "event_demo_day_nov",
-          title: "Project Demo Day – Capstone Showcase",
-          event_date: "Sat, Nov 8 · 10:00 AM – 1:00 PM",
-          venue: "Auditorium A & Live Stream",
-          description: "Annual Industry-Ready Engineer Program Capstone Presentation. Parents and industry mentors are invited to watch students present live working software applications.",
-          rsvp_status: "none",
-          guest_count: 1
-        },
-        practical_skills: [
-          {
-            skill: "Full-Stack Web Development",
-            tamil_label: "முழுமையான வலைப்பயன்பாட்டு உருவாக்கம்",
-            description: "Able to design and build complete web applications with modern frontend and backend databases.",
-            level: "Proficient"
-          },
-          {
-            skill: "Machine Learning & AI Modeling",
-            tamil_label: "இயந்திரக் கற்றல் மற்றும் AI மாடலிங்",
-            description: "Applies predictive algorithms to solve real-world agricultural and business forecasting problems.",
-            level: "Advanced"
-          },
-          {
-            skill: "API & Database Architecture",
-            tamil_label: "API மற்றும் தரவுத்தள வடிவமைப்பு",
-            description: "Designs high-speed, secure data pipelines and structured PostgreSQL storage.",
-            level: "Proficient"
-          }
-        ]
-      });
+      // never show another child's (demo) portfolio in place of this family's: say it failed
+      setData(null);
+      setError(err?.message || t("parent_portfolio.error_loading"));
     } finally {
       setLoading(false);
     }
@@ -192,37 +104,24 @@ export default function ParentPortfolioPage() {
   }, [language]);
 
   const handleRsvp = async (status: "attending" | "declined") => {
-    if (!data) return;
+    const invitation = data?.demo_day_invitation;
+    if (!invitation) return;
     setRsvpLoading(true);
     setRsvpFeedback(null);
+    setRsvpError(null);
     try {
-      await fetchApi("/parent/portfolio/rsvp", {
+      const res = await fetchApi<{ rsvp_status: string; guest_count: number }>("/parent/portfolio/rsvp", {
         method: "POST",
-        body: JSON.stringify({
-          event_id: data.demo_day_invitation.id,
-          status,
-          guest_count: 1
-        })
+        body: JSON.stringify({ event_id: invitation.id, status, guest_count: invitation.guest_count || 1 }),
       });
+      // show what the server stored, only after it stored it
+      setData((prev) => (prev && prev.demo_day_invitation
+        ? { ...prev, demo_day_invitation: { ...prev.demo_day_invitation, rsvp_status: res.rsvp_status, guest_count: res.guest_count } }
+        : prev));
+      setRsvpFeedback(status === "attending" ? t("parent_portfolio.rsvp_status_confirmed") : t("parent_portfolio.rsvp_status_updated"));
     } catch (err: any) {
-      console.warn("RSVP API call failed, updating optimistically:", err);
+      setRsvpError(`${t("parent_portfolio.rsvp_failed")} (${err?.message || "network"})`);
     } finally {
-      setData((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          demo_day_invitation: {
-            ...prev.demo_day_invitation,
-            rsvp_status: status
-          }
-        };
-      });
-
-      setRsvpFeedback(
-        status === "attending"
-          ? t("parent_portfolio.rsvp_status_confirmed")
-          : t("parent_portfolio.rsvp_status_updated")
-      );
       setRsvpLoading(false);
     }
   };
@@ -414,6 +313,7 @@ export default function ParentPortfolioPage() {
               </div>
 
               {/* Project Demo Day Invitation & RSVP Card */}
+              {data.demo_day_invitation && (
               <div className="bg-white rounded-card border-2 border-brand/30 p-6 md:p-8 shadow-card space-y-6 relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div className="space-y-1.5">
@@ -477,6 +377,13 @@ export default function ParentPortfolioPage() {
                     {t("parent_portfolio.rsvp_heading")}
                   </div>
 
+                  {rsvpError && (
+                    <div role="alert" data-testid="rsvp-error" className="p-3 rounded-card bg-danger-faint border border-danger-line text-xs font-semibold text-danger flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{rsvpError}</span>
+                    </div>
+                  )}
+
                   {rsvpFeedback && (
                     <div className="p-3 rounded-card bg-success-faint border border-success-line text-xs font-semibold text-success flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4" />
@@ -505,6 +412,7 @@ export default function ParentPortfolioPage() {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Mentor Remark Card */}
               <div className="bg-white rounded-card border border-line p-6 shadow-card space-y-3">

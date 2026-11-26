@@ -162,11 +162,8 @@ var countComponents = function(n, edges) {
 };"""
 }
 
-PROBLEM_HINTS = [
-    "Think of this as a connectivity problem. Each edge connects two nodes. Can you maintain the count of disjoint components starting from n?",
-    "Remember that if an edge connects two already connected nodes (same root), the component count does not decrease.",
-    "Notice how path compression in find() flattens the tree. For best worst-case complexity, combine with union-by-rank."
-]
+from services.coding_hints import hints_for
+SUBMIT_GRACE_SECONDS = 60   # a practice-test submit may arrive this late (network) and still save its final answers
 
 CURRICULUM_ORDER = [
     "prob_two_sum",
@@ -279,7 +276,7 @@ def get_coding_problem(
     revealed_hints = [r.hint_text for r in hint_records]
     if not revealed_hints:
         # Default with the first hint
-        revealed_hints = [PROBLEM_HINTS[0]]
+        revealed_hints = [hints_for(prob.topic)[0]]
 
     # Check if student has previous submissions
     last_submission = db.execute(
@@ -320,7 +317,7 @@ def get_coding_problem(
             ],
             "revealed_hints": revealed_hints,
             "hints_used": len(revealed_hints),
-            "max_hints": len(PROBLEM_HINTS),
+            "max_hints": len(hints_for(prob.topic)),
             "rules_note": f"Hints only, no full solutions. AI help used in this problem: {len(revealed_hints)} hint"
         },
         "last_submission": {
@@ -633,17 +630,17 @@ def request_coding_hint(
     # the first request unlocks hint 2, never hint 1 again.
     shown = max(len(hint_records), 1)
     next_hint_idx = shown
-    if next_hint_idx >= len(PROBLEM_HINTS):
+    if next_hint_idx >= len(hints_for(prob.topic)):
         # All hints exhausted
         return {
             "success": False,
             "message": "All available hints for this problem have been unlocked.",
-            "hint": PROBLEM_HINTS[-1],
-            "hints_used": len(PROBLEM_HINTS),
-            "max_hints": len(PROBLEM_HINTS)
+            "hint": hints_for(prob.topic)[-1],
+            "hints_used": len(hints_for(prob.topic)),
+            "max_hints": len(hints_for(prob.topic))
         }
 
-    hint_text = PROBLEM_HINTS[next_hint_idx]
+    hint_text = hints_for(prob.topic)[next_hint_idx]
     if student_id is not None:
         # trainers preview hints without consuming a student's hint quota
         to_record = [] if hint_records else [0]          # record the free hint 1 once
@@ -655,7 +652,7 @@ def request_coding_hint(
                 problem_id=prob.id,
                 student_id=student_id,
                 hint_number=idx + 1,
-                hint_text=PROBLEM_HINTS[idx],
+                hint_text=hints_for(prob.topic)[idx],
             ))
         db.commit()
 
@@ -664,7 +661,7 @@ def request_coding_hint(
         "hint": hint_text,
         "hint_number": next_hint_idx + 1,
         "hints_used": next_hint_idx + 1,
-        "max_hints": len(PROBLEM_HINTS)
+        "max_hints": len(hints_for(prob.topic))
     }
 
 
@@ -884,7 +881,10 @@ def batch_save_answers(
     marked_set = set(req.marked_for_review or [])
 
     for q_num_raw, val in req.answers.items():
-        q_num = int(q_num_raw)
+        try:
+            q_num = int(q_num_raw)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail=f"Answer keys must be question numbers, got '{str(q_num_raw)[:20]}'")
         q = q_by_num.get(q_num)
         if not q:
             continue
@@ -963,6 +963,9 @@ def submit_practice_test(
 
     if not attempt:
         raise HTTPException(status_code=404, detail="Test attempt not found")
+    if attempt.status == "submitted":
+        # submitting twice returns the graded result; it never takes new answers or re-grades
+        return get_attempt_result(attempt_id, current_user, db)
 
     questions = db.execute(
         select(PracticeQuestion)
@@ -971,9 +974,11 @@ def submit_practice_test(
     ).scalars().all()
 
     now = datetime.datetime.utcnow()
+    # after the time limit (plus a short grace for the network) only answers saved in time count
+    late = attempt.ends_at is not None and now > attempt.ends_at + datetime.timedelta(seconds=SUBMIT_GRACE_SECONDS)
 
     # Save any final answers if provided
-    if req and req.answers:
+    if req and req.answers and not late:
         marked_set = set(req.marked_for_review or [])
         existing_answers = {
             a.question_number: a
@@ -1048,7 +1053,8 @@ def submit_practice_test(
 
     total_q = len(questions) or 1
     accuracy_pct = round((total_score / total_q) * 100, 1)
-    time_taken_sec = int((now - attempt.started_at).total_seconds())
+    finished = min(now, attempt.ends_at) if attempt.ends_at else now
+    time_taken_sec = max(0, int((finished - attempt.started_at).total_seconds()))
     time_taken_mins = max(1, time_taken_sec // 60)
 
     attempt.status = "submitted"

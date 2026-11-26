@@ -164,34 +164,47 @@ def test_get_parent_portfolio(parent_auth_headers):
     assert "mentor_evaluation" in data
     assert data["mentor_evaluation"]["trainer_name"] == "Arun Kumar"
 
-def test_parent_demo_day_rsvp(parent_auth_headers):
-    # RSVP attending
-    rsvp_payload = {
-        "event_id": "event_demo_day_nov",
-        "status": "attending",
-        "guest_count": 2
-    }
-    res = client.post("/api/v1/parent/portfolio/rsvp", json=rsvp_payload, headers=parent_auth_headers)
-    assert res.status_code == 200
-    assert res.json()["success"] is True
-    assert res.json()["rsvp_status"] == "attending"
+def _parent(sub: str, name: str):
+    return {"Authorization": "Bearer " + create_access_token(data={"sub": sub, "role": "parent", "college_id": "col_demo_001", "name": name})}
 
-    # Verify database state
+
+def test_parent_demo_day_rsvp(parent_auth_headers):
+    """The Demo Day card is a real upcoming event; each parent's RSVP is their own (it used to be one shared row)."""
+    from models.schema import Rsvp
+    card = client.get("/api/v1/parent/portfolio", headers=parent_auth_headers).json()["demo_day_invitation"]
+    event_id = card["id"]
+    assert event_id == "evt_demo_day"
+
+    res = client.post("/api/v1/parent/portfolio/rsvp", json={"event_id": event_id, "status": "attending", "guest_count": 2},
+                      headers=parent_auth_headers)
+    assert res.status_code == 200 and res.json()["rsvp_status"] == "attending"
     db = SessionLocal()
     try:
-        ev = db.execute(select(ProjectDemoEvent).filter_by(id="event_demo_day_nov")).scalar_one_or_none()
-        assert ev is not None
-        assert ev.rsvp_status == "attending"
-        assert ev.guest_count == 2
+        mine = db.execute(select(Rsvp).filter_by(event_id=event_id, parent_user_id="usr_ramesh_01")).scalar_one()
+        assert (mine.status, mine.guests, mine.student_id) == ("yes", 2, "std_priya_01")
     finally:
         db.close()
 
-    # RSVP declined
-    rsvp_payload_decline = {
-        "event_id": "event_demo_day_nov",
-        "status": "declined",
-        "guest_count": 1
-    }
-    res_dec = client.post("/api/v1/parent/portfolio/rsvp", json=rsvp_payload_decline, headers=parent_auth_headers)
+    # another family's answer neither overwrites nor shows on this parent's card
+    lakshmi = _parent("usr_lakshmi_01", "Mrs. Lakshmi")
+    assert client.post("/api/v1/parent/portfolio/rsvp", json={"event_id": event_id, "status": "declined", "guest_count": 0},
+                       headers=lakshmi).status_code == 200
+    again = client.get("/api/v1/parent/portfolio", headers=parent_auth_headers).json()["demo_day_invitation"]
+    assert (again["rsvp_status"], again["guest_count"]) == ("attending", 2)
+
+    res_dec = client.post("/api/v1/parent/portfolio/rsvp", json={"event_id": event_id, "status": "declined", "guest_count": 1},
+                          headers=parent_auth_headers)
     assert res_dec.status_code == 200
     assert res_dec.json()["rsvp_status"] == "declined"
+
+
+def test_parent_rsvp_rejects_bad_input_and_past_events(parent_auth_headers):
+    ok = {"event_id": "evt_demo_day", "status": "attending", "guest_count": 1}
+    for bad in ({"status": "banana"}, {"guest_count": -5}, {"guest_count": 500}):
+        assert client.post("/api/v1/parent/portfolio/rsvp", json={**ok, **bad}, headers=parent_auth_headers).status_code == 422
+    # the old fixed-date row and any event that does not take RSVPs (or has passed) are refused
+    for event_id in ("event_demo_day_nov", "evt_midterm_dsa", "evt_does_not_exist"):
+        assert client.post("/api/v1/parent/portfolio/rsvp", json={**ok, "event_id": event_id}, headers=parent_auth_headers).status_code == 404
+    # a parent cannot RSVP for a child who is not theirs
+    assert client.post("/api/v1/parent/portfolio/rsvp", json={**ok, "child_id": "std_cse_5_001_d90c"},
+                       headers=parent_auth_headers).status_code == 404

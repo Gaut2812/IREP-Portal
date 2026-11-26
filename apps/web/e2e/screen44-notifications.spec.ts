@@ -37,6 +37,10 @@ test.describe("Screen 44: Notification centre (/notifications)", () => {
     await loginAs(page, "trainer", { lang: "ta" });
     await page.goto("/notifications");
     await expect(page.getByTestId("prefs-save")).toHaveText("விருப்பங்களைச் சேமி");
+    // the type under each notification is translated, not the raw kind ("info", "approval", ...)
+    const kinds = await page.getByTestId("notif-kind").allInnerTexts();
+    expect(kinds.length).toBeGreaterThan(0);
+    for (const k of kinds) expect(k).not.toMatch(/^[a-z_]+$/);
   });
 
   test("signed-out visitors are sent to sign in", async ({ page }) => {

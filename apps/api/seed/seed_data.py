@@ -256,6 +256,21 @@ def seed_portfolio_data(db, college_id="col_demo_001"):
 
     db.commit()
 
+def fix_pr_authors(db, college_id="col_demo_001") -> int:
+    """Seeded PRs were all credited to Priya's student id whatever the author's name: point each one at the
+    student who wrote it (review decisions notify the author). Idempotent; runs after the cohort exists."""
+    from models.schema import Student, User
+    changed = 0
+    for pr in db.execute(select(PullRequest).where(PullRequest.college_id == college_id)).scalars().all():
+        sid = db.execute(select(Student.id).join(User, User.id == Student.user_id)
+                         .where(Student.college_id == college_id, User.name == pr.author_name)
+                         .order_by(Student.id)).scalars().first()
+        if sid and pr.author_id != sid:
+            pr.author_id, changed = sid, changed + 1
+    db.flush()
+    return changed
+
+
 def seed_reviews_data(db, college_id="col_demo_001"):
     now = datetime.datetime.utcnow()
     prs_seed = [
@@ -673,6 +688,8 @@ def init_db_and_seed():
             from seed.seed_screen41 import seed_screen41
             seed_screen41(db, college_id="col_demo_001")
             db.commit()
+
+            fix_pr_authors(db, "col_demo_001")
 
             # keep at-risk flags consistent with the latest attendance history
             from services.at_risk import run_rules
@@ -1287,6 +1304,8 @@ def init_db_and_seed():
         from seed.seed_screen41 import seed_screen41
         seed_screen41(db, college_id="col_demo_001")
         db.flush()
+
+        fix_pr_authors(db, "col_demo_001")
 
         # same as the re-seed path: open at-risk flags for the seeded history
         from services.at_risk import run_rules

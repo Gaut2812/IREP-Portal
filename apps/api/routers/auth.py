@@ -11,6 +11,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
@@ -137,6 +138,15 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     record_audit(db, _as_payload(user), "auth.login", "user", user.id, {"method": "password"}, ip_address=ip)
     db.commit()
     return _issue(user)
+
+
+@router.post("/token", response_model=AuthResponse)
+def token_for_api_docs(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """OAuth2 password form for the API docs' "Authorize" button (the scheme's tokenUrl), local sign-in only.
+    Same checks as /auth/login (lockout, IP limit, audit, 410 in Keycloak mode); the role comes from the account."""
+    user = _find_user(db, form.username)
+    role = _sign_in_group(user.role) if user else "student"     # unknown accounts fail like a wrong password
+    return login(LoginRequest(role=role or "student", identifier=form.username, password=form.password), request, db)
 
 
 # ---- parent OTP ----

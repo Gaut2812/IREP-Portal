@@ -61,6 +61,27 @@ test.describe("Screen 24 - Coding Lab (/student/coding/:problemId)", () => {
     await expect(page.getByText(/18 \/ 18 hidden tests passed/i)).toBeVisible();
   });
 
+  test("a failed submit or hint says so: never Accepted, never an invented hint", async ({ page }) => {
+    await page.goto("/student/coding/prob_connected_components");
+    await expect(page.getByText(/Hint 1:/i)).toBeVisible();
+    await page.route("**/api/v1/student/coding/*/submit", (r) => r.fulfill({ status: 500, body: "boom" }));
+    await page.route("**/api/v1/student/coding/*/hint", (r) => r.abort());
+
+    await page.getByTestId("submit-button").click();
+    await expect(page.getByText(/could not confirm your submission/i)).toBeVisible();
+    await expect(page.getByText(/hidden tests passed/i)).toHaveCount(0);
+    await expect(page.getByText(/Accepted/)).toHaveCount(0);
+
+    // earlier specs may already have unlocked hint 2 on the server: the count must simply not move
+    const shown = await page.getByText(/^Hint \d+:/).count();
+    const askHint = page.getByTestId("request-hint-button");
+    if (await askHint.isVisible()) {
+      await askHint.click();
+      await expect(page.getByTestId("hint-error")).toBeVisible();
+      await expect(page.getByText(/^Hint \d+:/)).toHaveCount(shown);
+    }
+  });
+
   test("should support Tamil language toggle", async ({ page }) => {
     await page.goto("/student/coding/prob_connected_components");
 

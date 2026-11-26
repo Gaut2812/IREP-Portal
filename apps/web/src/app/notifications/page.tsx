@@ -26,6 +26,10 @@ export default function NotificationCentrePage() {
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const kindLabel = (k: string) => {
+    const label = t(`notifications.kinds.${k}`);
+    return label.startsWith("notifications.kinds.") ? k : label;
+  };
 
   const query = useCallback((before?: string | null) => {
     const q = new URLSearchParams({ lang: language, limit: "20" });
@@ -113,7 +117,7 @@ export default function NotificationCentrePage() {
               <select value={kind} onChange={(e) => setKind(e.target.value)} data-testid="filter-kind" aria-label={t("notifications.filter_kind")}
                 className="px-2.5 py-1.5 border border-line rounded-tile text-xs bg-white">
                 <option value="">{t("notifications.all_kinds")}</option>
-                {kinds.map((k) => <option key={k} value={k}>{k}</option>)}
+                {kinds.map((k) => <option key={k} value={k}>{kindLabel(k)}</option>)}
               </select>
               <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={unreadOnly} data-testid="filter-unread" onChange={(e) => setUnreadOnly(e.target.checked)} />{t("notifications.unread_only")}</label>
               <span className="text-xs text-muted" data-testid="unread-count">{unread} {t("notifications.unread")}</span>
@@ -130,7 +134,7 @@ export default function NotificationCentrePage() {
                       <span className="text-caption text-muted whitespace-nowrap">{it.created_at?.slice(0, 16).replace("T", " ")}</span>
                     </div>
                     {it.body && <div className="text-caption text-muted mt-0.5">{it.body}</div>}
-                    <span className="text-caption text-subtle">{it.kind}</span>
+                    <span className="text-caption text-subtle" data-testid="notif-kind">{kindLabel(it.kind)}</span>
                   </div>
                 );
                 return (

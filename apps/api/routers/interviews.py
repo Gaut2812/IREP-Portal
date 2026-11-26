@@ -55,12 +55,16 @@ def book(slot_id: str, current_user: TokenPayload = Depends(require_role(["stude
     booking = book_slot(db, student, slot_id)
     slot = db.execute(select(InterviewSlot).filter_by(id=slot_id)).scalar_one()
     when = slot.starts_at.strftime("%a %b %d, %I:%M %p")
-    notify_user(db, current_user.sub, "Mock interview booked", f"Your {slot.round_type.replace('_', ' ')} round is on {when}.",
-                title_ta="மாதிரி நேர்காணல் பதிவு செய்யப்பட்டது", kind="reminder", link="/student/interviews", college_id=student.college_id)
+    label = ROUND_LABEL.get(slot.round_type, ROUND_LABEL["technical"])
+    round_en, round_ta = label["en"], label["ta"]
+    notify_user(db, current_user.sub, "Mock interview booked", f"Your mock interview ({round_en}) is on {when}.",
+                title_ta="மாதிரி நேர்காணல் பதிவு செய்யப்பட்டது", body_ta=f"உங்கள் மாதிரி நேர்காணல் ({round_ta}): {when}.",
+                kind="reminder", link="/student/interviews", college_id=student.college_id)
     from models.schema import Trainer
     tr = db.execute(select(Trainer).filter_by(id=slot.trainer_id)).scalar_one_or_none()
     if tr:
-        notify_user(db, tr.user_id, f"Interview booked by {current_user.name}", f"{when} · {slot.round_type.replace('_', ' ')}", kind="info",
+        notify_user(db, tr.user_id, f"Interview booked by {current_user.name}", f"{when} · {round_en}",
+                    title_ta=f"{current_user.name} நேர்காணலைப் பதிவு செய்தார்", body_ta=f"{when} · {round_ta}", kind="info",
                     link="/trainer", college_id=student.college_id)
     record_audit(db, current_user, "interview.book", "interview_slot", slot.id)
     db.commit()

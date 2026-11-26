@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
@@ -12,6 +13,10 @@ import {
   Mic, MicOff, Video, VideoOff, Hand, MessageSquare, BarChart2, Cpu, LogOut, ArrowDown, ThumbsUp,
   CheckCircle2, AlertCircle, RefreshCw, Radio, Square, Plus, Send, Clock,
 } from "lucide-react";
+
+// LiveKit touches window, media devices and WebRTC: browser only, and only loaded for LiveKit classes
+const LiveKitStage = dynamic(() => import("@/components/live/LiveKitStage"), { ssr: false });
+type LkJoin = { ws_url: string; token: string; room: string };
 
 interface LiveState {
   session_id: string; title: string; subtext: string; trainer: string; role: "student" | "trainer"; provider: string;
@@ -27,6 +32,8 @@ interface LiveState {
   attendance: { minutes_present: number; total_minutes: number; threshold_minutes: number; threshold_pct: number; marked_present: boolean; joined_at: string | null; is_in_room: boolean } | null;
   attendance_on_track: boolean | null;
   spectate: { url: string; label: string | null } | null;
+  share_granted?: boolean;
+  share_grants?: string[];
 }
 
 const FLOW_STYLE: Record<string, string> = {
@@ -54,6 +61,7 @@ export default function LiveClassroomPage() {
   const [joined, setJoined] = useState(false);
   const [joinUrl, setJoinUrl] = useState<string | null>(null);
   const [joinProvider, setJoinProvider] = useState<string | null>(null);
+  const [lk, setLk] = useState<LkJoin | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mic, setMic] = useState(false);
@@ -114,10 +122,11 @@ export default function LiveClassroomPage() {
   const join = useCallback(async () => {
     setBusy(true);
     try {
-      const res = await fetchApi<{ join_url: string | null; provider?: string }>(`/sessions/${sessionId}/join`, { method: "POST" });
+      const res = await fetchApi<{ join_url: string | null; provider?: string; livekit?: LkJoin }>(`/sessions/${sessionId}/join`, { method: "POST" });
       setJoined(true);
       setJoinUrl(res.join_url);
       setJoinProvider(res.provider ?? null);
+      setLk(res.provider === "livekit" && res.livekit ? res.livekit : null);
       // Teams cannot be embedded (Master Plan): open the Teams app / web client
       if (res.provider === "teams" && res.join_url) window.open(res.join_url, "_blank", "noopener");
       await load();
@@ -136,6 +145,19 @@ export default function LiveClassroomPage() {
       join();
     }
   }, [st, joined, join]);
+
+  const moderate = useCallback(async (userId: string, action: "mute" | "remove" | "grant_share" | "revoke_share") => {
+    try {
+      await fetchApi(`/live/${sessionId}/participants/${userId}/moderate`, { method: "POST", body: JSON.stringify({ action }) });
+      setToast(t(`live_class.lk_done_${action}`));
+      await load();
+    } catch (err: any) {
+      setToast(err?.detail || t("live_class.action_failed"));
+    }
+  }, [sessionId, load, t]);
+
+  // removed by the trainer, the class ended, or the network dropped for good
+  const onLkGone = useCallback(() => { setLk(null); load(); }, [load]);
 
   const leave = async () => {
     try { await fetchApi(`/sessions/${sessionId}/leave`, { method: "POST" }); } catch { /* ignore */ }
@@ -293,6 +315,17 @@ export default function LiveClassroomPage() {
                 <p className="text-caption text-subtle max-w-sm">{t("live_class.teams_attendance_note")}</p>
                 {!isTrainer && <p className="text-caption text-subtle max-w-sm" data-testid="teams-name-rule">{t("live_class.teams_name_rule")}</p>}
               </div>
+            ) : lk ? (
+              <LiveKitStage wsUrl={lk.ws_url} token={lk.token} isTrainer={isTrainer} canShare={!!st.share_granted}
+                shareGrants={st.share_grants ?? []} t={t} onModerate={moderate} onToast={setToast} onDisconnected={onLkGone} />
+            ) : st.provider === "livekit" ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center" data-testid="lk-reconnect">
+                <p className="text-sm text-line font-semibold">{t("live_class.lk_not_connected")}</p>
+                <button onClick={join} disabled={busy || !st.can_join} className="px-4 py-2.5 bg-teal hover:bg-teal-hover text-white text-xs font-semibold rounded-card disabled:opacity-40" data-testid="lk-connect">
+                  {t("live_class.lk_connect")}
+                </button>
+                <p className="text-caption text-subtle max-w-sm">{t("live_class.lk_camera_note")}</p>
+              </div>
             ) : joinUrl ? (
               <iframe src={joinUrl} title={st.title} className="flex-1 w-full rounded-card bg-black" allow="camera; microphone; display-capture; fullscreen" />
             ) : (
@@ -325,7 +358,7 @@ export default function LiveClassroomPage() {
               </>
             )}
             {/* Participant tiles */}
-            <div className="flex items-center gap-2 pt-2 border-t border-[#2D3748] overflow-x-auto" data-testid="participants">
+            {st.provider !== "livekit" && <div className="flex items-center gap-2 pt-2 border-t border-[#2D3748] overflow-x-auto" data-testid="participants">
               {st.participants.map((p, i) => (
                 <div key={p.user_id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-tile bg-[#1E293B] border border-ink-soft text-xs flex-shrink-0">
                   <span className={`w-5 h-5 rounded-full ${AVATAR[i % AVATAR.length]} text-white font-semibold text-caption flex items-center justify-center`}>{p.initials}</span>
@@ -333,15 +366,17 @@ export default function LiveClassroomPage() {
                 </div>
               ))}
               {st.more_participants > 0 && <span className="text-caption text-subtle px-2 flex-shrink-0">{fill(t("live_class.more"), { n: st.more_participants })}</span>}
-            </div>
+            </div>}
           </div>
 
           {/* Control bar */}
           <div className="h-12 bg-[#141A29] rounded-card border border-[#2D3748] px-4 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
+              {st.provider !== "livekit" && <>
               <button onClick={() => setMic(!mic)} aria-label={mic ? t("live_class.mute") : t("live_class.unmute")} aria-pressed={mic} className={`p-2 rounded-tile ${mic ? "bg-teal" : "bg-[#1E293B] text-subtle hover:text-white"}`}>{mic ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}</button>
               <button onClick={() => setCam(!cam)} aria-label={t("live_class.camera")} aria-pressed={cam} className={`p-2 rounded-tile ${cam ? "bg-teal" : "bg-[#1E293B] text-subtle hover:text-white"}`}>{cam ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}</button>
               <button onClick={() => setHand(!hand)} aria-label={t("live_class.raise_hand")} aria-pressed={hand} className={`p-2 rounded-tile ${hand ? "bg-warning-fill" : "bg-[#1E293B] text-subtle hover:text-white"}`}><Hand className="w-4 h-4" /></button>
+              </>}
               <a href="#qa" aria-label={t("live_class.chat")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white"><MessageSquare className="w-4 h-4" /></a>
               {isTrainer ? (
                 <button onClick={() => setPollOpen(true)} aria-label={t("live_class.new_poll")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white" data-testid="new-poll"><BarChart2 className="w-4 h-4" /></button>

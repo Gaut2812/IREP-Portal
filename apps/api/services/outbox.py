@@ -79,6 +79,7 @@ def _load_handlers() -> None:
     # import modules that register handlers so a bare worker process sees them
     import services.notifications  # noqa: F401
     import services.teams  # noqa: F401
+    import services.livekit  # noqa: F401  (livekit.end_room, livekit.moderate)
     import services.at_risk  # noqa: F401  (at_risk.parent_call held over quiet hours)
     import services.lab_orchestrator  # noqa: F401  (lab.start, lab.stop)
     import services.broadcasts  # noqa: F401  (broadcast.chunk)

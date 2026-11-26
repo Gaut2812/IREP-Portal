@@ -48,6 +48,48 @@
         }
       }
     },
+    "/api/v1/auth/token": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Token For Api Docs",
+        "description": "OAuth2 password form for the API docs' \"Authorize\" button (the scheme's tokenUrl), local sign-in only.\nSame checks as /auth/login (lockout, IP limit, audit, 410 in Keycloak mode); the role comes from the account.",
+        "operationId": "token_for_api_docs_api_v1_auth_token_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_token_for_api_docs_api_v1_auth_token_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/parent/otp/request": {
       "post": {
         "tags": [
@@ -4145,6 +4187,135 @@
                 }
               ],
               "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/live/{session_id}/participants/{user_id}/moderate": {
+      "post": {
+        "tags": [
+          "Live Classroom"
+        ],
+        "summary": "Moderate Participant",
+        "description": "Trainer controls on a LiveKit class: mute, remove, allow or revoke screen share.\nRecorded and audited here; LiveKit is told by the outbox after commit.",
+        "operationId": "moderate_participant_api_v1_live__session_id__participants__user_id__moderate_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/livekit": {
+      "post": {
+        "tags": [
+          "Live Classroom"
+        ],
+        "summary": "Livekit Webhook",
+        "description": "LiveKit server callbacks, signed with LIVEKIT_API_SECRET (JWT with the body's sha256).",
+        "operationId": "livekit_webhook_api_v1_webhooks_livekit_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -19146,6 +19317,65 @@
         ],
         "title": "Body_import_students_api_v1_college_students_import_post"
       },
+      "Body_token_for_api_docs_api_v1_auth_token_post": {
+        "properties": {
+          "grant_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^password$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Type"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "title": "Password"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": ""
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "format": "password",
+            "title": "Client Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "Body_token_for_api_docs_api_v1_auth_token_post"
+      },
       "BranchIn": {
         "properties": {
           "name": {
@@ -20229,6 +20459,20 @@
         ],
         "title": "ModerateIn"
       },
+      "ModerateRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "pattern": "^(mute|remove|grant_share|revoke_share)$",
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "ModerateRequest"
+      },
       "MonthIn": {
         "properties": {
           "month": {
@@ -21062,6 +21306,17 @@
             "type": "integer",
             "title": "Guest Count",
             "default": 1
+          },
+          "child_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Id"
           }
         },
         "type": "object",

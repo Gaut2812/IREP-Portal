@@ -1226,7 +1226,7 @@ class LiveMeeting(TenantModel):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), unique=True, index=True)
-    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb, teams
+    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb, teams, livekit
     external_meeting_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     started_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
@@ -1245,6 +1245,8 @@ class LiveMeeting(TenantModel):
     graph_online_meeting_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     attendance_pulled_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     unmatched_attendees: Mapped[list] = mapped_column(JSON, default=list)   # Teams names the trainer must confirm
+    # LiveKit: users.id of students the trainer allowed to share their screen in this class
+    share_grants: Mapped[list] = mapped_column(JSON, default=list)
 
 
 class JoinEvent(TenantModel):
@@ -1255,7 +1257,10 @@ class JoinEvent(TenantModel):
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
     event: Mapped[str] = mapped_column(String(16), nullable=False)               # joined, left
     at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, index=True)
-    source: Mapped[str] = mapped_column(String(16), default="portal")            # portal, webhook
+    source: Mapped[str] = mapped_column(String(16), default="portal")            # portal, webhook, click, teams, livekit
+    external_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # provider webhook id (LiveKit retries)
+
+    __table_args__ = (UniqueConstraint("external_id", name="uq_join_events_external_id"),)
 
 
 class LivePoll(TenantModel):

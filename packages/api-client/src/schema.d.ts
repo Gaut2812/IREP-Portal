@@ -25,6 +25,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Token For Api Docs
+         * @description OAuth2 password form for the API docs' "Authorize" button (the scheme's tokenUrl), local sign-in only.
+         *     Same checks as /auth/login (lockout, IP limit, audit, 410 in Keycloak mode); the role comes from the account.
+         */
+        post: operations["token_for_api_docs_api_v1_auth_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/parent/otp/request": {
         parameters: {
             query?: never;
@@ -1116,6 +1137,47 @@ export interface paths {
         put?: never;
         /** Mark Answered */
         post: operations["mark_answered_api_v1_live__session_id__qa__question_id__answered_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/participants/{user_id}/moderate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Moderate Participant
+         * @description Trainer controls on a LiveKit class: mute, remove, allow or revoke screen share.
+         *     Recorded and audited here; LiveKit is told by the outbox after commit.
+         */
+        post: operations["moderate_participant_api_v1_live__session_id__participants__user_id__moderate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/livekit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Livekit Webhook
+         * @description LiveKit server callbacks, signed with LIVEKIT_API_SECRET (JWT with the body's sha256).
+         */
+        post: operations["livekit_webhook_api_v1_webhooks_livekit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4814,6 +4876,30 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_token_for_api_docs_api_v1_auth_token_post */
+        Body_token_for_api_docs_api_v1_auth_token_post: {
+            /** Grant Type */
+            grant_type?: string | null;
+            /** Username */
+            username: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
+            /**
+             * Scope
+             * @default
+             */
+            scope: string;
+            /** Client Id */
+            client_id?: string | null;
+            /**
+             * Client Secret
+             * Format: password
+             */
+            client_secret?: string | null;
+        };
         /** BranchIn */
         BranchIn: {
             /** Name */
@@ -5208,6 +5294,11 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** ModerateRequest */
+        ModerateRequest: {
+            /** Action */
+            action: string;
+        };
         /** MonthIn */
         MonthIn: {
             /** Month */
@@ -5488,6 +5579,8 @@ export interface components {
              * @default 1
              */
             guest_count: number;
+            /** Child Id */
+            child_id?: string | null;
         };
         /** ReportIn */
         ReportIn: {
@@ -5906,6 +5999,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    token_for_api_docs_api_v1_auth_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Body_token_for_api_docs_api_v1_auth_token_post"];
             };
         };
         responses: {
@@ -8084,6 +8210,75 @@ export interface operations {
                 session_id: string;
                 question_id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    moderate_participant_api_v1_live__session_id__participants__user_id__moderate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    livekit_webhook_api_v1_webhooks_livekit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

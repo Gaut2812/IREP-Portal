@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     BBB_URL: str = os.getenv("BBB_URL", "http://localhost:8080/bigbluebutton")
     BBB_SECRET: str = os.getenv("BBB_SECRET", "bbb_demo_secret_2026")
     LIVE_CLASS_ADAPTER: str = os.getenv("LIVE_CLASS_ADAPTER", "fake")
+    # LiveKit (LIVE_CLASS_ADAPTER=livekit): open-source media server on its own node (infra/livekit).
+    LIVEKIT_URL: str = os.getenv("LIVEKIT_URL", "http://localhost:7880")           # server API, as the API/workers reach it
+    LIVEKIT_WS_URL: str = os.getenv("LIVEKIT_WS_URL", "ws://localhost:7880")        # as students' browsers reach it (wss:// in production)
+    LIVEKIT_API_KEY: str = os.getenv("LIVEKIT_API_KEY", "devkey")                  # livekit-server --dev defaults
+    LIVEKIT_API_SECRET: str = os.getenv("LIVEKIT_API_SECRET", "irep_dev_livekit_secret_not_for_production")
     # Microsoft Teams via Graph (LIVE_CLASS_ADAPTER=teams): app-only client credentials.
     # The tenant admin must grant Calendars.ReadWrite, OnlineMeetings.Read.All and
     # OnlineMeetingArtifact.Read.All and set an application access policy (Master Plan).

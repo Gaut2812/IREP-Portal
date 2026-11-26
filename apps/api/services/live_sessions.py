@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from core.config import settings
 from models.schema import (
-    SessionItem, SessionAttendance, Recording, RecordingView, SessionReminder, Student, Batch,
+    SessionItem, SessionAttendance, Recording, RecordingView, SessionReminder, Student, Batch, LiveMeeting,
 )
 
 JOIN_WINDOW_MIN = 10
@@ -187,6 +187,13 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
     recs = db.execute(select(Recording).where(Recording.college_id == college_id, Recording.status == "ready")).scalars().all()
     rec_by_session = {r.session_id: r for r in recs if r.session_id}
     views = {v.recording_id: v for v in db.execute(select(RecordingView).filter_by(student_id=student.id)).scalars().all()}
+    # the trainer has started the class (screen 07): students may join even before the clock window opens
+    started = set(db.execute(select(LiveMeeting.session_id).where(
+        LiveMeeting.college_id == college_id, LiveMeeting.started_at.is_not(None), LiveMeeting.ended_at.is_(None),
+        LiveMeeting.session_id.in_([x.id for x in sessions] or ["_"]))).scalars().all())
+
+    def can_join(s: SessionItem) -> bool:
+        return s.status != "Cancelled" and (s.id in started or join_enabled(s, now))
 
     # current week (Mon-Sat containing the first upcoming session, else the latest)
     monday = (now - datetime.timedelta(days=now.weekday())).date()
@@ -204,7 +211,9 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
     def row(s: SessionItem) -> dict:
         status = session_status(s, att.get(s.id), now)
         rec = rec_by_session.get(s.id)
-        if status == "Live" or (status == "Upcoming" and join_enabled(s, now)):
+        if s.id in started and status in ("Upcoming", "Scheduled", "Live"):
+            status = "Live"
+        if status == "Live" or (status == "Upcoming" and can_join(s)):
             action = "join"
         elif status == "Missed" and rec:
             action = "watch_now"
@@ -218,7 +227,7 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
         return {
             "id": s.id, "day": DAY_TA.get(day, day) if lang == "ta" else day, "time": _fmt_range(s),
             "date": s.scheduled_start.date().isoformat(), "title": s.title, "type": s.session_type,
-            "status": status, "action": action, "join_enabled": join_enabled(s, now),
+            "status": status, "action": action, "join_enabled": can_join(s),
             "recording_id": rec.id if rec else None, "reminder_set": s.id in reminders,
             "starts_at": s.scheduled_start.isoformat(), "ends_at": s.scheduled_end.isoformat(),
         }
@@ -232,8 +241,8 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
             "id": hero.id, "title": hero.title, "trainer": hero.trainer_name,
             "date_label": hero.scheduled_start.strftime("%a, %b %d").replace(" 0", " "),
             "time_label": f"{hero.scheduled_start.strftime('%I:%M %p').lstrip('0')} to {hero.scheduled_end.strftime('%I:%M %p').lstrip('0')}",
-            "lab": hero.lab_name, "starts_in_min": max(0, mins), "is_live": hero.scheduled_start <= now,
-            "join_enabled": join_enabled(hero, now), "room": f"/live/{hero.id}", "reminder_set": hero.id in reminders,
+            "lab": hero.lab_name, "starts_in_min": max(0, mins), "is_live": hero.scheduled_start <= now or hero.id in started,
+            "join_enabled": can_join(hero), "room": f"/live/{hero.id}", "reminder_set": hero.id in reminders,
             "starts_at": hero.scheduled_start.isoformat(),
         }
 

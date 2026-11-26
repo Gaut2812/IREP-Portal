@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
+from core.config import settings
 from core.database import get_db, SessionLocal
 from core.security import require_role, TokenPayload, decode_access_token, websocket_user, normalize_role
 from core.tenant import get_student_for_user, get_trainer_for_user, get_trainer_batch_ids
@@ -22,6 +23,7 @@ from services.live_sessions import join_enabled
 from services.realtime import hub, publish_sync
 from services.audit import record_audit
 from services.teams import confirm_unmatched, queue_attendance_pull
+from services import livekit
 
 router = APIRouter(tags=["Live Classroom"])
 
@@ -40,6 +42,10 @@ class PollCreateRequest(BaseModel):
 
 class QuestionRequest(BaseModel):
     text: str = Field(min_length=3, max_length=500)
+
+
+class ModerateRequest(BaseModel):
+    action: str = Field(pattern="^(mute|remove|grant_share|revoke_share)$")
 
 
 def _now() -> datetime.datetime:
@@ -95,9 +101,10 @@ def build_state(db: Session, s: SessionItem, user: TokenPayload, now: Optional[d
         elapsed = int(((m.ended_at or now) - m.started_at).total_seconds())
 
     # participants currently in the room: last event per user is "joined"
-    rows = db.execute(
-        select(JoinEvent.user_id, JoinEvent.event, JoinEvent.at).where(JoinEvent.session_id == s.id).order_by(JoinEvent.at)
-    ).all()
+    q = select(JoinEvent.user_id, JoinEvent.event, JoinEvent.at).where(JoinEvent.session_id == s.id)
+    if m and m.provider == "livekit":
+        q = q.where(JoinEvent.source == "livekit")      # who is really connected, from LiveKit's webhooks
+    rows = db.execute(q.order_by(JoinEvent.at)).all()
     last = {}
     for uid, ev, at in rows:
         last[uid] = ev
@@ -144,7 +151,7 @@ def build_state(db: Session, s: SessionItem, user: TokenPayload, now: Optional[d
     return {
         "session_id": s.id, "title": s.title,
         "subtext": " · ".join(x for x in [s.track, f"Sem {batch.semester}" if batch else None, f"Week {s.week_no}" if s.week_no else None, s.scheduled_start.strftime("%a")] if x),
-        "trainer": s.trainer_name, "role": role, "provider": adapter.name,
+        "trainer": s.trainer_name, "role": role, "provider": m.provider if m else adapter.name,
         "meeting": {"state": state, "started_at": m.started_at.isoformat() if m and m.started_at else None,
                     "ended_at": m.ended_at.isoformat() if m and m.ended_at else None, "is_recording": bool(m and m.is_recording and state == "live")},
         "timer": {"elapsed_sec": elapsed, "duration_sec": s.duration_min * 60, "label": f"{_elapsed_label(elapsed)} / {_elapsed_label(s.duration_min * 60)}"},
@@ -158,6 +165,8 @@ def build_state(db: Session, s: SessionItem, user: TokenPayload, now: Optional[d
         "poll": poll_payload, "qa": qa,
         "attendance": presence, "attendance_on_track": on_track,
         # S13: the trainer's read-only lab view for this class (hidden once the class has ended)
+        "share_granted": bool(m and role == "student" and user.sub in (m.share_grants or [])),
+        "share_grants": list(m.share_grants or []) if m and role == "trainer" else [],
         "spectate": {"url": s.spectate_url, "label": s.spectate_label} if s.spectate_url and state != "ended" else None,
     }
 
@@ -189,6 +198,16 @@ def join_session(session_id: str, current_user: TokenPayload = Depends(require_r
         if not m.join_url:
             raise HTTPException(status_code=409, detail="The Teams meeting is still being set up. Try again in a minute.")
         return {"success": True, "session_id": s.id, "join_url": m.join_url, "provider": "teams", "meeting_state": _meeting_state(m)}
+    if m.provider == "livekit":
+        # attendance comes from LiveKit's webhooks; the click is kept for support only
+        me = db.execute(select(User).where(User.id == current_user.sub, User.college_id == current_user.college_id)).scalar_one_or_none()
+        if me is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        record_join_event(db, s, current_user.sub, "joined", now, source="click")
+        token = livekit.join_token(s, m, me, role, now)
+        db.commit()
+        return {"success": True, "session_id": s.id, "join_url": None, "provider": "livekit", "meeting_state": _meeting_state(m),
+                "livekit": {"ws_url": settings.LIVEKIT_WS_URL, "token": token, "room": m.external_meeting_id}}
     record_join_event(db, s, current_user.sub, "joined", now)
     db.commit()
     _publish(s.id, "participants")
@@ -200,7 +219,9 @@ def join_session(session_id: str, current_user: TokenPayload = Depends(require_r
 @router.post("/sessions/{session_id}/leave")
 def leave_session(session_id: str, current_user: TokenPayload = Depends(require_role(LIVE_ROLES)), db: Session = Depends(get_db)):
     s = _session_for_user(session_id, current_user, db)
-    record_join_event(db, s, current_user.sub, "left", _now())
+    m = _meeting(db, s)
+    source = "click" if m and m.provider in ("teams", "livekit") else "portal"
+    record_join_event(db, s, current_user.sub, "left", _now(), source=source)
     db.commit()
     _publish(s.id, "participants")
     return {"success": True}
@@ -225,7 +246,10 @@ def end_session(session_id: str, current_user: TokenPayload = Depends(require_ro
         return {"success": True, "attendance": {"pending": True}}
     if not m.ended_at:
         m.ended_at = now
-        get_live_adapter().end_meeting(m.external_meeting_id)
+        if m.provider == "livekit":
+            livekit.queue_end_room(db, s, m)      # disconnects everyone, after commit (rule 3)
+        else:
+            get_live_adapter().end_meeting(m.external_meeting_id)
     summary = finalize_session(db, s, m, now)
     record_audit(db, current_user, "live.end", "session", s.id, summary)
     db.commit()
@@ -341,6 +365,55 @@ def mark_answered(session_id: str, question_id: str, current_user: TokenPayload 
     db.commit()
     _publish(s.id, "qa")
     return {"success": True, "answered_at_sec": q.answered_at_sec}
+
+
+@router.post("/live/{session_id}/participants/{user_id}/moderate")
+def moderate_participant(session_id: str, user_id: str, req: ModerateRequest,
+                         current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    """Trainer controls on a LiveKit class: mute, remove, allow or revoke screen share.
+    Recorded and audited here; LiveKit is told by the outbox after commit."""
+    s = _session_for_user(session_id, current_user, db)
+    m = _meeting(db, s)
+    if m is None or m.provider != "livekit":
+        raise HTTPException(status_code=409, detail="Participant controls need the LiveKit classroom")
+    if not m.started_at or m.ended_at:
+        raise HTTPException(status_code=409, detail="The class is not live")
+    target = db.execute(select(User).where(User.id == user_id, User.college_id == s.college_id)).scalar_one_or_none()
+    if target is None or target.id == current_user.sub:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    grants = list(m.share_grants or [])
+    if req.action == "grant_share" and target.id not in grants:
+        grants.append(target.id)
+    elif req.action == "revoke_share" and target.id in grants:
+        grants.remove(target.id)
+    m.share_grants = grants
+    livekit.queue_moderation(db, s, m, target.id, req.action)
+    record_audit(db, current_user, "live.moderate", "session", s.id, {"user_id": target.id, "action": req.action})
+    db.commit()
+    _publish(s.id, "participants")
+    return {"success": True, "action": req.action, "share_grants": grants}
+
+
+@router.post("/webhooks/livekit")
+async def livekit_webhook(request: Request, authorization: Optional[str] = Header(default=None)):
+    """LiveKit server callbacks, signed with LIVEKIT_API_SECRET (JWT with the body's sha256)."""
+    body = await request.body()
+    if not livekit.verify_webhook(body, authorization):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+    try:
+        payload = json.loads(body or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    db = SessionLocal()
+    try:
+        result = livekit.handle_webhook(db, payload)
+        db.commit()
+    finally:
+        db.close()
+    if result["session_id"] and result["applied"]:
+        kind = "ended" if result["event"] == "room_finished" else "participants"
+        await hub.publish(f"live:{result['session_id']}", {"type": kind, "session_id": result["session_id"]})
+    return {"success": True, **result}
 
 
 @router.post("/webhooks/bbb")

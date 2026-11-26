@@ -15,6 +15,7 @@ import { KeyRound,
   MessageSquare, Calendar, Users, ClipboardCheck,
   Search, ChevronDown, Languages, LogOut, Menu, X, Mail, ShieldCheck, Building2,
 } from "lucide-react";
+import { BrandMark } from "@/components/ui/BrandMark";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -137,7 +138,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     <>
       <div className="flex items-center justify-between gap-2 h-16 px-5 flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-tile bg-gradient-to-tr from-teal to-brand flex items-center justify-center font-semibold text-white text-label">IR</div>
+          <BrandMark className="w-8 h-8" />
           <span className="font-semibold text-heading text-white truncate">IREP Portal</span>
         </div>
         <button onClick={() => setNavOpen(false)} className="lg:hidden p-1.5 rounded-tile text-white/70 hover:bg-navy-2 hover:text-white" aria-label={t("shell.close_menu")}>

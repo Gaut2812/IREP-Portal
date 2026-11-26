@@ -7,6 +7,7 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi, ApiError } from "@/lib/api";
 import { AuthConfig, getAuthConfig, startKeycloakSignIn } from "@/lib/oidc";
 import { GraduationCap, Users, UserCheck, Building2, Languages, ArrowRight, ShieldCheck } from "lucide-react";
+import { BrandMark } from "@/components/ui/BrandMark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -120,9 +121,7 @@ export default function LoginPage() {
 
         {/* Brand */}
         <div className="flex items-center gap-3 z-10">
-          <div className="w-10 h-10 rounded-card bg-gradient-to-tr from-teal to-brand flex items-center justify-center font-semibold text-white text-lg shadow-pop">
-            IR
-          </div>
+          <BrandMark className="w-10 h-10" rounded="rounded-card" />
           <div>
             <div className="font-semibold text-xl tracking-tight leading-none">IREP Portal</div>
             <div className="text-xs text-subtle font-medium mt-1">Industry-Ready Engineer Program</div>

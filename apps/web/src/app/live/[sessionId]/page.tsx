@@ -13,6 +13,7 @@ import {
   Mic, MicOff, Video, VideoOff, Hand, MessageSquare, BarChart2, Cpu, LogOut, ArrowDown, ThumbsUp,
   CheckCircle2, AlertCircle, RefreshCw, Radio, Square, Plus, Send, Clock,
 } from "lucide-react";
+import { BrandMark } from "@/components/ui/BrandMark";
 
 // LiveKit touches window, media devices and WebRTC: browser only, and only loaded for LiveKit classes
 const LiveKitStage = dynamic(() => import("@/components/live/LiveKitStage"), { ssr: false });
@@ -245,7 +246,7 @@ export default function LiveClassroomPage() {
     return shell(
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="bg-[#141A29] border border-[#2D3748] rounded-card p-8 text-center space-y-4 max-w-md w-full" data-testid="live-lobby">
-          <div className="flex items-center justify-center gap-2"><span className="w-7 h-7 rounded-tile bg-teal flex items-center justify-center font-semibold text-xs">IR</span><span className="font-semibold">{t("live_class.brand")}</span></div>
+          <div className="flex items-center justify-center gap-2"><BrandMark className="w-7 h-7" /><span className="font-semibold">{t("live_class.brand")}</span></div>
           <h1 className="text-lg font-semibold">{st.title}</h1>
           <p className="text-xs text-subtle">{st.subtext}</p>
           {st.meeting.state === "ended" ? (
@@ -281,7 +282,7 @@ export default function LiveClassroomPage() {
       {/* Top bar (PDF 13) */}
       <header className="h-12 bg-[#141A29] border-b border-[#2D3748] px-4 flex items-center justify-between flex-shrink-0 gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="w-6 h-6 rounded-tile bg-teal flex items-center justify-center font-semibold text-xs flex-shrink-0">IR</span>
+          <BrandMark className="w-6 h-6" />
           <span className="font-semibold text-sm flex-shrink-0">{t("live_class.brand")}</span>
           <span className="font-semibold text-xs text-line truncate">{st.title}</span>
           <span className="text-caption text-subtle hidden md:inline truncate">{st.subtext}</span>

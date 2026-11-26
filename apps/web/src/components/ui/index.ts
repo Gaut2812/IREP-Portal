@@ -5,3 +5,4 @@ export type { Tone, Segment } from "./Metrics";
 export { Badge, Button, buttonClass, Input, Select, Field, inputClass, Tabs, EmptyState } from "./Controls";
 export { Table, THead, Th, Tr, Td } from "./Table";
 export { PageHeader } from "./PageHeader";
+export { BrandMark } from "./BrandMark";

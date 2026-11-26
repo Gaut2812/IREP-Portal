@@ -13,7 +13,7 @@ import { KeyRound,
   LayoutDashboard, BookOpen, Code2, FileCheck2, Cpu,
   KanbanSquare, Video, Bot, Award, Briefcase, Radio,
   MessageSquare, Calendar, Users, ClipboardCheck,
-  Search, ChevronDown, Languages, LogOut, Menu, X, Mail, ShieldCheck, Building2, PanelLeftClose,
+  Search, ChevronDown, Languages, LogOut, Menu, X, Mail, ShieldCheck, Building2,
 } from "lucide-react";
 
 const COLLAPSE_KEY = "irep_sidebar_collapsed";
@@ -162,12 +162,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
             className={cn("group flex items-center gap-2.5 min-w-0 rounded-card p-1 -m-1 transition-colors hover:bg-white/10 focus-visible:bg-white/10",
               compact ? "" : "flex-1")}>
             <BrandMark className="w-8 h-8 transition-transform duration-200 group-hover:scale-105 group-active:scale-95" />
-            {!compact && (
-              <>
-                <span className="font-semibold text-heading text-white truncate">IREP Portal</span>
-                <PanelLeftClose className="ml-auto w-4 h-4 flex-shrink-0 text-white/80 group-hover:text-white" aria-hidden />
-              </>
-            )}
+            {!compact && <span className="font-semibold text-heading text-white truncate">IREP Portal</span>}
           </button>
         )}
         <button onClick={() => setNavOpen(false)} className="lg:hidden p-1.5 rounded-tile text-white/70 hover:bg-white/10 hover:text-white" aria-label={t("shell.close_menu")}>
@@ -207,7 +202,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     <div className="flex h-screen bg-canvas overflow-hidden">
       {/* Desktop sidebar */}
       <aside data-testid="desktop-sidebar" data-collapsed={collapsed ? "true" : "false"}
-        className={cn("hidden lg:flex flex-shrink-0 bg-brand text-white flex-col z-20 transition-[width] duration-300 ease-out", collapsed ? "w-[72px]" : "w-[240px]")}>
+        className={cn("hidden lg:flex flex-shrink-0 side-gradient text-white flex-col z-20 transition-[width] duration-300 ease-out", collapsed ? "w-[72px]" : "w-[240px]")}>
         {sidebar(collapsed)}
       </aside>
 
@@ -215,7 +210,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
       {navOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label={t("shell.main_menu")}>
           <div className="absolute inset-0 bg-ink/50" onClick={() => setNavOpen(false)} />
-          <aside className="relative w-[260px] max-w-[80vw] bg-brand text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar(false, true)}</aside>
+          <aside className="relative w-[260px] max-w-[80vw] side-gradient text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar(false, true)}</aside>
         </div>
       )}
 

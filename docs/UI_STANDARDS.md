@@ -39,9 +39,9 @@ Use these instead of hex values. They work with every utility (`text-`, `bg-`, `
 | Group | Tokens |
 |---|---|
 | Text | `ink` (headings, values), `ink-soft` (body), `muted` (labels), `subtle` (placeholders, ids) |
-| Surfaces | `canvas` (page), `surface` (cards), `surface-2` (table head, tiles, hover) |
+| Surfaces | `canvas` (page, soft pink), `surface` (cards), `surface-2` (table head, tiles, hover) |
 | Lines | `line` (borders), `line-soft` (dividers, bar tracks), `line-strong` (inputs, dashed) |
-| Brand | `navy`, `navy-2` (dark panels), `brand` (also the app sidebar), `brand-hover`, `brand-soft`, `brand-line`, `teal`, `teal-hover` |
+| Brand | `side`, `side-2` (app sidebar gradient, light to dark blue), `navy`, `navy-2` (dark panels), `brand`, `brand-hover`, `brand-soft`, `brand-line`, `teal`, `teal-hover` |
 | Status | `success`, `warning`, `danger`, each with `-fill`, `-soft`, `-faint` and `-line`, plus `info`/`info-soft` and `violet`/`violet-soft` |
 
 Rules:

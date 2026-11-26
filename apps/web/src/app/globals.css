@@ -16,7 +16,7 @@
   --color-subtle: #94A3B8;       /* placeholders, ids */
 
   /* surfaces and lines */
-  --color-canvas: #F4F6FA;       /* page background */
+  --color-canvas: #FEE2E2;       /* page background (soft pink) */
   --color-surface: #FFFFFF;      /* cards */
   --color-surface-2: #F8FAFC;    /* table head, tiles, hover */
   --color-line: #E2E8F0;         /* card and input borders */
@@ -26,7 +26,9 @@
   /* brand */
   --color-navy: #14284B;         /* sidebar */
   --color-navy-2: #1E3A6E;       /* sidebar hover, dividers */
-  --color-brand: #2B5CD0;        /* primary actions, links, bars, app sidebar */
+  --color-side: #3B76EC;         /* app sidebar gradient: light blue (top) */
+  --color-side-2: #1A3A8C;       /* app sidebar gradient: dark blue (bottom) */
+  --color-brand: #2B5CD0;        /* primary actions, links, bars */
   --color-brand-hover: #234BB0;
   --color-brand-soft: #EFF6FF;
   --color-brand-line: #BFDBFE;
@@ -80,7 +82,7 @@
 /* legacy names kept until every screen moves to the tokens above */
 :root {
   --sidebar-navy: #14284B;
-  --page-bg: #F4F6FA;
+  --page-bg: #FEE2E2;
   --card-white: #FFFFFF;
   --card-border: #E2E8F0;
   --heading-text: #0F1F3A;
@@ -148,3 +150,6 @@
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass-bar { background: rgb(255 255 255 / 0.96); }
 }
+
+/* app sidebar: light blue at the top to dark blue at the bottom (tokens side / side-2) */
+.side-gradient { background: linear-gradient(180deg, var(--color-side) 0%, var(--color-side-2) 100%); }

@@ -13,7 +13,7 @@ import { KeyRound,
   LayoutDashboard, BookOpen, Code2, FileCheck2, Cpu,
   KanbanSquare, Video, Bot, Award, Briefcase, Radio,
   MessageSquare, Calendar, Users, ClipboardCheck,
-  Search, ChevronDown, Languages, LogOut, Menu, X, Mail, ShieldCheck, Building2, PanelLeftClose, PanelLeftOpen,
+  Search, ChevronDown, Languages, LogOut, Menu, X, Mail, ShieldCheck, Building2, PanelLeftClose,
 } from "lucide-react";
 
 const COLLAPSE_KEY = "irep_sidebar_collapsed";
@@ -146,15 +146,31 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
   const currentNav = role === "admin" ? adminNav : role === "trainer" ? trainerNav : role === "college" ? collegeNav : role === "parent" ? parentNav : studentNav;
   const homes = ["/student", "/trainer", "/college", "/parent", "/admin/colleges"];
 
-  /** compact = the desktop icon rail; the phone drawer always shows labels. */
-  const sidebar = (compact: boolean) => (
+  /** compact = the desktop icon rail; drawer = the phone menu (always full, its logo does not toggle). */
+  const sidebar = (compact: boolean, drawer = false) => (
     <>
-      <div className={cn("flex items-center gap-2 h-16 flex-shrink-0", compact ? "justify-center px-3" : "justify-between px-5")}>
-        <div className="flex items-center gap-2.5 min-w-0">
-          <BrandMark className="w-8 h-8" />
-          {!compact && <span className="font-semibold text-heading text-white truncate">IREP Portal</span>}
-        </div>
-        <button onClick={() => setNavOpen(false)} className="lg:hidden p-1.5 rounded-tile text-white/70 hover:bg-navy-2 hover:text-white" aria-label={t("shell.close_menu")}>
+      <div className={cn("flex items-center gap-2 h-16 flex-shrink-0", compact ? "justify-center px-3" : "justify-between px-4")}>
+        {drawer ? (
+          <div className="flex items-center gap-2.5 min-w-0 px-1">
+            <BrandMark className="w-8 h-8" />
+            <span className="font-semibold text-heading text-white truncate">IREP Portal</span>
+          </div>
+        ) : (
+          // desktop: the logo is the toggle between the full sidebar and the icon rail
+          <button onClick={toggleCollapsed} data-testid="sidebar-toggle" aria-pressed={compact}
+            aria-label={compact ? t("shell.expand_menu") : t("shell.collapse_menu")} title={compact ? t("shell.expand_menu") : t("shell.collapse_menu")}
+            className={cn("group flex items-center gap-2.5 min-w-0 rounded-card p-1 -m-1 transition-colors hover:bg-white/10 focus-visible:bg-white/10",
+              compact ? "" : "flex-1")}>
+            <BrandMark className="w-8 h-8 transition-transform duration-200 group-hover:scale-105 group-active:scale-95" />
+            {!compact && (
+              <>
+                <span className="font-semibold text-heading text-white truncate">IREP Portal</span>
+                <PanelLeftClose className="ml-auto w-4 h-4 flex-shrink-0 text-white/60 group-hover:text-white" aria-hidden />
+              </>
+            )}
+          </button>
+        )}
+        <button onClick={() => setNavOpen(false)} className="lg:hidden p-1.5 rounded-tile text-white/70 hover:bg-white/10 hover:text-white" aria-label={t("shell.close_menu")}>
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -167,26 +183,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
               title={compact ? item.label : undefined} aria-label={compact ? item.label : undefined}
               className={cn("flex items-center min-h-9 py-2 rounded-tile text-body leading-5 font-medium transition-colors",
                 compact ? "justify-center px-0" : "gap-3 px-3",
-                isActive ? "bg-navy-2 text-white" : "text-white/70 hover:bg-white/5 hover:text-white")}>
-              <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-white" : "text-white/60")} />
+                isActive ? "bg-white/15 text-white shadow-card ring-1 ring-white/15" : "text-white/75 hover:bg-white/10 hover:text-white")}>
+              <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-white" : "text-white/70")} />
               {!compact && <span className="min-w-0 break-words">{item.label}</span>}
             </Link>
           );
         })}
       </nav>
-      {/* desktop only: switch between the full sidebar and the icon rail */}
-      <div className={cn("hidden lg:flex border-t border-white/10 flex-shrink-0 py-2", compact ? "justify-center px-2" : "px-3")}>
-        <button onClick={toggleCollapsed} data-testid="sidebar-toggle" aria-pressed={compact}
-          aria-label={compact ? t("shell.expand_menu") : t("shell.collapse_menu")} title={compact ? t("shell.expand_menu") : t("shell.collapse_menu")}
-          className={cn("flex items-center min-h-9 py-2 rounded-tile text-label font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors",
-            compact ? "justify-center w-full" : "gap-3 px-3 w-full")}>
-          {compact ? <PanelLeftOpen className="w-4 h-4 flex-shrink-0" /> : <PanelLeftClose className="w-4 h-4 flex-shrink-0" />}
-          {!compact && <span>{t("shell.collapse_menu")}</span>}
-        </button>
-      </div>
-      <div className={cn("flex items-center gap-3 py-4 border-t border-white/10 flex-shrink-0", compact ? "justify-center px-2" : "px-5")}
+      <div className={cn("flex items-center gap-3 py-4 border-t border-white/15 flex-shrink-0", compact ? "justify-center px-2" : "px-5")}
         data-testid="sidebar-user" title={compact ? `${user?.name || ""} · ${roleLabel[role]}` : undefined}>
-        <span className="w-9 h-9 rounded-full bg-navy-2 text-white flex items-center justify-center font-semibold text-label flex-shrink-0">{user?.avatar || "?"}</span>
+        <span className="w-9 h-9 rounded-full bg-white/15 ring-1 ring-white/20 text-white flex items-center justify-center font-semibold text-label flex-shrink-0">{user?.avatar || "?"}</span>
         {!compact && (
           <div className="min-w-0">
             <div className="text-label font-semibold text-white truncate">{user?.name || ""}</div>
@@ -201,7 +207,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     <div className="flex h-screen bg-canvas overflow-hidden">
       {/* Desktop sidebar */}
       <aside data-testid="desktop-sidebar" data-collapsed={collapsed ? "true" : "false"}
-        className={cn("hidden lg:flex flex-shrink-0 bg-navy text-white flex-col z-20 transition-[width] duration-200", collapsed ? "w-[72px]" : "w-[240px]")}>
+        className={cn("hidden lg:flex flex-shrink-0 side-gradient text-white flex-col z-20 transition-[width] duration-300 ease-out", collapsed ? "w-[72px]" : "w-[240px]")}>
         {sidebar(collapsed)}
       </aside>
 
@@ -209,26 +215,28 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
       {navOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label={t("shell.main_menu")}>
           <div className="absolute inset-0 bg-ink/50" onClick={() => setNavOpen(false)} />
-          <aside className="relative w-[260px] max-w-[80vw] bg-navy text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar(false)}</aside>
+          <aside className="relative w-[260px] max-w-[80vw] side-gradient text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar(false, true)}</aside>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 bg-surface border-b border-line px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3 flex-shrink-0 z-10">
+      {/* the whole right side scrolls, so the page passes under the frosted top bar */}
+      <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden" data-testid="app-scroll">
+        <header className="sticky top-0 z-30 px-3 pt-2 sm:px-4 lg:px-6">
+        <div className="glass-bar h-14 rounded-card px-3 sm:px-4 flex items-center justify-between gap-3" data-testid="top-bar">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <button onClick={() => setNavOpen(true)} className="lg:hidden p-2 -ml-2 rounded-tile hover:bg-line-soft" aria-label={t("shell.open_menu")} data-testid="open-nav">
+            <button onClick={() => setNavOpen(true)} className="lg:hidden p-2 -ml-1 rounded-tile hover:bg-white/70" aria-label={t("shell.open_menu")} data-testid="open-nav">
               <Menu className="w-5 h-5 text-ink" />
             </button>
             <div className="relative hidden lg:block w-full max-w-sm">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
               <input type="text" placeholder={t("shell.search")} aria-label={t("shell.search")}
-                className="w-full h-9 pl-9 pr-3 bg-surface-2 border border-line rounded-tile text-body text-ink placeholder:text-subtle focus:outline-none focus:border-brand focus:bg-surface focus:ring-2 focus:ring-brand/15" />
+                className="w-full h-9 pl-9 pr-3 bg-white/60 border border-white/80 rounded-tile text-body text-ink placeholder:text-subtle focus:outline-none focus:border-brand focus:bg-surface focus:ring-2 focus:ring-brand/15" />
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button onClick={toggleLanguage} title="Tamil / English" data-testid="lang-toggle"
-              className="flex items-center gap-1.5 h-9 px-3 bg-surface hover:bg-surface-2 text-ink text-label font-medium rounded-tile transition-colors border border-line">
+              className="flex items-center gap-1.5 h-9 px-3 bg-white/60 hover:bg-white/90 text-ink text-label font-medium rounded-tile transition-colors border border-white/80">
               <Languages className="w-4 h-4 text-brand" />
               <span>{language === "en" ? "தமிழ்" : "English"}</span>
             </button>
@@ -238,7 +246,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
             {/* Profile menu (sign out lives here) */}
             <div className="relative" ref={profileRef}>
               <button onClick={() => setProfileOpen(!profileOpen)} aria-haspopup="menu" aria-expanded={profileOpen} data-testid="profile-button"
-                className="flex items-center gap-1.5 p-0.5 sm:pr-2 rounded-full hover:bg-line-soft transition-colors" aria-label={t("shell.profile")}>
+                className="flex items-center gap-1.5 p-0.5 sm:pr-2 rounded-full hover:bg-white/70 transition-colors" aria-label={t("shell.profile")}>
                 <span className="w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center font-semibold text-caption">{user?.avatar || "?"}</span>
                 <ChevronDown className="w-4 h-4 text-muted hidden sm:block" />
               </button>
@@ -271,9 +279,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
               )}
             </div>
           </div>
+        </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main className="px-4 pt-5 pb-6 sm:px-6 lg:px-8 lg:pt-6 lg:pb-8">
           {header && <PageHeader title={pageTitle} subtitle={pageSubtitle} actions={pageActions} />}
           {children}
         </main>

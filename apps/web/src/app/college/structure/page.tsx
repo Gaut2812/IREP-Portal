@@ -229,7 +229,7 @@ export default function CollegeStructurePage() {
 
           <section className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="import-section">
             <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><FileUp className="w-4 h-4 text-brand" />{t("structure.import_title")}</h2>
-            <p className="text-caption text-muted">{t("structure.import_help")} <code className="font-mono">register_no,name,email,phone,branch_code,batch,semester,parent_name,parent_phone,parent_email,parent_consent,parent_consent_ref</code></p>
+            <p className="text-caption text-muted">{t("structure.import_help")} <code className="font-mono break-all">register_no,name,email,phone,branch_code,batch,semester,parent_name,parent_phone,parent_email,parent_consent,parent_consent_ref</code></p>
             <p className="text-caption text-muted" data-testid="import-consent-help">{t("structure.import_consent_help")}</p>
             <div className="flex flex-wrap items-center gap-2">
               <input type="file" accept=".csv,text/csv" data-testid="import-file" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); }} className="text-xs" />

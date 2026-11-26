@@ -17,7 +17,7 @@ HEX = {
     # surfaces and lines
     "FFFFFF": "surface", "F8FAFC": "surface-2", "F1F5F9": "line-soft", "E2E8F0": "line", "CBD5E1": "line-strong",
     # brand
-    "14284B": "navy", "1E3A6E": "navy-2", "2B5CD0": "brand", "1E46B0": "brand-hover", "204497": "brand-hover",
+    "14284B": "navy", "1E3A6E": "navy-2", "1E4887": "side", "226494": "side-2", "2B5CD0": "brand", "1E46B0": "brand-hover", "204497": "brand-hover",
     "2049AA": "brand-hover", "EFF6FF": "brand-soft", "BFDBFE": "brand-line",
     "2BB3A0": "teal", "249B8A": "teal-hover", "239988": "teal-hover",
     # success

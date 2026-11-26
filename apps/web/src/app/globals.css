@@ -26,6 +26,8 @@
   /* brand */
   --color-navy: #14284B;         /* sidebar */
   --color-navy-2: #1E3A6E;       /* sidebar hover, dividers */
+  --color-side: #1E4887;         /* app sidebar gradient: top left */
+  --color-side-2: #226494;       /* app sidebar gradient: bottom right */
   --color-brand: #2B5CD0;        /* primary actions, links, bars */
   --color-brand-hover: #234BB0;
   --color-brand-soft: #EFF6FF;
@@ -135,3 +137,19 @@
 .chip-red { background-color: var(--color-danger-soft); color: var(--color-danger); }
 .chip-blue { background-color: var(--color-info-soft); color: var(--color-info); }
 .chip-purple { background-color: var(--color-violet-soft); color: var(--color-violet); }
+
+/* "Liquid glass" top bar: frosted, slightly translucent white that the page scrolls under,
+   with a bright top edge. Falls back to near-opaque white where backdrop-filter is missing. */
+.glass-bar {
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.78), rgb(255 255 255 / 0.52));
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+  border: 1px solid rgb(255 255 255 / 0.75);
+  box-shadow: 0 8px 28px rgb(15 31 58 / 0.10), 0 1px 2px rgb(15 31 58 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.9);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-bar { background: rgb(255 255 255 / 0.96); }
+}
+
+/* app sidebar: the brand gradient (tokens side / side-2) */
+.side-gradient { background: linear-gradient(160deg, var(--color-side) 0%, var(--color-side-2) 100%); }

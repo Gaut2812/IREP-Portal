@@ -154,7 +154,7 @@ def get_messages(group_id: str, after: Optional[str] = None, current_user: Token
     db.commit()
     if read_something_new:
         publish_sync(f"group:{g.id}", {"type": "read", "group_id": g.id})
-    mods = db.execute(select(User.name).join(GroupMember, GroupMember.user_id == User.id).where(GroupMember.group_id == g.id, GroupMember.role == "moderator")).scalars().all()
+    mods = db.execute(select(User.name).join(GroupMember, GroupMember.user_id == User.id).where(GroupMember.group_id == g.id, GroupMember.role == "moderator").order_by(User.name)).scalars().all()   # stable order on every database
     muted = bool(m.muted_until and m.muted_until > now)
     can_post = not muted and (not g.is_locked_announcement or m.role == "moderator")
     return {

@@ -3,6 +3,7 @@
 /** Screen 06 · Timetable (college): approve schedule changes with clash warnings (link L11 down). */
 import React, { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { ClashList, Clash, WeekSession, WeekView, isoDate } from "@/components/schedule/WeekView";
 import { useLanguage } from "@/lib/LanguageContext";
@@ -55,6 +56,7 @@ export default function CollegeTimetablePage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("schedule.college_title")}>
+        <HowItWorks topic="timetable" steps={4} className="mb-4 max-w-6xl" />
         <div className="space-y-6 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="timetable-error">{error}</p>}
           <section className="bg-white rounded-card border border-line p-4 space-y-2" data-testid="pending-requests">

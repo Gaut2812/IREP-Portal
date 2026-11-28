@@ -20,6 +20,7 @@ from core.database import get_db
 from core.security import PLATFORM_TENANT, STAFF_ROLES, SUPER, TokenPayload, get_password_hash, keycloak_mode
 from models.schema import College, SupportSession, SupportTicket, User
 from services.audit import record_audit
+from services.invitations import create_invitation
 from services.outbox import emit, handler as outbox_handler
 
 router = APIRouter(prefix="/admin", tags=["Super admin"])
@@ -74,23 +75,16 @@ def invite_staff(req: StaffIn, current_user: TokenPayload = Depends(SUPER), db: 
     if db.execute(select(User.id).where(func.lower(User.email) == email)).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists")
     name = req.name.strip()
-    temp_password = None if keycloak_mode() else secrets.token_urlsafe(9)
     u = User(id=f"usr_{uuid.uuid4().hex[:16]}", college_id=PLATFORM_TENANT, email=email, name=name, role=req.role,
              avatar_initials="".join(p[0] for p in name.split()[:2]).upper() or "IR", language_pref="en",
-             hashed_password=get_password_hash(temp_password or secrets.token_urlsafe(32)))
+             hashed_password=get_password_hash(secrets.token_urlsafe(32)))
     db.add(u)
     db.flush()
     record_audit(db, current_user, "staff.invited", "user", u.id, {"email": email, "role": req.role}, college_id=PLATFORM_TENANT)
-    if keycloak_mode():
-        # Keycloak emails a set-password link; the first sign-in also sets up the authenticator app (2FA)
-        emit(db, "identity.invite_user", {"user_id": u.id}, college_id=PLATFORM_TENANT, entity_type="user", entity_id=u.id)
+    # Keycloak mode: Keycloak emails a set-password link and the first sign-in sets up the authenticator app (2FA)
+    invite = create_invitation(db, u, current_user)
     db.commit()
-    out = _staff_out(u, current_user)
-    if temp_password:
-        out["temporary_password"] = temp_password        # development only; shown once, never stored in plain text
-    else:
-        out["invite"] = "Keycloak will email a link to set a password and the authenticator app"
-    return out
+    return {**_staff_out(u, current_user), **invite}
 
 
 @router.put("/staff/{user_id}/role")

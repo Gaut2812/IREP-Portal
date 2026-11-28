@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Badge, Button, Card, CardHeader, EmptyState, ProgressBar, StatTile, buttonClass, type Tone } from "@/components/ui";
 import { useLanguage } from "@/lib/LanguageContext";
+import { TileDetails, type DetailKind } from "@/components/dashboard/TileDetails";
 import { fetchApi } from "@/lib/api";
 import {
   TrendingUp, Award, Flame, CheckCircle2, Calendar, ArrowRight, Clock,
@@ -37,6 +38,9 @@ interface WhyScore {
   history: { date: string; score: number }[];
 }
 
+/** Where an upcoming item opens. Kinds without a student screen (guest talk, demo day) stay plain text. */
+const EVENT_HREF: Record<string, string> = { test: "/student/tests", exam: "/student/tests", interview: "/student/interviews", drive: "/student/interviews" };
+
 const BAND_TONE: Record<string, Tone> = { "Placement Ready": "success", "Nearly Ready": "warning", "Needs Support": "danger" };
 
 /** Skill bars: brand blue, green when strong, amber when it needs work (same rule as readiness components). */
@@ -59,6 +63,34 @@ function kindChipClass(kind: string) {
   return "chip-green";
 }
 
+/** Readiness snapshots as bars. Each column has a fixed height so the bar's % height resolves (it collapsed to 0 before). */
+function ScoreHistory({ history, readyMin, title }: { history: { date: string; score: number }[]; readyMin: number; title: string }) {
+  const short = (d: string) => {
+    const dt = new Date(d);
+    return Number.isNaN(dt.getTime()) ? d : dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  };
+  return (
+    <div data-testid="score-history">
+      <div className="text-xs font-semibold text-ink mb-2 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5 text-brand" /> {title}</div>
+      <div className="relative">
+        <div className="absolute inset-x-0 border-t border-dashed border-success-line" style={{ bottom: `${readyMin}%` }} aria-hidden="true" />
+        <div className="flex items-end gap-1.5 h-28">
+          {history.map((h) => (
+            <div key={h.date} className="flex-1 h-full flex flex-col justify-end items-center min-w-0" title={`${h.date}: ${h.score}`}>
+              <span className="text-caption text-ink-soft tabular mb-0.5">{h.score}</span>
+              <div className={`w-full max-w-10 rounded-t ${h.score >= readyMin ? "bg-success-fill" : "bg-brand"}`}
+                style={{ height: `${Math.max(2, Math.min(100, h.score))}%` }} data-testid="score-bar" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex gap-1.5 mt-1">
+        {history.map((h) => <span key={h.date} className="flex-1 text-center text-caption text-muted truncate">{short(h.date)}</span>)}
+      </div>
+    </div>
+  );
+}
+
 export default function StudentDashboardPage() {
   const { t, language } = useLanguage();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -67,6 +99,7 @@ export default function StudentDashboardPage() {
   const [whyOpen, setWhyOpen] = useState(false);
   const [why, setWhy] = useState<WhyScore | null>(null);
   const [whyLoading, setWhyLoading] = useState(false);
+  const [detail, setDetail] = useState<DetailKind | null>(null);
 
   // only the latest request may set state: a slower reply for the old language must not overwrite the new one
   const latest = useRef(0);
@@ -143,7 +176,7 @@ export default function StudentDashboardPage() {
                     {t("dashboard.semester")} {data.student.semester} · {data.student.track}{data.student.week_label ? ` · ${data.student.week_label}` : ""}
                   </p>
                 </div>
-                <Link href="/student/coding/prob_connected_components" className={buttonClass("primary", "md")}>
+                <Link href="/student/coding" className={buttonClass("primary", "md")}>
                   <span>{t("dashboard.resume_practice")}</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
@@ -174,12 +207,14 @@ export default function StudentDashboardPage() {
                   )}
                 </button>
 
+                <button type="button" onClick={() => setDetail("problems")} className="text-left rounded-card hover:ring-1 hover:ring-brand" data-testid="tile-problems">
                 <StatTile label={t("dashboard.problems_solved")}
                   value={<span className="flex items-baseline gap-2">
                     {data.student.problems_solved}
                     {data.student.problems_delta > 0 && <span className="text-label font-medium text-success">▲ {data.student.problems_delta} {t("dashboard.this_month")}</span>}
                   </span>}
-                  hint={<span className="flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-brand" /> {data.student.batch}</span>} />
+                  hint={<span className="flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-brand" /> {t("dashboard.by_topic")}</span>} />
+                </button>
 
                 <div className={tile}>
                   <div className="flex items-center justify-between gap-2 text-label font-medium text-muted">
@@ -198,15 +233,18 @@ export default function StudentDashboardPage() {
                   </div>
                 </div>
 
+                <button type="button" onClick={() => setDetail("streak")} className="text-left rounded-card hover:ring-1 hover:ring-brand" data-testid="tile-streak">
                 <StatTile label={t("dashboard.practice_streak")}
                   value={`🔥 ${data.student.streak_days} ${t("dashboard.days")}`}
                   hint={<span className="flex items-center gap-1"><Flame className="w-4 h-4 text-warning-fill" /> {t("dashboard.best")}: {data.student.streak_best} {t("dashboard.days")}</span>} />
+                </button>
               </div>
 
               {/* Row 2: skills + this week */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
-                  <CardHeader title={t("dashboard.skill_progress")} subtitle={`${t("dashboard.semester")} ${data.student.semester}`} />
+                  <CardHeader title={t("dashboard.skill_progress")} subtitle={`${t("dashboard.semester")} ${data.student.semester}`}
+                    actions={<button type="button" onClick={() => setDetail("skills")} className="text-label font-medium text-brand hover:underline" data-testid="open-skill-how">{t("dashboard.how_skills_grow")}</button>} />
                   <div className="space-y-4" data-testid="skill-progress">
                     {data.skill_progress.map((item) => (
                       <div key={item.key}>
@@ -273,18 +311,27 @@ export default function StudentDashboardPage() {
                     <EmptyState title={t("dashboard.no_upcoming")} />
                   ) : (
                     <ul className="divide-y divide-line-soft -my-2" data-testid="upcoming-events">
-                      {data.upcoming_events.map((e) => (
-                        <li key={e.id} className="flex items-center justify-between gap-3 py-2.5">
-                          <span className="text-body text-ink truncate">{e.title}</span>
+                      {data.upcoming_events.map((e) => {
+                        const href = EVENT_HREF[e.kind];
+                        const inner = (<>
+                          <span className={`text-body text-ink truncate ${href ? "group-hover:text-brand" : ""}`}>{e.title}</span>
                           <span className={`${kindChipClass(e.kind)} flex-shrink-0`}>{e.date}</span>
-                        </li>
-                      ))}
+                        </>);
+                        return (
+                          <li key={e.id}>
+                            {href
+                              ? <Link href={href} className="flex items-center justify-between gap-3 py-2.5 group">{inner}</Link>
+                              : <div className="flex items-center justify-between gap-3 py-2.5">{inner}</div>}
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </Card>
 
                 <Card>
-                  <CardHeader title={t("dashboard.badges_earned")} actions={<Award className="w-4 h-4 text-teal" />} />
+                  <CardHeader title={t("dashboard.badges_earned")}
+                    actions={<button type="button" onClick={() => setDetail("badges")} className="text-label font-medium text-brand hover:underline inline-flex items-center gap-1" data-testid="open-all-badges"><Award className="w-4 h-4 text-teal" />{t("dashboard.all_badges")}</button>} />
                   {data.badges.length === 0 ? (
                     <EmptyState title={t("dashboard.no_badges")} />
                   ) : (
@@ -309,6 +356,8 @@ export default function StudentDashboardPage() {
             </>
           )}
         </div>
+
+        {detail && <TileDetails kind={detail} onClose={() => setDetail(null)} t={t} lang={language} />}
 
         {/* Why this score drawer */}
         {whyOpen && (
@@ -352,19 +401,7 @@ export default function StudentDashboardPage() {
                       </tr>
                     </tbody>
                   </table>
-                  {why.history.length > 1 && (
-                    <div>
-                      <div className="text-xs font-semibold text-ink mb-2 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5 text-brand" /> {t("dashboard.history")}</div>
-                      <div className="flex items-end gap-1.5 h-20">
-                        {why.history.map((h) => (
-                          <div key={h.date} className="flex-1 flex flex-col items-center gap-1" title={`${h.date}: ${h.score}`}>
-                            <div className="w-full bg-brand/80 rounded-t" style={{ height: `${h.score}%` }} />
-                            <span className="text-caption text-muted">{h.score}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {why.history.length > 0 && <ScoreHistory history={why.history} readyMin={why.thresholds.ready_min} title={t("dashboard.history")} />}
                 </>
               )}
             </div>

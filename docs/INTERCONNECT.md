@@ -228,5 +228,5 @@ Event names are derived from the flows in the source document. Confirm any new o
 | Code and test details | Own | Summary only | Assigned batches | No | No |
 | Trainer private notes | No | No | Yes | No | No |
 | Chats | Own groups | Own threads | Own threads and groups | Own threads | No |
-| Certificates | Own | Own child | Assigned batches | Counts and proof status | No |
+| Certificates | Own | Own child | Assigned batches | Counts and proof status; who holds which earned certificate (name, register no, title, issuer, date; no proof files or notes; each read audited; decision D1, 27 Nov 2026) | No |
 | Consent and audit | Own consent | Own consent | No | Export requests | Full audit trail |

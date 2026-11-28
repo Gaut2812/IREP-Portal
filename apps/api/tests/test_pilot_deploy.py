@@ -399,3 +399,18 @@ def test_parent_code_by_fast2sms(monkeypatch):
 def test_fast2sms_production_settings():
     assert problems(_prod(SMS_PROVIDER="fast2sms", FAST2SMS_API_KEY="k", PARENT_OTP_CHANNEL="sms")) == []
     assert any("FAST2SMS_API_KEY" in p for p in problems(_prod(SMS_PROVIDER="fast2sms", FAST2SMS_API_KEY="")))
+
+
+def test_public_demo_stack_stays_a_demo():
+    """infra/demo: demo mode (sign-in required), local sign-in, no email or SMS, a gate, and no published service but Caddy."""
+    root = Path(__file__).resolve().parents[3]
+    compose = (root / "infra/demo/docker-compose.yml").read_text(encoding="utf-8")
+    caddy = (root / "infra/demo/Caddyfile").read_text(encoding="utf-8")
+    assert "ENVIRONMENT: demo" in compose and "NOTIFY_ADAPTER: fake" in compose and "AUTH_PROVIDER: local" in compose
+    assert "ENVIRONMENT: development" not in compose          # development allows anonymous demo profiles
+    assert compose.count("ports:") == 1                       # only Caddy
+    assert "DEMO_GATE: ${DEMO_GATE:-gate}" in compose         # gated unless someone opens it on purpose
+    assert "basic_auth" in caddy and "irep_demo_gate={$DEMO_GATE_TOKEN}" in caddy and "respond @docs 404" in caddy
+    assert "route {" in caddy                                 # explicit order: the gate runs before the proxies
+    from core.security import DEMO_AUTH_ENVIRONMENTS
+    assert "demo" not in DEMO_AUTH_ENVIRONMENTS

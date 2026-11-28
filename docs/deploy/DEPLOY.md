@@ -20,6 +20,8 @@ This guide takes a fresh Ubuntu 24.04 server to a running portal at `https://por
 
 ---
 
+> Only need a demo with the demo accounts? Use [infra/demo](../../infra/demo/README.md) instead: one small server, no Keycloak, no email. Never put real data on it.
+
 ## 0. What you need before you start
 
 - **A server.** 2 vCPU, 4 GB RAM and 40 GB disk is enough for a 500-student pilot. Examples: an Oracle Cloud Always Free Ampere VM (4 OCPU, 24 GB) or an AWS, Azure or GCP free-tier VM. Add 2 GB of swap on anything with 4 GB RAM or less (step 2).

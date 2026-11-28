@@ -38,14 +38,18 @@ def _now() -> datetime.datetime:
     return datetime.datetime.now()
 
 
-def session_status(s: SessionItem, attendance: Optional[SessionAttendance], now: datetime.datetime) -> str:
-    """Attended / Missed / Live / Upcoming / Scheduled / Cancelled."""
+def session_status(s: SessionItem, attendance: Optional[SessionAttendance], now: datetime.datetime,
+                   meeting_ended: bool = False) -> str:
+    """Attended / Missed / Excused / Completed / Live / Upcoming / Scheduled / Cancelled, worked out from the clock,
+    the live meeting and attendance (the stored status only says whether the class was cancelled)."""
     if s.status == "Cancelled":                      # approved on screen 06
         return "Cancelled"
-    if s.scheduled_end <= now:
+    if s.scheduled_end <= now or meeting_ended:      # the trainer may end the class early: then it is over
         if attendance is None:
             return "Completed"
-        return "Attended" if attendance.status == "Present" else "Missed"
+        if attendance.status in ("Present", "Late"):
+            return "Attended"
+        return "Excused" if attendance.status == "Excused" else "Missed"
     if s.scheduled_start <= now:
         return "Live"
     if s.scheduled_start - now <= datetime.timedelta(hours=24):
@@ -192,8 +196,12 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
         LiveMeeting.college_id == college_id, LiveMeeting.started_at.is_not(None), LiveMeeting.ended_at.is_(None),
         LiveMeeting.session_id.in_([x.id for x in sessions] or ["_"]))).scalars().all())
 
+    ended = set(db.execute(select(LiveMeeting.session_id).where(
+        LiveMeeting.college_id == college_id, LiveMeeting.ended_at.is_not(None),
+        LiveMeeting.session_id.in_([x.id for x in sessions] or ["_"]))).scalars().all())
+
     def can_join(s: SessionItem) -> bool:
-        return s.status != "Cancelled" and (s.id in started or join_enabled(s, now))
+        return s.status != "Cancelled" and s.id not in ended and (s.id in started or join_enabled(s, now))
 
     # current week (Mon-Sat containing the first upcoming session, else the latest)
     monday = (now - datetime.timedelta(days=now.weekday())).date()
@@ -209,7 +217,7 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
         week = [s for s in sessions if monday <= s.scheduled_start.date() <= monday + datetime.timedelta(days=6)]
 
     def row(s: SessionItem) -> dict:
-        status = session_status(s, att.get(s.id), now)
+        status = session_status(s, att.get(s.id), now, meeting_ended=s.id in ended)
         rec = rec_by_session.get(s.id)
         if s.id in started and status in ("Upcoming", "Scheduled", "Live"):
             status = "Live"
@@ -217,7 +225,7 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
             action = "join"
         elif status == "Missed" and rec:
             action = "watch_now"
-        elif status in ("Attended", "Completed") and rec:
+        elif status in ("Attended", "Completed", "Excused") and rec:
             action = "recording"
         elif status in ("Upcoming", "Scheduled"):
             action = "remind_me"
@@ -232,7 +240,7 @@ def build_student_live(db: Session, student: Student, lang: str = "en", now: Opt
             "starts_at": s.scheduled_start.isoformat(), "ends_at": s.scheduled_end.isoformat(),
         }
 
-    upcoming = [s for s in sessions if s.scheduled_end > now]
+    upcoming = [s for s in sessions if s.scheduled_end > now and s.id not in ended and s.status != "Cancelled"]
     hero = upcoming[0] if upcoming else None
     hero_payload = None
     if hero:

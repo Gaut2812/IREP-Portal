@@ -70,7 +70,9 @@ def test_payload_matches_pdf7():
         ("Core CS knowledge", 4), ("Project explanation", 4), ("Communication & confidence", 3)]
     assert li["feedback"].startswith("Strong on DSA")
     assert [t["label"] for t in d["trend"]] == ["#1 · 3.0", "#2 · 3.8"] and d["target"] == 4.2
-    assert [s["type_label"] for s in d["available_slots"]] == ["Technical", "HR round", "AI-allowed coding"]
+    # the PDF's three demo slots, in order (the booking calendar adds more open slots around them)
+    demo = {"slot_demo_tech": "Technical", "slot_demo_hr": "HR round", "slot_demo_ai": "AI-allowed coding"}
+    assert [s["type_label"] for s in d["available_slots"] if s["id"] in demo] == ["Technical", "HR round", "AI-allowed coding"]
     assert len(li["comments"]) == 5 and li["comments"][1]["label"] == "9:00"
 
 

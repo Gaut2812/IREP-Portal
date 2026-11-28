@@ -5,15 +5,17 @@
  *  mock drive (38) carry the drive's name (L17). Spec: docs/screens/37-38-39-interviews-drives-readiness.md */
 import React, { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
+import { ConfirmDelete, DeleteButton } from "@/components/ui";
 
 interface Slot { id: string; starts_at: string; duration_min: number; round_type: string; round_label: string; batch_id: string | null;
   booked_by: string | null; drive: string | null; can_cancel: boolean }
 interface Iv { id: string; student: string; round_number: number; round_type: string; round_label: string; scheduled_at: string;
   duration_min: number; overall: number | null; has_recording: boolean; drive: string | null }
-interface View { rubric: { max: number; criteria: { key: string; label: string }[] }; batches: { id: string; name: string }[];
+interface View { rubric: { max: number; scale?: string; service_ready_min?: number; product_ready_min?: number; criteria: { key: string; label: string; help?: string }[] }; batches: { id: string; name: string }[];
   slots: Slot[]; to_score: Iv[]; upcoming: Iv[]; submitted: Iv[] }
 interface Note { at: string; text: string }
 
@@ -31,6 +33,7 @@ export default function TrainerInterviewsPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [delRec, setDelRec] = useState<Iv | null>(null);
   const [slot, setSlot] = useState({ starts_at: "", round_type: "technical", duration_min: "40", batch_id: "" });
   const [scoring, setScoring] = useState<Iv | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
@@ -100,6 +103,7 @@ export default function TrainerInterviewsPage() {
           <input type="file" accept="video/mp4,video/webm,audio/mpeg,audio/mp4" className="hidden" data-testid="iv-recording"
             onChange={(e) => upload(iv, e.target.files?.[0])} />
         </label>
+        {iv.has_recording && <DeleteButton onClick={() => setDelRec(iv)} label={t("trainer_interviews.delete_recording")} testId={`iv-recording-delete-${iv.id}`} />}
         {action}
       </div>
     </li>
@@ -108,6 +112,7 @@ export default function TrainerInterviewsPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("trainer_interviews.title")} pageSubtitle={t("trainer_interviews.help")}>
+        <HowItWorks topic="interview_scoring" steps={5} className="mb-4 max-w-6xl" />
         <div className="space-y-6 max-w-5xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="ti-error">{error}</p>}
           {msg && <p className="text-xs text-success" role="status" data-testid="ti-msg">{msg}</p>}
@@ -115,10 +120,16 @@ export default function TrainerInterviewsPage() {
           {scoring && v && (
             <form onSubmit={submit} noValidate className={`${card} border-brand`} data-testid="score-form">
               <h2 className="text-sm font-semibold text-ink">{t("trainer_interviews.score_title")} · {scoring.student} · #{scoring.round_number} {scoring.round_label}</h2>
+              {v.rubric.scale && (
+                <p className="text-caption text-muted" data-testid="rubric-scale">
+                  {v.rubric.scale}
+                  {v.rubric.service_ready_min != null && ` · ${t("trainer_interviews.ready_bars").replace("{s}", String(v.rubric.service_ready_min)).replace("{p}", String(v.rubric.product_ready_min))}`}
+                </p>
+              )}
               <div className="grid sm:grid-cols-2 gap-2">
                 {v.rubric.criteria.map((c) => (
                   <label key={c.key} className="text-xs flex items-center justify-between gap-2 border border-line-soft rounded-tile px-2.5 py-1.5">
-                    <span>{c.label}</span>
+                    <span className="min-w-0"><span className="block">{c.label}</span>{c.help && <span className="block text-caption text-muted" data-testid={`help-${c.key}`}>{c.help}</span>}</span>
                     <select value={scores[c.key] || ""} onChange={(e) => setScores({ ...scores, [c.key]: Number(e.target.value) })}
                       className={field} data-testid={`score-${c.key}`} aria-label={c.label}>
                       <option value="">–</option>
@@ -205,6 +216,15 @@ export default function TrainerInterviewsPage() {
             <ul className="space-y-2">{v?.submitted.map((iv) => ivRow(iv))}</ul>
           </section>
         </div>
+        {delRec && (
+          <ConfirmDelete itemName={`${t("trainer_interviews.recording_of")} ${delRec.student} · #${delRec.round_number}`} note={t("trainer_interviews.delete_recording_note")}
+            onConfirm={async () => {
+              await fetchApi(`/trainer/interviews/${delRec.id}/recording`, { method: "DELETE" });
+              setMsg(t("trainer_interviews.recording_deleted"));
+              await load();
+            }}
+            onClose={() => setDelRec(null)} />
+        )}
       </AppShell>
     </RoleGuard>
   );

@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import {
   Badge, Card, CardHeader, DistributionBar, MetricBar, Select, StatTile, Table, THead, Th, Tr, Td, deltaTone,
@@ -64,6 +65,7 @@ export default function ReadinessPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("readiness.title")} pageSubtitle={t("readiness.help")}>
+        <HowItWorks topic="readiness" steps={4} className="mb-4 max-w-6xl" />
         <div className="space-y-6 max-w-6xl">
           {error && <p className="text-body text-danger" role="alert">{error}</p>}
 

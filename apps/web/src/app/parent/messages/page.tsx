@@ -5,12 +5,13 @@ import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
+import { ThreadMessageBody, type ThreadMsg } from "@/components/messages/ThreadMessageBody";
 import { Send, Clock, AlertCircle, RefreshCw } from "lucide-react";
 
 interface ThreadRow { id: string; name: string; role_chip: string; avatar: string; unread: number }
 interface Detail {
   thread: { id: string; trainer_name: string; child: { name: string; batch: string } | null };
-  messages: { id: string; is_mine: boolean; sender_name: string; text: string; original_text: string; translated: boolean; time: string; date: string }[];
+  messages: (ThreadMsg & { sender_name: string; original_text: string; translated: boolean; time: string; date: string })[];
 }
 
 export default function ParentMessagesPage() {
@@ -105,11 +106,12 @@ export default function ParentMessagesPage() {
                 {detail.messages.map((m) => (
                   <div key={m.id} className={`flex flex-col ${m.is_mine ? "items-end" : "items-start"}`}>
                     <div className={`max-w-[85%] p-3 rounded-card text-sm space-y-1 ${m.is_mine ? "bg-brand text-white" : "bg-line-soft text-ink"}`}>
-                      <p className="leading-relaxed">{showOriginal[m.id] ? m.original_text : m.text}</p>
-                      <div className={`flex items-center justify-between gap-3 text-caption ${m.is_mine ? "text-white/70" : "text-subtle"}`}>
-                        {m.translated ? <button onClick={() => setShowOriginal({ ...showOriginal, [m.id]: !showOriginal[m.id] })} className="underline">{showOriginal[m.id] ? t("parent_messages.translated") : t("parent_messages.show_original")}</button> : <span />}
-                        <span>{m.date}</span>
-                      </div>
+                      <ThreadMessageBody m={m} text={showOriginal[m.id] ? m.original_text : m.text} meta={m.date} onChanged={() => selected ? loadThread(selected) : undefined} />
+                      {m.translated && !m.deleted && (
+                        <button onClick={() => setShowOriginal({ ...showOriginal, [m.id]: !showOriginal[m.id] })} className={`text-caption underline ${m.is_mine ? "text-white/70" : "text-subtle"}`}>
+                          {showOriginal[m.id] ? t("parent_messages.translated") : t("parent_messages.show_original")}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

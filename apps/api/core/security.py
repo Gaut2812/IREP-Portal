@@ -94,6 +94,7 @@ def normalize_role(role: Optional[str]) -> Optional[str]:
     return ROLE_ALIASES.get(role, role)
 
 
+# "demo" (the public demo server, infra/demo) is deliberately not here: everyone there signs in
 DEMO_AUTH_ENVIRONMENTS = {"development", "dev", "local", "test"}
 
 

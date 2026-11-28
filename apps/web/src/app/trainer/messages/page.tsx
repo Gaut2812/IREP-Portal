@@ -3,18 +3,19 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { fetchApi, WS_BASE } from "@/lib/api";
+import { ThreadMessageBody, type ThreadMsg } from "@/components/messages/ThreadMessageBody";
 import { Search, Send, Languages, Radio, AlertCircle, RefreshCw, CheckCircle2, X, Users, ExternalLink } from "lucide-react";
 
 interface ThreadRow { id: string; kind: "thread" | "group"; name: string; category: string; role_chip: string; avatar: string; unread: number; last_message: string; time: string }
-interface MatrixRow { key: string; label_en: string; label_ta: string; status_en: string; status_ta: string; color: string }
 interface Child { id: string; name: string; batch: string; readiness: number | null; band: string | null }
 interface ThreadDetail {
   thread: { id: string; category: string; contact_name: string; contact_role: string; prefers_tamil: boolean; trainer_name: string; child: Child | null };
-  messages: { id: string; is_mine: boolean; sender_name: string; text: string; original_text: string; translated: boolean; time: string }[];
+  messages: (ThreadMsg & { sender_name: string; original_text: string; translated: boolean; time: string })[];
 }
 interface GroupMsg { id: string; sender_name: string; sender_role: string; message_text: string; is_removed: boolean; time: string }
 interface ModItem { id: string; group: string; reason: string; author: string; snippet: string; time: string }
@@ -22,7 +23,6 @@ interface Delivery { students: number; parents: number; parents_sms: number; tot
 interface BroadcastRow { id: string; title: string; audience: string; delivery: Delivery; time: string }
 
 const CATS = ["All", "Parents", "College", "Groups"] as const;
-const CHIP: Record<string, string> = { red: "chip-red", green: "chip-green", blue: "chip-blue" };
 
 function fill(template: string, vars: Record<string, string | number>) {
   return Object.entries(vars).reduce((acc, [k, v]) => acc.split(`{${k}}`).join(String(v)), template);
@@ -34,7 +34,6 @@ export default function TrainerMessageHubPage() {
   const [category, setCategory] = useState<(typeof CATS)[number]>("All");
   const [query, setQuery] = useState("");
   const [threads, setThreads] = useState<ThreadRow[]>([]);
-  const [matrix, setMatrix] = useState<MatrixRow[]>([]);
   const [selected, setSelected] = useState<ThreadRow | null>(null);
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [groupMsgs, setGroupMsgs] = useState<GroupMsg[] | null>(null);
@@ -56,9 +55,8 @@ export default function TrainerMessageHubPage() {
 
   const loadThreads = useCallback(async () => {
     try {
-      const res = await fetchApi<{ threads: ThreadRow[]; permission_matrix: MatrixRow[] }>(`/trainer/threads?category=${category}`);
+      const res = await fetchApi<{ threads: ThreadRow[] }>(`/trainer/threads?category=${category}`);
       setThreads(res.threads);
-      setMatrix(res.permission_matrix);
       setSelected((cur) => (cur && res.threads.find((x) => x.id === cur.id)) || res.threads[0] || null);
       setError(null);
     } catch (err: any) {
@@ -172,6 +170,7 @@ export default function TrainerMessageHubPage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("hub.title")}>
+        <HowItWorks topic="moderation" steps={5} className="mb-4 max-w-6xl" />
         {loading && <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl mx-auto animate-pulse" aria-busy="true" aria-label={t("hub.loading")}><div className="lg:col-span-3 h-96 bg-white rounded-card" /><div className="lg:col-span-6 h-96 bg-white rounded-card" /><div className="lg:col-span-3 h-96 bg-white rounded-card" /></div>}
 
         {!loading && error && (
@@ -250,9 +249,8 @@ export default function TrainerMessageHubPage() {
                     {detail?.messages.map((m) => (
                       <div key={m.id} className={`flex flex-col ${m.is_mine ? "items-end" : "items-start"}`}>
                         <div className={`max-w-[80%] p-3.5 rounded-card text-xs space-y-1 ${m.is_mine ? "bg-brand text-white" : "bg-line-soft text-ink"}`}>
-                          <p className="leading-relaxed">{m.text}</p>
-                          {m.translated && <p className={`text-caption italic ${m.is_mine ? "text-white/70" : "text-muted"}`} title={m.original_text}>{t("hub.translated")} · {t("hub.original")}: {m.original_text}</p>}
-                          <div className={`text-caption text-right ${m.is_mine ? "text-white/70" : "text-subtle"}`}>{m.time}</div>
+                          {m.translated && !m.deleted && <p className={`text-caption italic ${m.is_mine ? "text-white/70" : "text-muted"}`} title={m.original_text}>{t("hub.translated")} · {t("hub.original")}: {m.original_text}</p>}
+                          <ThreadMessageBody m={m} meta={m.time} onChanged={() => selected ? loadSelected(selected, showTamil) : undefined} />
                         </div>
                       </div>
                     ))}
@@ -281,15 +279,7 @@ export default function TrainerMessageHubPage() {
 
             {/* Right column */}
             <div className="lg:col-span-3 space-y-4 overflow-y-auto">
-              <div className="bg-white rounded-card border border-line p-4 shadow-card space-y-3" data-testid="permission-matrix">
-                <h4 className="text-xs font-semibold text-ink border-b border-line pb-2">{t("hub.who_can")}</h4>
-                <div className="space-y-1.5">
-                  {matrix.map((r) => (
-                    <div key={r.key} className="flex items-center justify-between text-xs gap-2"><span className="text-muted">{language === "ta" ? r.label_ta : r.label_en}</span><span className={CHIP[r.color] || "chip-blue"}>{language === "ta" ? r.status_ta : r.status_en}</span></div>
-                  ))}
-                </div>
-              </div>
-
+              {/* who may message whom is enforced by the API (chat_policy.can_message); no card for it here */}
               <div className="bg-white rounded-card border border-line p-4 shadow-card space-y-3" data-testid="moderation-queue">
                 <div className="flex items-center justify-between border-b border-line pb-2">
                   <h4 className="text-xs font-semibold text-ink">{t("hub.moderation")}</h4>

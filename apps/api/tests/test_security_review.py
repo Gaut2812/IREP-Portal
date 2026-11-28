@@ -270,3 +270,13 @@ def test_demo_user_sync_refuses_production(monkeypatch, capsys):
     monkeypatch.setattr(sk, "admin_from_env", lambda: pytest.fail("must not contact Keycloak"))
     assert sk.main() == 2
     assert "refuses to run" in capsys.readouterr().out
+
+
+def test_public_demo_mode_shows_the_parent_code_but_needs_a_sign_in(monkeypatch):
+    """infra/demo runs ENVIRONMENT=demo: parents see their code on screen, but no anonymous demo profile."""
+    monkeypatch.setattr(settings, "ENVIRONMENT", "demo")
+    r = client.post(REQ, json={"phone": PHONE})
+    assert r.status_code == 200 and r.json().get("demo_otp")
+    assert client.get("/api/v1/auth/me", headers={"X-Demo-Role": "super_admin"}).status_code == 401
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    assert "demo_otp" not in client.post(REQ, json={"phone": "9000000042"}).json()

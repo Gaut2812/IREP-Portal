@@ -99,3 +99,6 @@ export async function fetchBlob(endpoint: string): Promise<Blob> {
   if (!res.ok) throw new ApiError(res.status, res.statusText);
   return await res.blob();
 }
+
+/** A signed media link from the API (`/media/...?exp=&sig=`) as a full URL on the API host. */
+export const mediaSrc = (url: string) => `${API_BASE.replace(/\/api\/v1$/, "")}${url}`;

@@ -7,6 +7,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi, fetchBlob } from "@/lib/api";
 import { Download, FilePlus2 } from "lucide-react";
+import { ConfirmDelete, DeleteButton } from "@/components/ui";
 
 interface Report { id: string; title: string; type: string; period: string | null; generated_at: string | null; data_as_of: string | null; size_kb: number; status: string }
 
@@ -16,6 +17,7 @@ export default function CollegeReportsPage() {
   const [type, setType] = useState("progress");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [delRep, setDelRep] = useState<Report | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -74,13 +76,24 @@ export default function CollegeReportsPage() {
                   <div className="text-xs font-semibold text-ink truncate">{r.title}</div>
                   <div className="text-caption text-muted">{t("reports.data_as_of")} {r.data_as_of} · {r.size_kb} KB</div>
                 </div>
+                <div className="flex items-center gap-2 shrink-0">
                 <button type="button" onClick={() => download(r)} data-testid="mou-download" className="px-2.5 py-1 border border-line-strong text-xs font-semibold rounded-tile inline-flex items-center gap-1 shrink-0">
                   <Download className="w-3.5 h-3.5" />PDF
                 </button>
+                <DeleteButton onClick={() => setDelRep(r)} testId="mou-delete" />
+                </div>
               </li>
             ))}
           </ul>
         </div>
+        {delRep && (
+          <ConfirmDelete itemName={delRep.title}
+            onConfirm={async () => {
+              await fetchApi(`/college/reports/${delRep.id}`, { method: "DELETE" });
+              await load();
+            }}
+            onClose={() => setDelRep(null)} />
+        )}
       </AppShell>
     </RoleGuard>
   );

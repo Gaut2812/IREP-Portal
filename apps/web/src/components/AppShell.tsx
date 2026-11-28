@@ -74,7 +74,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
   const studentNav = [
     { label: t("nav.dashboard"), href: "/student", icon: LayoutDashboard },
     { label: t("nav.my_courses"), href: "/student/courses", icon: BookOpen },
-    { label: t("nav.coding_lab"), href: "/student/coding/prob_connected_components", icon: Code2 },
+    { label: t("nav.coding_lab"), href: "/student/coding", icon: Code2 },
     { label: t("nav.practice_tests"), href: "/student/tests", icon: FileCheck2 },
     { label: t("nav.virtual_labs"), href: "/student/labs", icon: Cpu },
     { label: t("nav.sprint_board"), href: "/student/projects/board", icon: KanbanSquare },
@@ -84,7 +84,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.certificates"), href: "/student/certificates", icon: Award },
     { label: t("nav.portfolio"), href: "/student/portfolio", icon: Briefcase },
     { label: t("nav.live_sessions"), href: "/student/live", icon: Radio },
-    { label: t("nav.checkin"), href: "/student/checkin", icon: ClipboardCheck },
     { label: t("nav.discussions"), href: "/student/discussions", icon: MessageSquare },
   ];
 
@@ -96,12 +95,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.approvals"), href: "/trainer/approvals", icon: ShieldCheck },
     { label: t("nav.assessments"), href: "/trainer/assessments", icon: FileCheck2 },
     { label: t("nav.mock_interviews"), href: "/trainer/interviews", icon: Video },
+    { label: t("nav.trainer_projects"), href: "/trainer/projects", icon: KanbanSquare },
     { label: t("nav.code_reviews"), href: "/trainer/reviews", icon: Code2 },
     { label: t("nav.at_risk_students"), href: "/trainer/at-risk", icon: Users },
     { label: t("nav.lab_board"), href: "/trainer/labs", icon: Cpu },
     { label: t("nav.reports"), href: "/trainer/reports", icon: BookOpen },
     { label: t("nav.messages"), href: "/trainer/messages", icon: MessageSquare },
-    { label: t("nav.live_classroom"), href: "/live/sess_thu_rag", icon: Radio },
+    { label: t("nav.live_classroom"), href: "/trainer/live", icon: Radio },
   ];
 
   const collegeNav = [

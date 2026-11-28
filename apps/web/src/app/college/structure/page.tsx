@@ -3,6 +3,7 @@
 /** Screen 03 · Branches and batches (college admin). Spec: docs/screens/03-branches-and-batches.md */
 import React, { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { API_BASE, ApiError, authHeaders, fetchApi } from "@/lib/api";
@@ -123,6 +124,7 @@ export default function CollegeStructurePage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("structure.title")} pageSubtitle={t("structure.subtitle")}>
+        <HowItWorks topic="branch_batch" steps={4} className="mb-4 max-w-6xl" />
         <div className="space-y-6 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="structure-error">{error}</p>}
 

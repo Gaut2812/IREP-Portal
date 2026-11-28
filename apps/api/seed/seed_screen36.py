@@ -69,6 +69,14 @@ def seed_screen36(db, college_id: str = "col_demo_001") -> None:
     wed = _next(today, 2, 1)
     sat = wed + datetime.timedelta(days=3)  # the Saturday after that Wednesday, so the PDF order holds on every weekday
     plan = [("slot_demo_tech", wed, 16, 0, "technical"), ("slot_demo_hr", sat, 10, 30, "hr"), ("slot_demo_ai", sat, 12, 0, "ai_coding")]
+    # the booking calendar: more open slots over the next two weeks (Mon, Tue, Thu, Fri at 3 PM; types take turns)
+    types = ["technical", "hr", "ai_coding"]
+    k = 0
+    for d in range(1, 15):
+        day = today + datetime.timedelta(days=d)
+        if day.weekday() in (0, 1, 3, 4):
+            plan.append((f"slot_demo_cal_{k:02d}", day, 15, 0, types[k % 3]))
+            k += 1
     db.execute(delete(InterviewSlot).where(InterviewSlot.trainer_id == ARUN, InterviewSlot.id.notin_([p[0] for p in plan]),
                                            InterviewSlot.starts_at > now))
     for sid, day, hh, mm, rtype in plan:

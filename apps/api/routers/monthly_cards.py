@@ -20,6 +20,7 @@ from services.notifications import notify_user
 from services.parent_overview import month_label
 from services.reports import render_pdf
 from services.storage import get_storage
+from services.translation import translate
 
 router = APIRouter(tags=["Monthly cards"])
 TRAINER = require_role(["trainer"])
@@ -73,7 +74,8 @@ def _card_out(c: MonthlyCard, lang: str, name: Optional[str] = None) -> dict:
         "trainer_remark_en": c.trainer_remark_en, "trainer_remark_ta": c.trainer_remark_ta,
         "how_to_help_en": c.how_to_help_en, "how_to_help_ta": c.how_to_help_ta,
         "trainer_name": c.trainer_name, "approved_at": c.approved_at.isoformat() if c.approved_at else None,
-        "missing": [k for k in ("trainer_remark_en", "trainer_remark_ta", "how_to_help_en", "how_to_help_ta") if not (getattr(c, k) or "").strip()],
+        # the trainer writes English only; Tamil is filled in by the translation service (fill_tamil)
+        "missing": [k for k in ("trainer_remark_en", "how_to_help_en") if not (getattr(c, k) or "").strip()],
     }
 
 
@@ -155,10 +157,27 @@ def edit_card(card_id: str, req: CardEdit, current_user: TokenPayload = Depends(
     c = _trainer_card(db, card_id, current_user)
     if c.status != "draft":
         raise HTTPException(status_code=409, detail="This card is already released and cannot be edited")
-    for k, v in req.model_dump(exclude_unset=True).items():
+    sent = req.model_dump(exclude_unset=True)
+    for k, v in sent.items():
         setattr(c, k, (v or "").strip() or None)
+    # an English edit refreshes its Tamil text unless the same request also sent Tamil explicitly
+    fill_tamil(db, c, refresh=[base for base in TA_PAIRS if f"{base}_en" in sent and f"{base}_ta" not in sent])
     db.commit()
     return _card_out(c, "en")
+
+
+TA_PAIRS = ("trainer_remark", "how_to_help")
+
+
+def fill_tamil(db: Session, c: MonthlyCard, refresh: Optional[List[str]] = None) -> None:
+    """Parents read the card in Tamil (rule 9): translate each English field into its _ta field when that is
+    empty, or when the English was just edited (refresh). Production uses TRANSLATE_ADAPTER=libretranslate."""
+    for base in TA_PAIRS:
+        en = getattr(c, f"{base}_en")
+        if en and (not getattr(c, f"{base}_ta") or base in (refresh or [])):
+            setattr(c, f"{base}_ta", translate(db, en, "ta", c.college_id, src="en"))
+        elif not en and base in (refresh or []):
+            setattr(c, f"{base}_ta", None)
 
 
 def card_pdf(c: MonthlyCard, child_name: str) -> str:
@@ -177,7 +196,8 @@ def _approve(db: Session, c: MonthlyCard, user: TokenPayload) -> Optional[str]:
         return "already released"
     missing = _card_out(c, "en")["missing"]
     if missing:
-        return "add the remark and the help text in English and Tamil"
+        return "add the remark and the help text"
+    fill_tamil(db, c)
     st = db.get(Student, c.student_id)
     name = get_user_name(db, st.user_id, "Student")
     c.status, c.approved_by, c.approved_at = "approved", user.sub, datetime.datetime.utcnow()

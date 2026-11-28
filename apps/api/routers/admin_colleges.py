@@ -16,8 +16,9 @@ from sqlalchemy.orm import Session
 
 from core.database import get_db
 from core.security import SUPER, TokenPayload, get_password_hash, is_super_admin, keycloak_mode, require_role
-from models.schema import College, MouTerm, Student, User
+from models.schema import Batch, Branch, College, Invoice, MouTerm, Student, User
 from services.audit import record_audit
+from services.invitations import INVITE_HOURS, create_invitation, get_invitation, list_invitations, resend_invitation, revoke_invitation
 from services.outbox import emit, handler as outbox_handler
 
 router = APIRouter(prefix="/admin/colleges", tags=["Screen 45 · Colleges and MoU"])
@@ -190,6 +191,49 @@ def activate_mou(college_id: str, mou_id: str, current_user: TokenPayload = Depe
     return _mou_out(m)
 
 
+@router.delete("/{college_id}/mou/{mou_id}")
+def delete_mou(college_id: str, mou_id: str, current_user: TokenPayload = Depends(SUPER), db: Session = Depends(get_db)):
+    """Delete a draft or superseded MoU. The active one sets quotas and billing: activate another one first.
+    An MoU an invoice was billed against stays (the invoice must keep its terms)."""
+    c = _college(db, college_id)
+    m = db.execute(select(MouTerm).where(MouTerm.id == mou_id, MouTerm.college_id == c.id)).scalar_one_or_none()
+    if m is None:
+        raise HTTPException(status_code=404, detail="MoU not found")
+    if m.status == "active":
+        raise HTTPException(status_code=409, detail="This is the active MoU; activate another MoU before deleting it")
+    if db.execute(select(Invoice.id).where(Invoice.mou_id == m.id)).first():
+        raise HTTPException(status_code=409, detail="Invoices were billed against this MoU, so it is kept on record")
+    record_audit(db, current_user, "mou.deleted", "mou", m.id, _mou_out(m), college_id=c.id)
+    db.delete(m)
+    db.commit()
+    return {"success": True}
+
+
+@router.delete("/{college_id}")
+def delete_college(college_id: str, current_user: TokenPayload = Depends(SUPER), db: Session = Depends(get_db)):
+    """Delete a college that holds no people or records yet (for example, one created by mistake). A college
+    with users, students, structure or invoices is refused: personal data leaves only through a deletion request."""
+    c = _college(db, college_id)
+    in_use = {
+        "users": db.execute(select(func.count(User.id)).where(User.college_id == c.id)).scalar_one(),
+        "students": db.execute(select(func.count(Student.id)).where(Student.college_id == c.id)).scalar_one(),
+        "branches": db.execute(select(func.count(Branch.id)).where(Branch.college_id == c.id)).scalar_one(),
+        "batches": db.execute(select(func.count(Batch.id)).where(Batch.college_id == c.id)).scalar_one(),
+        "invoices": db.execute(select(func.count(Invoice.id)).where(Invoice.college_id == c.id)).scalar_one(),
+    }
+    used = {k: v for k, v in in_use.items() if v}
+    if used:
+        detail = ", ".join(f"{v} {k}" for k, v in used.items())
+        raise HTTPException(status_code=409, detail=f"This college still has {detail}; only an empty college can be deleted")
+    for m in db.execute(select(MouTerm).where(MouTerm.college_id == c.id)).scalars():
+        db.delete(m)
+    db.flush()
+    record_audit(db, current_user, "college.deleted", "college", c.id, {"code": c.code, "name": c.name}, college_id=c.id)
+    db.delete(c)
+    db.commit()
+    return {"success": True}
+
+
 def _activate(db: Session, user: TokenPayload, c: College, m: MouTerm) -> None:
     for old in db.execute(select(MouTerm).where(MouTerm.college_id == c.id, MouTerm.status == "active", MouTerm.id != m.id)).scalars():
         old.status = "superseded"
@@ -207,23 +251,38 @@ def create_college_admin(college_id: str, req: AdminIn, current_user: TokenPaylo
         raise HTTPException(status_code=409, detail="An account with this email already exists")
     name = req.name.strip()
     initials = "".join(p[0] for p in name.split()[:2]).upper() or "CA"
-    temp_password = None if keycloak_mode() else secrets.token_urlsafe(9)
     u = User(id=f"usr_{uuid.uuid4().hex[:16]}", college_id=c.id, email=email, name=name, phone=req.phone, role="college_admin",
              avatar_initials=initials, language_pref="en",
-             # Keycloak mode: no portal password at all; Keycloak owns the credential
-             hashed_password=get_password_hash(temp_password or secrets.token_urlsafe(32)))
+             # unusable until the invitation is accepted (Keycloak mode: Keycloak owns the credential)
+             hashed_password=get_password_hash(secrets.token_urlsafe(32)))
     db.add(u)
     db.flush()
     record_audit(db, current_user, "college.admin_created", "user", u.id, {"email": email}, college_id=c.id)
-    if keycloak_mode():
-        emit(db, "identity.invite_user", {"user_id": u.id}, college_id=c.id, entity_type="user", entity_id=u.id)
+    invite = create_invitation(db, u, current_user)        # Phase 5: a set-password link, not a temporary password
     _refresh_status(db, c)
     db.commit()
-    out = {"id": u.id, "email": email, "college_status": c.status}
-    if temp_password:
-        out["temporary_password"] = temp_password       # shown once; never stored in plain text
-    else:
-        out["invite"] = "Keycloak will email a link to set a password"
+    return {"id": u.id, "email": email, "college_status": c.status, **invite}
+
+
+@router.get("/{college_id}/invitations")
+def college_invitations_for_staff(college_id: str, current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
+    c = _college(db, college_id)
+    return {"items": list_invitations(db, c.id), "valid_hours": INVITE_HOURS}
+
+
+@router.post("/{college_id}/invitations/{invitation_id}/resend")
+def staff_resend_invitation(college_id: str, invitation_id: str, current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
+    c = _college(db, college_id)
+    out = resend_invitation(db, get_invitation(db, c.id, invitation_id), current_user)
+    db.commit()
+    return out
+
+
+@router.post("/{college_id}/invitations/{invitation_id}/revoke")
+def staff_revoke_invitation(college_id: str, invitation_id: str, current_user: TokenPayload = Depends(STAFF), db: Session = Depends(get_db)):
+    c = _college(db, college_id)
+    out = revoke_invitation(db, get_invitation(db, c.id, invitation_id), current_user)
+    db.commit()
     return out
 
 
@@ -239,4 +298,5 @@ def _invite_in_keycloak(db: Session, event) -> None:
     first, _, last = (u.name or u.email).partition(" ")
     rep = {"username": u.email, "email": u.email, "emailVerified": False, "enabled": True, "firstName": first, "lastName": last or "-",
            "attributes": {"irep_user_id": [u.id], "college_id": [u.college_id]}}
-    admin_from_env().invite(rep, u.role, send_email=os.getenv("KEYCLOAK_INVITE_EMAIL", "false").lower() == "true")
+    admin_from_env().invite(rep, u.role, send_email=os.getenv("KEYCLOAK_INVITE_EMAIL", "false").lower() == "true",
+                            resend=bool((event.payload or {}).get("resend")))

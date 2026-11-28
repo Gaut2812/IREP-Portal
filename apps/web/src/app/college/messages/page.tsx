@@ -6,10 +6,11 @@ import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
+import { ThreadMessageBody, type ThreadMsg } from "@/components/messages/ThreadMessageBody";
 import { Megaphone, MessageSquare, Send } from "lucide-react";
 
 interface Thread { id: string; name: string; last_message?: string | null; unread?: number }
-interface Msg { id: string; is_mine: boolean; sender_name: string; text: string }
+interface Msg extends ThreadMsg { sender_name: string }
 interface Announcement { id: string; title: string; audience: string; batches: string[] | "all"; status: string; recipients: number; delivered: number; at: string | null }
 
 export default function CollegeMessagesPage() {
@@ -119,7 +120,9 @@ export default function CollegeMessagesPage() {
                   <div className="flex-1 overflow-y-auto p-3 space-y-2" data-testid="cmsg-chat">
                     {msgs.map((m) => (
                       <div key={m.id} className={`flex ${m.is_mine ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[80%] rounded-card px-3 py-2 text-sm ${m.is_mine ? "bg-brand text-white" : "bg-line-soft"}`}>{m.text}</div>
+                        <div className={`max-w-[80%] rounded-card px-3 py-2 text-sm ${m.is_mine ? "bg-brand text-white" : "bg-line-soft"}`} data-testid="dm-bubble">
+                          <ThreadMessageBody m={m} meta={m.time} onChanged={() => current ? loadMsgs(current) : undefined} />
+                        </div>
                       </div>
                     ))}
                   </div>

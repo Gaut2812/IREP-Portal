@@ -24,11 +24,21 @@ router = APIRouter(tags=["Discussion Groups"])
 GROUP_ROLES = ["student", "trainer"]
 HELPER_WINDOW_DAYS = 30
 ONLINE_WINDOW_MIN = 10
+EDIT_WINDOW_MIN = 15          # a sent message can be edited for this long
+REACTIONS = ("👍", "❤️", "😂", "😮", "🙏", "👏")     # one reaction per person per message, as in WhatsApp
 
 
 class MessageIn(BaseModel):
     message_text: str = Field(min_length=1, max_length=4000)
     code_snippet: Optional[str] = Field(default=None, max_length=8000)
+
+
+class EditIn(BaseModel):
+    message_text: str = Field(min_length=1, max_length=4000)
+
+
+class ReactIn(BaseModel):
+    emoji: str = Field(default="👍", max_length=8)
 
 
 class ReportIn(BaseModel):
@@ -52,18 +62,52 @@ def _local(dt: datetime.datetime) -> datetime.datetime:
     return dt + (datetime.datetime.now() - datetime.datetime.utcnow())
 
 
+def _with_legacy_likes(summary: list, legacy: int) -> list:
+    """Seeded messages carry a like count from before per-person reactions: it counts as 👍."""
+    out = [dict(x) for x in summary]
+    if legacy:
+        like = next((x for x in out if x["emoji"] == "👍"), None)
+        if like:
+            like["count"] += legacy
+        else:
+            out.append({"emoji": "👍", "count": legacy})
+    return sorted(out, key=lambda x: -x["count"])
+
+
 def _serialize(db: Session, msgs, user: TokenPayload) -> list:
     ids = [m.id for m in msgs] or ["_"]
     counts = dict(db.execute(select(MessageReaction.message_id, func.count(MessageReaction.id)).where(MessageReaction.message_id.in_(ids)).group_by(MessageReaction.message_id)).all())
-    mine = set(db.execute(select(MessageReaction.message_id).where(MessageReaction.message_id.in_(ids), MessageReaction.user_id == user.sub)).scalars().all())
+    by_emoji: dict = {}
+    for mid, emoji, n in db.execute(select(MessageReaction.message_id, MessageReaction.emoji, func.count(MessageReaction.id))
+                                    .where(MessageReaction.message_id.in_(ids)).group_by(MessageReaction.message_id, MessageReaction.emoji)):
+        by_emoji.setdefault(mid, []).append({"emoji": emoji, "count": n})
+    my_emoji = dict(db.execute(select(MessageReaction.message_id, MessageReaction.emoji).where(MessageReaction.message_id.in_(ids), MessageReaction.user_id == user.sub)).all())
+    mine = set(my_emoji)
+    # seen ticks for my own messages: the other members whose last read is at or after the message
+    group_ids = {m.group_id for m in msgs}
+    readers = db.execute(select(GroupMember.group_id, GroupMember.user_id, GroupMember.last_read_at, User.name)
+                         .join(User, User.id == GroupMember.user_id)
+                         .where(GroupMember.group_id.in_(list(group_ids) or ["_"]), GroupMember.user_id != user.sub,
+                                GroupMember.last_read_at.is_not(None))).all()
+    now = datetime.datetime.utcnow()
     reported = set(db.execute(select(MessageReport.message_id).where(MessageReport.message_id.in_(ids), MessageReport.reporter_user_id == user.sub)).scalars().all())
     out = []
     for m in msgs:
+        is_mine = m.sender_user_id == user.sub
+        gone = m.is_removed or m.deleted_at is not None
+        seen_by = [name for gid, uid, at, name in readers if gid == m.group_id and at >= m.created_at] if is_mine and not gone else []
         out.append({
             "id": m.id, "sender_name": m.sender_name, "sender_role": m.sender_role, "sender_initials": m.sender_initials,
-            "is_mine": m.sender_user_id == user.sub,
-            "message_text": "This message was removed by a moderator." if m.is_removed else m.message_text,
-            "code_snippet": None if m.is_removed else m.code_snippet, "is_removed": m.is_removed,
+            "is_mine": is_mine,
+            "message_text": ("This message was removed by a moderator." if m.is_removed
+                             else "This message was deleted." if m.deleted_at else m.message_text),
+            "code_snippet": None if gone else m.code_snippet, "is_removed": m.is_removed,
+            "is_deleted": m.deleted_at is not None, "edited": bool(m.edited_at) and not gone,
+            "can_edit": is_mine and not gone and (now - m.created_at) <= datetime.timedelta(minutes=EDIT_WINDOW_MIN),
+            "can_delete": is_mine and not gone,
+            "seen_by": seen_by[:20], "seen_count": len(seen_by),
+            "reaction_summary": [] if gone else _with_legacy_likes(by_emoji.get(m.id, []), m.reactions_count or 0),
+            "my_emoji": my_emoji.get(m.id),
             "is_marked_as_answer": m.is_marked_as_answer, "reactions": counts.get(m.id, 0) + (m.reactions_count or 0),
             "my_reaction": m.id in mine, "reported_by_me": m.id in reported,
             "time": _local(m.created_at).strftime("%I:%M %p").lstrip("0"), "date": _local(m.created_at).strftime("%b %d"),
@@ -81,7 +125,8 @@ def list_groups(current_user: TokenPayload = Depends(require_role(GROUP_ROLES)),
     order = ["batch", "track_doubts", "daily_dsa", "team", "announcements", "gd"]
     out = []
     for g, m in sorted(rows, key=lambda r: (order.index(r[0].kind) if r[0].kind in order else 99, r[0].name)):
-        last = db.execute(select(GroupMessage).where(GroupMessage.group_id == g.id, GroupMessage.is_removed.is_(False)).order_by(GroupMessage.created_at.desc())).scalars().first()
+        last = db.execute(select(GroupMessage).where(GroupMessage.group_id == g.id, GroupMessage.is_removed.is_(False),
+                                                     GroupMessage.deleted_at.is_(None)).order_by(GroupMessage.created_at.desc())).scalars().first()
         unread_q = select(func.count(GroupMessage.id)).where(GroupMessage.group_id == g.id, GroupMessage.sender_user_id != current_user.sub)
         if m.last_read_at:
             unread_q = unread_q.where(GroupMessage.created_at > m.last_read_at)
@@ -102,9 +147,13 @@ def get_messages(group_id: str, after: Optional[str] = None, current_user: Token
         q = q.where(GroupMessage.created_at > datetime.datetime.fromisoformat(after))
     msgs = db.execute(q.order_by(GroupMessage.created_at.desc()).limit(60)).scalars().all()[::-1]
     now = datetime.datetime.utcnow()
+    newest_other = max((x.created_at for x in msgs if x.sender_user_id != current_user.sub), default=None)
+    read_something_new = newest_other is not None and (m.last_read_at is None or newest_other > m.last_read_at)
     m.last_read_at = now
     m.last_seen_at = now
     db.commit()
+    if read_something_new:
+        publish_sync(f"group:{g.id}", {"type": "read", "group_id": g.id})
     mods = db.execute(select(User.name).join(GroupMember, GroupMember.user_id == User.id).where(GroupMember.group_id == g.id, GroupMember.role == "moderator")).scalars().all()
     muted = bool(m.muted_until and m.muted_until > now)
     can_post = not muted and (not g.is_locked_announcement or m.role == "moderator")
@@ -112,6 +161,7 @@ def get_messages(group_id: str, after: Optional[str] = None, current_user: Token
         "group": {"id": g.id, "name": g.name, "kind": g.kind, "icon": g.icon, "is_locked": g.is_locked_announcement, "pinned_note": g.pinned_note,
                   "moderators": [n.replace("Arun Kumar", "Arun K.").replace("Meena S", "Meena S.") for n in mods]},
         "me": {"role": m.role, "can_post": can_post, "muted_until": m.muted_until.isoformat() if muted else None},
+        "reactions": list(REACTIONS), "edit_window_min": EDIT_WINDOW_MIN,
         "messages": _serialize(db, msgs, current_user),
     }
 
@@ -193,19 +243,71 @@ def _message_for(db: Session, message_id: str, user: TokenPayload):
 
 
 @router.post("/messages/{message_id}/react")
-def react(message_id: str, current_user: TokenPayload = Depends(require_role(GROUP_ROLES)), db: Session = Depends(get_db)):
+def react(message_id: str, req: Optional[ReactIn] = None, current_user: TokenPayload = Depends(require_role(GROUP_ROLES)), db: Session = Depends(get_db)):
+    """React with one of REACTIONS (default 👍). The same emoji again takes the reaction back; another one replaces it."""
     msg, g, _ = _message_for(db, message_id, current_user)
+    emoji = (req.emoji if req else None) or "👍"
+    if emoji not in REACTIONS:
+        raise HTTPException(status_code=422, detail="Pick one of the offered reactions")
+    if msg.deleted_at or msg.is_removed:
+        raise HTTPException(status_code=409, detail="This message is no longer there")
     existing = db.execute(select(MessageReaction).filter_by(message_id=msg.id, user_id=current_user.sub)).scalar_one_or_none()
-    if existing:
+    if existing and existing.emoji == emoji:
         db.delete(existing)
         mine = False
+    elif existing:
+        existing.emoji = emoji
+        mine = True
     else:
-        db.add(MessageReaction(id=f"rx_{uuid.uuid4().hex[:16]}", college_id=g.college_id, message_id=msg.id, user_id=current_user.sub))
+        db.add(MessageReaction(id=f"rx_{uuid.uuid4().hex[:16]}", college_id=g.college_id, message_id=msg.id, user_id=current_user.sub, emoji=emoji))
         mine = True
     db.commit()
     total = db.execute(select(func.count(MessageReaction.id)).filter_by(message_id=msg.id)).scalar_one() + (msg.reactions_count or 0)
     publish_sync(f"group:{g.id}", {"type": "reaction", "group_id": g.id})
-    return {"success": True, "my_reaction": mine, "reactions": total}
+    return {"success": True, "my_reaction": mine, "my_emoji": emoji if mine else None, "reactions": total}
+
+
+@router.patch("/messages/{message_id}")
+def edit_message(message_id: str, req: EditIn, current_user: TokenPayload = Depends(require_role(GROUP_ROLES)), db: Session = Depends(get_db)):
+    """The sender fixes a message within EDIT_WINDOW_MIN. Moderation checks the new text; the first version is kept."""
+    msg, g, _ = _message_for(db, message_id, current_user)
+    if msg.sender_user_id != current_user.sub:
+        raise HTTPException(status_code=403, detail="You can edit only your own messages")
+    if msg.deleted_at or msg.is_removed:
+        raise HTTPException(status_code=409, detail="This message is no longer there")
+    if datetime.datetime.utcnow() - msg.created_at > datetime.timedelta(minutes=EDIT_WINDOW_MIN):
+        raise HTTPException(status_code=409, detail=f"Messages can be edited for {EDIT_WINDOW_MIN} minutes after sending")
+    verdict = check_text(db, g.college_id, req.message_text)
+    if verdict and verdict[0] == "block":
+        raise HTTPException(status_code=422, detail=MOD_REASONS[verdict[1]])
+    if msg.original_text is None:
+        msg.original_text = msg.message_text
+    msg.message_text = req.message_text.strip()
+    msg.edited_at = datetime.datetime.utcnow()
+    if verdict and verdict[0] == "flag":
+        db.add(MessageReport(id=f"rep_{uuid.uuid4().hex[:14]}", college_id=g.college_id, message_id=msg.id, group_id=g.id,
+                             reporter_user_id=f"system-edit-{uuid.uuid4().hex[:6]}", reason=f"Auto-flag after edit: '{verdict[1]}'", status="open"))
+    db.commit()
+    publish_sync(f"group:{g.id}", {"type": "edit", "group_id": g.id, "message_id": msg.id})
+    return {"success": True, "edited": True}
+
+
+@router.delete("/messages/{message_id}")
+def delete_message(message_id: str, current_user: TokenPayload = Depends(require_role(GROUP_ROLES)), db: Session = Depends(get_db)):
+    """The sender deletes their own message: everyone sees "This message was deleted"; moderators keep the text
+    (a report or a moderation review can still read it)."""
+    msg, g, _ = _message_for(db, message_id, current_user)
+    if msg.sender_user_id != current_user.sub:
+        raise HTTPException(status_code=403, detail="You can delete only your own messages")
+    if msg.deleted_at or msg.is_removed:
+        raise HTTPException(status_code=409, detail="This message is no longer there")
+    msg.deleted_at = datetime.datetime.utcnow()
+    msg.is_marked_as_answer = False
+    db.execute(delete(MessageReaction).where(MessageReaction.message_id == msg.id))
+    record_audit(db, current_user, "group.message_deleted", "group_message", msg.id, {"group_id": g.id})
+    db.commit()
+    publish_sync(f"group:{g.id}", {"type": "delete", "group_id": g.id, "message_id": msg.id})
+    return {"success": True}
 
 
 @router.post("/messages/{message_id}/mark-answer")

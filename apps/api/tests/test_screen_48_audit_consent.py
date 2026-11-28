@@ -15,7 +15,7 @@ from sqlalchemy import delete, select
 from core.database import SessionLocal
 from core.security import PLATFORM_TENANT, create_access_token
 from main import app
-from models.schema import AuditLog, ConsentRecord, DataRequest, Notification, OutboxEvent, ParentStudent, Student, User
+from models.schema import Invitation, AuditLog, ConsentRecord, DataRequest, Notification, OutboxEvent, ParentStudent, Student, User
 from services import outbox
 
 client = TestClient(app)
@@ -71,6 +71,7 @@ def throwaway_student():
         db.execute(delete(ConsentRecord).where(ConsentRecord.subject_student_id == sid))
         db.execute(delete(ParentStudent).where(ParentStudent.student_id == sid))
         db.execute(delete(Student).where(Student.id == sid))
+        db.execute(delete(Invitation).where(Invitation.user_id == f"usr_tmp_{tag}"))
         db.execute(delete(User).where(User.id == f"usr_tmp_{tag}"))
         db.commit()
     finally:

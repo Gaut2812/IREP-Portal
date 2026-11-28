@@ -6,6 +6,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi, API_BASE } from "@/lib/api";
 import { Play, Calendar, MessageSquareQuote, AlertCircle, RefreshCw, CheckCircle2, Clock } from "lucide-react";
+import { SlotCalendar, type CalSlot } from "@/components/interviews/SlotCalendar";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, LabelList } from "recharts";
 
 interface Latest {
@@ -13,7 +14,7 @@ interface Latest {
   chips: { label: string; type: string }[]; rubric: { key: string; label: string; score: number; max: number }[];
   feedback: string | null; has_recording: boolean; comments: { id: string; at_seconds: number; label: string; text: string; author: string }[];
 }
-interface Slot { id: string; date: string; time: string; round_type: string; type_label: string; trainer: string }
+type Slot = CalSlot;
 interface Booking extends Slot { slot_id: string; can_cancel: boolean }
 interface Data {
   latest_interview: Latest | null;
@@ -36,6 +37,7 @@ export default function MockInterviewsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
+  const [bookError, setBookError] = useState<string | null>(null);   // stays in the card, not only a passing toast
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [seekTo, setSeekTo] = useState<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -60,12 +62,14 @@ export default function MockInterviewsPage() {
 
   const book = async (slot: Slot) => {
     setBusy(slot.id);
+    setBookError(null);
     try {
       await fetchApi(`/student/interview-slots/${slot.id}/book`, { method: "POST" });
       setToast({ text: t("interviews.booked_toast"), ok: true });
       await load();
     } catch (err: any) {
       setToast({ text: err?.detail || t("interviews.action_failed"), ok: false });
+      setBookError(err?.detail || t("interviews.action_failed"));
       await load();
     } finally {
       setBusy(null);
@@ -208,18 +212,8 @@ export default function MockInterviewsPage() {
                       ))}
                     </div>
                   )}
-                  {data.available_slots.length === 0 ? (
-                    <p className="text-xs text-muted py-3 text-center">{t("interviews.no_slots")}</p>
-                  ) : data.available_slots.map((s) => (
-                    <div key={s.id} className="grid grid-cols-[1fr_auto] sm:grid-cols-[100px_70px_1fr_auto] items-center gap-2 p-2.5 rounded-tile border border-line bg-surface-2 text-xs" data-testid={`slot-${s.id}`}>
-                      <span className="font-semibold text-ink">{s.date}</span>
-                      <span className="text-muted hidden sm:inline">{s.time}</span>
-                      <span className={`${TYPE_CHIP[s.round_type] || "chip-blue"} text-caption justify-self-start hidden sm:inline-flex`}>{s.type_label}</span>
-                      <button onClick={() => book(s)} disabled={busy === s.id} className="px-3 py-1 rounded-tile text-xs font-semibold bg-teal hover:bg-teal-hover text-white disabled:opacity-50" aria-label={`${t("interviews.book")} ${s.date} ${s.time} ${s.type_label}`} data-testid={`book-${s.id}`}>
-                        {busy === s.id ? t("interviews.booking") : t("interviews.book")}
-                      </button>
-                    </div>
-                  ))}
+                  {bookError && <p className="p-2.5 rounded-tile bg-danger-faint border border-danger-line text-xs text-danger" role="alert" data-testid="book-error">{bookError}</p>}
+                  <SlotCalendar slots={data.available_slots} busyId={busy} onBook={book} t={t} locale={language === "ta" ? "ta-IN" : "en-IN"} />
                 </div>
 
                 <div className="bg-white rounded-card border border-line p-4 shadow-card space-y-3" data-testid="recording">

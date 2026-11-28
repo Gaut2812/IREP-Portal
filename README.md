@@ -94,7 +94,7 @@ Sign-in rules:
 | 21 | Monthly reports (trainer; approve and release cards) | `/trainer/reports` |
 | 22 | Assessments (trainer; publish problems and tests to batches, results, IREP bank) | `/trainer/assessments` |
 | 23 | Practice tests (published to my batch) | `/student/tests`, `/student/tests/{id}` |
-| 24 | Coding lab | `/student/coding/{problemId}` |
+| 24 | Coding lab (terminal runs on Judge0: docs/deploy/JUDGE0.md) | `/student/coding` (opens your next problem), `/student/coding/{problemId}` |
 | 25 | AI Study Buddy (student; hints, daily cap, Tamil) | `/student/buddy` |
 | 26 | Certificates (student; external proofs to the trainer) | `/student/certificates` |
 | 27 | Certificates (parent; verified only) | `/parent/certificates` |

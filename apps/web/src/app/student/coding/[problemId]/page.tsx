@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use, useCallback } from "react";
+import React, { useState, useEffect, use, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -34,8 +34,15 @@ import {
   Search,
   Trophy,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  Map as MapIcon,
+  AArrowDown,
+  AArrowUp
 } from "lucide-react";
+import { TerminalPanel } from "@/components/coding/TerminalPanel";
 import Link from "next/link";
 
 interface TestCaseResult {
@@ -73,6 +80,8 @@ interface ProblemData {
   constraints: string;
   starter_codes: Record<string, string>;
   starter_code: string;
+  io_mode?: "function" | "stdio";
+  judged_languages?: string[];
   trainer_notes: string;
   trainer_author: string;
   prev_problem?: { id: string; title: string; week_info?: string } | null;
@@ -110,11 +119,15 @@ interface ReviewResult {
   engine?: string;
 }
 
+const TOOL = "p-1.5 rounded-tile text-line-strong hover:text-white hover:bg-[#2D3748] transition-colors";
+
 export default function CodingLabPage({ params }: { params: Promise<{ problemId: string }> }) {
   const resolvedParams = use(params);
   const problemId = resolvedParams.problemId || "prob_connected_components";
   const router = useRouter();
   const { t } = useLanguage();
+  const fill = (k: string, v: Record<string, string | number>) =>
+    Object.entries(v).reduce((acc, [kk, vv]) => acc.replace(`{${kk}}`, String(vv)), t(k));
 
   const [problem, setProblem] = useState<ProblemData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -165,6 +178,68 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
   // Success celebration state
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
 
+  // Editor preferences (kept in this browser) and full screen
+  const [fontSize, setFontSize] = useState<number>(14);
+  const [minimap, setMinimap] = useState<boolean>(false);
+  const [focusMode, setFocusMode] = useState<boolean>(false);
+  const labRef = useRef<HTMLDivElement>(null);
+  const languageRef = useRef(language);
+  languageRef.current = language;
+
+  useEffect(() => {
+    try {
+      const f = Number(localStorage.getItem("irep_editor_font"));
+      if (f >= 11 && f <= 24) setFontSize(f);
+      setMinimap(localStorage.getItem("irep_editor_minimap") === "1");
+    } catch { /* private mode: defaults */ }
+  }, []);
+  const changeFont = (delta: number) => setFontSize((f) => {
+    const next = Math.min(24, Math.max(11, f + delta));
+    try { localStorage.setItem("irep_editor_font", String(next)); } catch { /* ignore */ }
+    return next;
+  });
+  const toggleMinimap = () => setMinimap((m) => {
+    try { localStorage.setItem("irep_editor_minimap", m ? "0" : "1"); } catch { /* ignore */ }
+    return !m;
+  });
+
+  // Full screen: the editor and terminal fill the screen (browser full screen when allowed). Esc leaves it.
+  useEffect(() => {
+    const onChange = () => { if (!document.fullscreenElement) setFocusMode(false); };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  useEffect(() => {
+    if (!focusMode) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.fullscreenElement) setFocusMode(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focusMode]);
+  const toggleFocus = async () => {
+    if (focusMode) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
+      setFocusMode(false);
+    } else {
+      setFocusMode(true);
+      await labRef.current?.requestFullscreen?.().catch(() => undefined);   // denied: the in-page full view still applies
+    }
+  };
+
+  // Drafts: your code is kept per problem and language in this browser, so a reload or a language switch loses nothing
+  const draftKey = useCallback((lang: string) => `irep_code:${problemId}:${lang}`, [problemId]);
+  const readDraft = useCallback((lang: string): string | null => {
+    try { return localStorage.getItem(draftKey(lang)); } catch { return null; }
+  }, [draftKey]);
+  const onCodeChange = (val: string) => {
+    setCode(val);
+    try { localStorage.setItem(draftKey(language), val); } catch { /* storage full or blocked */ }
+  };
+  const resetCode = () => {
+    const starter = problem?.starter_codes?.[language] || problem?.starter_code || "";
+    setCode(starter);
+    try { localStorage.removeItem(draftKey(language)); } catch { /* ignore */ }
+  };
+
   // Fetch all 20 problems list for drawer
   useEffect(() => {
     async function fetchCurriculumProblems() {
@@ -191,7 +266,8 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
     try {
       const data = await fetchApi<ProblemData>(`/student/coding/${problemId}`);
       setProblem(data);
-      setCode(data.starter_codes?.[language] || data.starter_code || "");
+      const lang = languageRef.current;
+      setCode(readDraft(lang) ?? (data.starter_codes?.[lang] || data.starter_code || ""));
       setHints(data.ai_reviewer?.revealed_hints || []);
       setHintsCount(data.ai_reviewer?.hints_used || 1);
 
@@ -217,7 +293,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
     } finally {
       setLoading(false);
     }
-  }, [problemId, language]);
+  }, [problemId, readDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadProblem();
@@ -226,10 +302,11 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
   // Handle language switch
   const handleLanguageChange = (newLang: string) => {
     setLanguage(newLang);
-    if (problem?.starter_codes?.[newLang]) {
-      setCode(problem.starter_codes[newLang]);
-    }
+    setCode(readDraft(newLang) ?? (problem?.starter_codes?.[newLang] || ""));
+    // a language this problem's tests don't run in: the terminal is where its code runs
+    if (problem?.judged_languages && !problem.judged_languages.includes(newLang)) setActiveTab("terminal");
   };
+  const judged = !problem?.judged_languages || problem.judged_languages.includes(language);
 
   // Run sample cases
   const handleRun = async () => {
@@ -401,7 +478,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal hover:bg-teal-hover text-white text-xs font-semibold rounded-card shadow-card cursor-pointer transition-all"
                 >
                   <Layers className="w-3.5 h-3.5" />
-                  <span>Browse 20 Problems</span>
+                  <span>{t("coding.browse_problems")}</span>
                 </button>
                 <Link
                   href="/student"
@@ -441,10 +518,11 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
 
         {/* LOADED 3-COLUMN CONTENT */}
         {!loading && problem && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-120px)]">
+          <div ref={labRef} data-testid="coding-lab" data-focus={focusMode ? "true" : "false"}
+            className={focusMode ? "fixed inset-0 z-40 bg-canvas p-3 grid grid-cols-1 gap-3" : "grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-120px)]"}>
 
             {/* LEFT COLUMN: Problem Statement (4 cols) */}
-            <div className="lg:col-span-4 bg-white rounded-card border border-line shadow-card flex flex-col justify-between overflow-hidden">
+            <div className={`${focusMode ? "hidden" : ""} lg:col-span-4 bg-white rounded-card border border-line shadow-card flex flex-col justify-between overflow-hidden`}>
               <div className="p-5 overflow-y-auto space-y-4">
                 {/* Curriculum Problem Switcher Bar */}
                 <div className="flex items-center justify-between pb-3 border-b border-line">
@@ -452,10 +530,10 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                     onClick={() => setIsDrawerOpen(true)}
                     data-testid="problem-switcher-button"
                     className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-2 hover:bg-slate-100 text-ink text-xs font-semibold rounded-tile border border-line-strong transition-all cursor-pointer"
-                    title="Browse all 20 curriculum problems"
+                    title={t("coding.browse_title")}
                   >
                     <Layers className="w-3.5 h-3.5 text-brand" />
-                    <span>Problem {problem.curriculum_index || 18} of {problem.total_problems || 20}</span>
+                    <span>{fill("coding.problem_n_of", { n: problem.curriculum_index ?? 1, total: problem.total_problems ?? allProblems.length })}</span>
                     <ChevronDown className="w-3 h-3 text-muted" />
                   </button>
 
@@ -488,7 +566,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   <div className="flex flex-wrap gap-2">
                     <span className="chip-amber">{problem.difficulty}</span>
                     <span className="chip-blue">{problem.topic}</span>
-                    <span className="chip-purple">Asked: {problem.company_tags}</span>
+                    {problem.company_tags && <span className="chip-purple">{t("coding.asked")} {problem.company_tags}</span>}
                   </div>
                 </div>
 
@@ -506,8 +584,8 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 <div className="bg-surface-2 border border-line rounded-card p-3.5 space-y-2 text-xs">
                   <div className="font-semibold text-ink">{t("coding.example") || "Example"}:</div>
                   <div className="font-mono text-caption text-ink-soft space-y-0.5">
-                    <div><span className="text-muted">Input:</span> {problem.example_input}</div>
-                    <div><span className="text-muted">Output:</span> {problem.example_output}</div>
+                    <div><span className="text-muted">{t("coding.input")}:</span> {problem.example_input}</div>
+                    <div><span className="text-muted">{t("coding.output")}:</span> {problem.example_output}</div>
                   </div>
                 </div>
 
@@ -520,23 +598,14 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 </div>
               </div>
 
-              {/* Footer Status with 20 Problems Drawer Trigger */}
-              <div className="p-3 bg-surface-2 border-t border-line flex items-center justify-between text-caption font-semibold text-muted">
-                <div>{problem.week_info}</div>
-                <button
-                  onClick={() => setIsDrawerOpen(true)}
-                  data-testid="browse-problems-footer-button"
-                  className="inline-flex items-center gap-1 text-brand hover:text-brand-hover font-semibold text-caption px-2 py-0.5 rounded-tile hover:bg-blue-50 transition-colors cursor-pointer"
-                >
-                  <Layers className="w-3 h-3" />
-                  <span>All 20 Problems</span>
-                  <ChevronRight className="w-3 h-3" />
-                </button>
-              </div>
+              {/* Footer: the week this problem belongs to (the list opens from the switcher at the top) */}
+              {problem.week_info && (
+                <div className="p-3 bg-surface-2 border-t border-line text-caption font-semibold text-muted">{problem.week_info}</div>
+              )}
             </div>
 
             {/* MIDDLE COLUMN: Code Editor + Test Results / Terminal Drawer (5 cols) */}
-            <div className="lg:col-span-5 flex flex-col gap-4 overflow-hidden">
+            <div className={`${focusMode ? "h-full min-h-0" : "lg:col-span-5"} flex flex-col gap-4 overflow-hidden`}>
               {/* Editor Container */}
               <div className="flex-1 bg-[#1B2236] rounded-card border border-[#2D3748] shadow-card flex flex-col overflow-hidden">
                 {/* Editor Header Bar */}
@@ -550,19 +619,30 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                         className="bg-[#1E293B] text-line-strong text-xs font-mono px-2.5 py-1 pr-6 rounded border border-ink-soft appearance-none focus:outline-none cursor-pointer"
                         data-testid="language-selector"
                       >
-                        <option value="python">solution.py (Python 3.12)</option>
-                        <option value="java">Solution.java (Java 17)</option>
-                        <option value="cpp">solution.cpp (C++ 20)</option>
-                        <option value="javascript">solution.js (Node.js)</option>
+                        {([["python", "solution.py (Python 3)"], ["java", "Main.java (Java)"], ["cpp", "solution.cpp (C++)"], ["javascript", "solution.js (Node.js)"]] as const).map(([v, label]) => (
+                          <option key={v} value={v}>{label}{problem.judged_languages && !problem.judged_languages.includes(v) ? ` · ${t("coding.terminal_only")}` : ""}</option>
+                        ))}
                       </select>
                       <ChevronDown className="w-3 h-3 text-subtle absolute right-2 top-2 pointer-events-none" />
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="hidden sm:flex items-center gap-0.5 mr-1" role="group" aria-label={t("coding.editor_tools")}>
+                      <button type="button" onClick={() => changeFont(-1)} className={TOOL} aria-label={t("coding.font_smaller")} title={t("coding.font_smaller")} data-testid="font-smaller"><AArrowDown className="w-4 h-4" /></button>
+                      <span className="text-caption font-mono text-subtle w-6 text-center" data-testid="font-size">{fontSize}</span>
+                      <button type="button" onClick={() => changeFont(1)} className={TOOL} aria-label={t("coding.font_larger")} title={t("coding.font_larger")} data-testid="font-larger"><AArrowUp className="w-4 h-4" /></button>
+                      <button type="button" onClick={toggleMinimap} aria-pressed={minimap} className={`${TOOL} ${minimap ? "text-teal" : ""}`} aria-label={t("coding.minimap")} title={t("coding.minimap")} data-testid="minimap-toggle"><MapIcon className="w-4 h-4" /></button>
+                      <button type="button" onClick={resetCode} className={TOOL} aria-label={t("coding.reset_code")} title={t("coding.reset_code")} data-testid="reset-code"><RotateCcw className="w-4 h-4" /></button>
+                    </div>
+                    <button type="button" onClick={toggleFocus} className={TOOL} aria-pressed={focusMode}
+                      aria-label={focusMode ? t("coding.exit_full_screen") : t("coding.full_screen")} title={focusMode ? t("coding.exit_full_screen") : t("coding.full_screen")} data-testid="full-screen">
+                      {focusMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </button>
                     <button
                       onClick={handleRun}
-                      disabled={isRunning || isSubmitting}
+                      disabled={isRunning || isSubmitting || !judged}
+                      title={judged ? undefined : t("coding.not_judged_lang")}
                       className="flex items-center gap-1.5 px-3 py-1 bg-transparent border border-ink-soft hover:bg-[#2D3748] text-white text-xs font-semibold rounded-tile transition-all cursor-pointer disabled:opacity-50"
                       data-testid="run-button"
                     >
@@ -575,7 +655,8 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                     </button>
                     <button
                       onClick={handleSubmit}
-                      disabled={isRunning || isSubmitting}
+                      disabled={isRunning || isSubmitting || !judged}
+                      title={judged ? undefined : t("coding.not_judged_lang")}
                       className="flex items-center gap-1.5 px-3.5 py-1 bg-teal hover:bg-teal-hover text-white text-xs font-semibold rounded-tile shadow-card transition-all cursor-pointer disabled:opacity-50"
                       data-testid="submit-button"
                     >
@@ -594,13 +675,15 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   <MonacoEditorWrapper
                     value={code}
                     language={language}
-                    onChange={setCode}
+                    onChange={onCodeChange}
+                    fontSize={fontSize}
+                    minimap={minimap}
                   />
                 </div>
               </div>
 
               {/* Test Results + Terminal Drawer */}
-              <div className="h-48 bg-white rounded-card border border-line shadow-card flex flex-col flex-shrink-0 overflow-hidden" data-testid="test-results-drawer">
+              <div className={`${focusMode ? "h-72" : "h-56"} bg-white rounded-card border border-line shadow-card flex flex-col flex-shrink-0 overflow-hidden`} data-testid="test-results-drawer">
                 {/* Drawer Header with Dual Tabs */}
                 <div className="flex items-center justify-between px-4 py-2 border-b border-line flex-shrink-0">
                   <div className="flex items-center gap-3">
@@ -658,11 +741,14 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   {/* TEST CASES TAB */}
                   {activeTab === "cases" && (
                     <div className="h-full flex flex-col p-3 gap-2 overflow-y-auto">
-                      {runResult?.error_message ? (
+                      {!judged && <p className="text-caption text-warning" data-testid="not-judged-note">{t("coding.not_judged_lang")}</p>}
+                      {/* a failed run shows its error AND which cases failed (it used to hide the cases) */}
+                      {runResult?.error_message && (
                         <div className="p-2.5 rounded-tile bg-danger-faint border border-danger-line text-xs text-danger font-mono">
                           {runResult.error_message}
                         </div>
-                      ) : (
+                      )}
+                      {(runResult?.cases?.length ?? 0) > 0 || !runResult?.error_message ? (
                         <>
                           {/* Case Pills Row */}
                           <div className="flex flex-wrap gap-1.5">
@@ -696,19 +782,19 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                             <div className="flex gap-2 text-caption font-mono">
                               {activeCaseData.input_data && (
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-caption font-semibold text-muted mb-0.5">Input</div>
+                                  <div className="text-caption font-semibold text-muted mb-0.5">{t("coding.input")}</div>
                                   <pre className="bg-surface-2 border border-line rounded p-1.5 text-ink-soft overflow-x-auto whitespace-pre-wrap">{activeCaseData.input_data}</pre>
                                 </div>
                               )}
                               {activeCaseData.expected_output && (
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-caption font-semibold text-muted mb-0.5">Expected</div>
+                                  <div className="text-caption font-semibold text-muted mb-0.5">{t("coding.expected")}</div>
                                   <pre className="bg-success-faint border border-success-line rounded p-1.5 text-success overflow-x-auto">{activeCaseData.expected_output}</pre>
                                 </div>
                               )}
                               {activeCaseData.actual_output && (
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-caption font-semibold text-muted mb-0.5">Output</div>
+                                  <div className="text-caption font-semibold text-muted mb-0.5">{t("coding.output")}</div>
                                   <pre className={`border rounded p-1.5 overflow-x-auto ${
                                     activeCaseData.actual_output === activeCaseData.expected_output
                                       ? "bg-success-faint border-success-line text-success"
@@ -719,13 +805,15 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                             </div>
                           )}
 
-                          {/* Hidden tests aggregate & Next Problem Action */}
-                          <div className="text-xs font-semibold text-success flex items-center justify-between mt-auto pt-1">
+                          {/* Result summary and next-problem action: counts come only from a real run or submission */}
+                          {runResult && (
+                          <div className={`text-xs font-semibold flex items-center justify-between mt-auto pt-1 ${runResult.status === "Accepted" || runResult.status === "Passed" ? "text-success" : "text-danger"}`}>
                             <div className="flex items-center gap-1.5">
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span>
-                                {runResult?.tests_passed ?? 18} / {runResult?.tests_total ?? 18}{" "}
-                                {t("coding.hidden_passed") || "hidden tests passed"}
+                              {runResult.status === "Accepted" || runResult.status === "Passed" ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                              <span data-testid="result-summary">
+                                {runResult.is_submit && runResult.tests_total != null
+                                  ? `${runResult.tests_passed ?? 0} / ${runResult.tests_total} ${t("coding.hidden_passed")}`
+                                  : fill("coding.samples_passed", { n: runResult.cases.filter((c) => c.status === "Passed").length, total: runResult.cases.length })}
                               </span>
                             </div>
 
@@ -736,44 +824,39 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                                 data-testid="next-problem-button"
                                 className="inline-flex items-center gap-1.5 px-3 py-1 bg-success hover:bg-success text-white text-caption font-semibold rounded-tile shadow-card transition-all cursor-pointer animate-pulse"
                               >
-                                <span>Next Problem: {nextTarget.title}</span>
+                                <span>{fill("coding.next_problem_named", { title: nextTarget.title })}</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
                               </button>
                             ) : (
                               <span className="text-caption font-normal text-muted">
-                                {runResult?.is_submit ? "Official Submission Recorded" : "Sample Run Verified"}
+                                {runResult.is_submit ? t("coding.submission_recorded") : t("coding.sample_run_done")}
                               </span>
                             )}
                           </div>
+                          )}
+                          {/* a failed submission: Study Buddy explains it (hints, not the answer) */}
+                          {runResult?.is_submit && runResult.status !== "Accepted" && runResult.status !== "Error" && (
+                            <Link href={`/student/buddy?explain=${problemId}`} data-testid="explain-failure"
+                              className="self-start inline-flex items-center gap-1.5 text-caption font-semibold text-brand hover:underline">
+                              <Bot className="w-3.5 h-3.5" />{t("coding.ask_buddy_why")}
+                            </Link>
+                          )}
+                          {!runResult && <p className="text-caption text-muted">{t("coding.results_empty")}</p>}
                         </>
-                      )}
+                      ) : null}
                     </div>
                   )}
 
-                  {/* TERMINAL TAB */}
+                  {/* TERMINAL TAB: run the code on your own input */}
                   {activeTab === "terminal" && (
-                    <div className="h-full bg-[#0B0F19] p-3 font-mono text-xs text-success-fill overflow-y-auto" data-testid="terminal-output">
-                      <div className="text-ink-soft text-caption mb-1 select-none">
-                        $ irep-judge &gt; run {language} solution
-                      </div>
-                      {runResult?.stdout ? (
-                        <pre className="whitespace-pre-wrap leading-relaxed">{runResult.stdout}</pre>
-                      ) : (
-                        <span className="text-ink-soft italic text-caption">
-                          {isRunning ? "Running code..." : "Press Run to see output here."}
-                        </span>
-                      )}
-                      {isRunning && (
-                        <span className="inline-block w-2 h-3 bg-success-fill animate-pulse ml-1 align-middle" />
-                      )}
-                    </div>
+                    <TerminalPanel problemId={problemId} code={code} language={language} t={t} />
                   )}
                 </div>
               </div>
             </div>
 
             {/* RIGHT COLUMN: AI Code Reviewer + Trainer Notes (3 cols) */}
-            <div className="lg:col-span-3 bg-white rounded-card border border-line shadow-card p-4 flex flex-col justify-between overflow-y-auto space-y-4">
+            <div className={`${focusMode ? "hidden" : ""} lg:col-span-3 bg-white rounded-card border border-line shadow-card p-4 flex flex-col justify-between overflow-y-auto space-y-4`}>
               <div className="space-y-4">
                 {/* AI Reviewer Header */}
                 <div className="flex items-center justify-between border-b border-line pb-3">
@@ -796,7 +879,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   className="w-full flex items-center justify-center gap-1.5 py-2 bg-brand hover:bg-brand-hover disabled:bg-subtle text-white text-xs font-semibold rounded-tile transition-all cursor-pointer disabled:cursor-not-allowed shadow-card"
                 >
                   {isReviewing ? (
-                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Analyzing...</span></>
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>{t("coding.analyzing")}</span></>
                   ) : (
                     <><Zap className="w-3.5 h-3.5" /><span>{t("coding.run_review") || "Analyze Code"}</span></>
                   )}
@@ -854,7 +937,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                     {/* Code Smells (if any) */}
                     {reviewResult.code_smells && reviewResult.code_smells.length > 0 && (
                       <div className="p-2.5 rounded-tile bg-warning-faint border border-warning-line text-caption text-warning">
-                        <div className="font-semibold mb-1">Notice:</div>
+                        <div className="font-semibold mb-1">{t("coding.notice")}</div>
                         {reviewResult.code_smells.map((s, i) => (
                           <div key={i}>• {s}</div>
                         ))}
@@ -862,64 +945,39 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                     )}
                   </div>
                 ) : (
-                  /* Static content preserving exact E2E selectors */
-                  <div className="space-y-2">
-                    {/* Reviewer Note 1 (Good - Blue) */}
-                    <div className="p-3 rounded-card bg-brand-soft border border-brand-line text-xs space-y-1">
-                      <div className="font-semibold text-info flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5" /> {t("coding.good_practice") || "Good Practice"}
+                  <p className="p-3 rounded-card bg-surface-2 border border-line text-caption text-muted leading-relaxed" data-testid="review-empty">
+                    {t("coding.review_empty")}
+                  </p>
+                )}
+
+                {/* Who set the problem: from the problem, never a fixed name (the week is in the left column's footer) */}
+                {problem.trainer_author && (
+                  <div className="p-3 rounded-card bg-surface-2 border border-line text-xs space-y-1" data-testid="problem-attribution">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-brand text-white text-caption font-semibold flex items-center justify-center flex-shrink-0">
+                        {problem.trainer_author.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
-                      <p className="text-info text-caption leading-relaxed">
-                        Path compression flattens the tree during find(), keeping subsequent lookups near constant time.
-                      </p>
-                    </div>
-
-                    {/* Reviewer Note 2 (Try Next - Amber) */}
-                    <div className="p-3 rounded-card bg-warning-soft border border-warning-line text-xs space-y-1">
-                      <div className="font-semibold text-warning">{t("coding.try_next") || "Try next:"}</div>
-                      <p className="text-warning text-caption leading-relaxed">
-                        Add union by rank. Can you explain why it helps achieve the inverse Ackermann worst-case time?
-                      </p>
-                    </div>
-
-                    {/* Reviewer Note 3 (Interview Tip - Blue) */}
-                    <div className="p-3 rounded-card bg-brand-soft border border-brand-line text-xs space-y-1">
-                      <div className="font-semibold text-info">{t("coding.interview_tip") || "Interview tip:"}</div>
-                      <p className="text-info text-caption leading-relaxed font-mono">
-                        State the complexity aloud: near O(E · α(n)), where α is the inverse Ackermann function.
-                      </p>
+                      <div>
+                        <div className="text-caption text-muted">{t("coding.set_by")}</div>
+                        <div className="font-semibold text-ink text-caption">{problem.trainer_author}</div>
+                      </div>
                     </div>
                   </div>
                 )}
-
-                {/* Problem Attribution Card */}
-                <div className="p-3 rounded-card bg-surface-2 border border-line text-xs space-y-1" data-testid="problem-attribution">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-brand text-white text-caption font-semibold flex items-center justify-center flex-shrink-0">AK</div>
-                    <div>
-                      <div className="font-semibold text-ink text-caption">Trainer Arun Kumar</div>
-                      <div className="text-caption text-muted">Lead Technical Trainer · IREP Placement Cell</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 text-caption text-muted pt-0.5">
-                    <BookOpen className="w-3 h-3" />
-                    <span>Assigned for Placement Training · Week 8</span>
-                  </div>
-                </div>
 
                 {/* Unlocked Hints Section */}
                 {hints.length > 0 && (
                   <div className="space-y-2 pt-1">
                     <div className="text-caption font-semibold text-ink flex items-center gap-1">
                       <HelpCircle className="w-3.5 h-3.5 text-brand" />
-                      <span>Unlocked Hints ({hints.length}/3)</span>
+                      <span>{fill("coding.unlocked_hints", { n: hints.length, max: (problem.ai_reviewer?.max_hints || 3) })}</span>
                     </div>
                     {hints.map((hint, index) => (
                       <div
                         key={index}
                         className="p-2.5 rounded-tile bg-surface-2 border border-line-strong text-caption text-ink leading-relaxed"
                       >
-                        <strong className="text-brand">Hint {index + 1}:</strong> {hint}
+                        <strong className="text-brand">{fill("coding.hint_n", { n: index + 1 })}</strong> {hint}
                       </div>
                     ))}
                   </div>
@@ -932,7 +990,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 )}
 
                 {/* Extra Hint Button */}
-                {hints.length < 3 ? (
+                {hints.length < (problem.ai_reviewer?.max_hints || 3) ? (
                   <button
                     onClick={handleRequestHint}
                     disabled={isRequestingHint}
@@ -954,19 +1012,21 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   {hints.length} {hints.length === 1 ? (t("coding.hint_singular") || "hint") : (t("coding.hint_plural") || "hints")}
                 </div>
 
-                {/* Trainer Notes Section */}
-                <div className="pt-2 border-t border-line space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
-                    <MessageSquareQuote className="w-3.5 h-3.5 text-teal" />
-                    <span>{t("coding.trainer_note") || "Trainer note"}</span>
-                  </div>
-                  <blockquote className="text-caption text-ink-soft italic bg-surface-2 p-2.5 rounded-tile border-l-2 border-teal">
-                    "{problem.trainer_notes || "Notice how path compression in find() flattens the tree. For best worst-case complexity, add union-by-rank."}"
-                    <div className="text-right font-semibold text-caption text-ink not-italic mt-1">
-                      – {problem.trainer_author || "Arun K."}
+                {/* Trainer note: only when the trainer wrote one for this problem */}
+                {problem.trainer_notes && (
+                  <div className="pt-2 border-t border-line space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+                      <MessageSquareQuote className="w-3.5 h-3.5 text-teal" />
+                      <span>{t("coding.trainer_note")}</span>
                     </div>
-                  </blockquote>
-                </div>
+                    <blockquote className="text-caption text-ink-soft italic bg-surface-2 p-2.5 rounded-tile border-l-2 border-teal">
+                      &ldquo;{problem.trainer_notes}&rdquo;
+                      {problem.trainer_author && (
+                        <div className="text-right font-semibold text-caption text-ink not-italic mt-1">– {problem.trainer_author}</div>
+                      )}
+                    </blockquote>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -982,14 +1042,15 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 <div>
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-brand" />
-                    <h3 className="font-semibold text-sm text-ink">20 Weekly DSA Problems</h3>
+                    <h3 className="font-semibold text-sm text-ink">{t("coding.drawer_title")}</h3>
                   </div>
                   <p className="text-caption text-muted mt-0.5">
-                    Weeks 1–8 Curriculum · {solvedCount} of 20 Solved
+                    {fill("coding.drawer_solved", { solved: solvedCount, total: allProblems.length })}
                   </p>
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
+                  aria-label={t("coding.close")}
                   className="p-1.5 rounded-tile hover:bg-slate-200 text-muted hover:text-ink transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -1004,7 +1065,8 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search problems, topics..."
+                    placeholder={t("coding.search_placeholder")}
+                    aria-label={t("coding.search_placeholder")}
                     className="w-full pl-9 pr-3 py-1.5 bg-surface-2 border border-line rounded-tile text-xs focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
@@ -1058,8 +1120,7 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                               {p.title}
                             </div>
                             <div className="text-caption text-muted flex items-center gap-1.5 mt-0.5">
-                              <span>{p.week_info?.split("·")[0]?.trim() || "Week"}</span>
-                              <span>•</span>
+                              {p.week_info && <><span>{p.week_info.split("·")[0].trim()}</span><span>•</span></>}
                               <span className="truncate">{p.topic}</span>
                             </div>
                           </div>
@@ -1080,10 +1141,6 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                 })}
               </div>
 
-              {/* Drawer Footer */}
-              <div className="p-3 bg-surface-2 border-t border-line text-center text-caption text-muted">
-                Curriculum Trainer: Arun Kumar · IREP Placement Cell
-              </div>
             </div>
           </div>
         )}
@@ -1097,23 +1154,23 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
               </div>
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-ink">
-                  🎉 Problem Accepted!
+                  🎉 {t("coding.accepted_title")}
                 </h3>
                 <p className="text-xs text-muted">
-                  All 18 hidden test cases passed. Excellent work on mastering this pattern!
+                  {fill("coding.accepted_desc", { n: runResult?.tests_total ?? 0 })}
                 </p>
               </div>
 
               {/* Next Problem Card */}
               <div className="p-3.5 bg-success-faint border border-success-line rounded-card text-left space-y-1.5">
                 <div className="text-caption font-semibold text-success">
-                  Up Next in Curriculum:
+                  {t("coding.up_next")}
                 </div>
                 <div className="font-semibold text-xs text-ink">
                   {nextTarget.title}
                 </div>
                 <div className="text-caption text-muted">
-                  {nextTarget.week_info || "Next DSA Pattern Drill"}
+                  {nextTarget.week_info}
                 </div>
               </div>
 
@@ -1123,14 +1180,14 @@ export default function CodingLabPage({ params }: { params: Promise<{ problemId:
                   onClick={() => setShowSuccessModal(false)}
                   className="flex-1 py-2 text-xs font-semibold text-muted hover:text-ink rounded-card border border-line-strong transition-colors cursor-pointer"
                 >
-                  Stay on Problem
+                  {t("coding.stay")}
                 </button>
                 <button
                   onClick={handleGoToNextProblem}
                   data-testid="modal-next-problem-button"
                   className="flex-1 py-2 bg-success hover:bg-success text-white text-xs font-semibold rounded-card shadow-card transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  <span>Solve Next</span>
+                  <span>{t("coding.solve_next")}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>

@@ -112,6 +112,24 @@ def generate_report(
     return {"success": True, "report": {"id": rid, "title": run.title_en, "download_url": f"/api/v1/college/reports/{rid}/download"}}
 
 
+@router.delete("/reports/{report_id}")
+def delete_report(
+    report_id: str,
+    current_user: TokenPayload = Depends(require_role(COLLEGE_ROLES)),
+    db: Session = Depends(get_db),
+):
+    """Remove a generated report and its PDF (the audit log keeps that it existed and who made it)."""
+    from services.file_cleanup import delete_file_later
+    run = db.execute(select(ReportRun).filter_by(id=report_id, college_id=current_user.college_id)).scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Report not found")
+    delete_file_later(db, run.file_path, college_id=run.college_id, entity_type="report_run", entity_id=run.id)
+    record_audit(db, current_user, "report.deleted", "report_run", run.id, {"title": run.title_en, "generated_by": run.generated_by})
+    db.delete(run)
+    db.commit()
+    return {"success": True}
+
+
 @router.get("/reports/{report_id}/download")
 def download_report(
     report_id: str,

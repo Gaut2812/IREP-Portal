@@ -8,10 +8,12 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { SpectateBar } from "@/components/labs/SpectateBar";
+import { CheckinBox } from "@/components/live/CheckinBox";
+import { LivePanels, ReactionBubbles, type Controls } from "@/components/live/LivePanels";
 import { fetchApi, WS_BASE } from "@/lib/api";
 import {
   Mic, MicOff, Video, VideoOff, Hand, MessageSquare, BarChart2, Cpu, LogOut, ArrowDown, ThumbsUp,
-  CheckCircle2, AlertCircle, RefreshCw, Radio, Square, Plus, Send, Clock,
+  CheckCircle2, AlertCircle, RefreshCw, Radio, Square, Plus, Send, Clock, Smile,
 } from "lucide-react";
 import { BrandMark } from "@/components/ui/BrandMark";
 
@@ -19,7 +21,7 @@ import { BrandMark } from "@/components/ui/BrandMark";
 const LiveKitStage = dynamic(() => import("@/components/live/LiveKitStage"), { ssr: false });
 type LkJoin = { ws_url: string; token: string; room: string };
 
-interface LiveState {
+interface LiveState extends Partial<Controls> {
   session_id: string; title: string; subtext: string; trainer: string; role: "student" | "trainer"; provider: string;
   meeting: { state: "not_started" | "live" | "ended"; started_at: string | null; ended_at: string | null; is_recording: boolean };
   timer: { elapsed_sec: number; duration_sec: number; label: string };
@@ -67,11 +69,12 @@ export default function LiveClassroomPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [mic, setMic] = useState(false);
   const [cam, setCam] = useState(false);
-  const [hand, setHand] = useState(false);
   const [question, setQuestion] = useState("");
   const [pollOpen, setPollOpen] = useState(false);
   const [pollQ, setPollQ] = useState("");
   const [pollOpts, setPollOpts] = useState("");
+  const [reactOpen, setReactOpen] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const [tick, setTick] = useState(0);
   const autoJoinTried = useRef(false);
 
@@ -178,6 +181,23 @@ export default function LiveClassroomPage() {
     }
   };
 
+  const post = async (path: string, body?: unknown) => {
+    try {
+      await fetchApi(`/live/${sessionId}${path}`, { method: "POST", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+      await load();
+    } catch (err: any) {
+      setToast(err?.detail || t("live_class.action_failed"));
+    }
+  };
+  const toggleHand = () => post("/hand", { raised: !st?.my_hand });
+  const react = (emoji: string) => { setReactOpen(false); post("/react", { emoji }); };
+  const muteAll = async () => {
+    try {
+      const r = await fetchApi<{ muted: number }>(`/live/${sessionId}/mute-all`, { method: "POST" });
+      setToast(t("live_class.muted_all").replace("{n}", String(r.muted)));
+    } catch (err: any) { setToast(err?.detail || t("live_class.action_failed")); }
+  };
+
   const vote = async (key: string) => {
     try {
       await fetchApi(`/live/${sessionId}/poll/vote`, { method: "POST", body: JSON.stringify({ option: key }) });
@@ -253,7 +273,7 @@ export default function LiveClassroomPage() {
             <>
               <div className="text-sm font-semibold text-teal">{t("live_class.ended_title")}</div>
               <p className="text-xs text-line-strong">{t("live_class.ended_desc")}</p>
-              <Link href={isTrainer ? "/trainer" : "/student/live"} className="inline-block px-4 py-2 bg-brand text-white text-xs font-semibold rounded-tile">{t("live_class.back_to_sessions")}</Link>
+              <Link href={isTrainer ? "/trainer/live" : "/student/live"} className="inline-block px-4 py-2 bg-brand text-white text-xs font-semibold rounded-tile">{t("live_class.back_to_sessions")}</Link>
             </>
           ) : (
             <>
@@ -268,7 +288,7 @@ export default function LiveClassroomPage() {
                   <Radio className="w-4 h-4" /> {t("live_class.join_now")}
                 </button>
               )}
-              <Link href={isTrainer ? "/trainer" : "/student/live"} className="block text-xs text-subtle hover:text-white">{t("live_class.back_to_sessions")}</Link>
+              <Link href={isTrainer ? "/trainer/live" : "/student/live"} className="block text-xs text-subtle hover:text-white">{t("live_class.back_to_sessions")}</Link>
             </>
           )}
         </div>
@@ -293,6 +313,7 @@ export default function LiveClassroomPage() {
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> {t("live_class.rec")}
             </span>
           )}
+          <span className="text-caption text-line-strong hidden sm:inline" data-testid="head-count">{t("live_class.in_class").replace("{n}", String(st.participant_count || 0))}</span>
           <span className="font-mono text-line-strong" data-testid="live-timer">{fmt(elapsed)} / {fmt(st.timer.duration_sec)}</span>
           {!isTrainer && st.attendance_on_track !== null && (
             <span className={`${a?.marked_present || st.attendance_on_track ? "chip-green" : "chip-amber"} text-caption font-semibold`} data-testid="attendance-pill">
@@ -306,7 +327,13 @@ export default function LiveClassroomPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Stage */}
         <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden min-w-0">
-          <div className="flex-1 bg-[#141A29] rounded-card border border-[#2D3748] p-4 flex flex-col overflow-hidden">
+          {st.spotlight && (
+            <div className="px-3 py-1.5 rounded-tile bg-warning-fill text-ink text-xs font-semibold flex items-center gap-1.5" data-testid="spotlight-banner">
+              ★ {t("live_class.spotlight_on").replace("{name}", st.spotlight.name)}
+            </div>
+          )}
+          <div className="relative flex-1 bg-[#141A29] rounded-card border border-[#2D3748] p-4 flex flex-col overflow-hidden">
+            <ReactionBubbles reactions={st.reactions || []} />
             {joinUrl && joinProvider === "teams" ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center" data-testid="teams-join">
                 <p className="text-sm text-line font-semibold">{t("live_class.teams_opened")}</p>
@@ -376,24 +403,42 @@ export default function LiveClassroomPage() {
               {st.provider !== "livekit" && <>
               <button onClick={() => setMic(!mic)} aria-label={mic ? t("live_class.mute") : t("live_class.unmute")} aria-pressed={mic} className={`p-2 rounded-tile ${mic ? "bg-teal" : "bg-[#1E293B] text-subtle hover:text-white"}`}>{mic ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}</button>
               <button onClick={() => setCam(!cam)} aria-label={t("live_class.camera")} aria-pressed={cam} className={`p-2 rounded-tile ${cam ? "bg-teal" : "bg-[#1E293B] text-subtle hover:text-white"}`}>{cam ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}</button>
-              <button onClick={() => setHand(!hand)} aria-label={t("live_class.raise_hand")} aria-pressed={hand} className={`p-2 rounded-tile ${hand ? "bg-warning-fill" : "bg-[#1E293B] text-subtle hover:text-white"}`}><Hand className="w-4 h-4" /></button>
               </>}
-              <a href="#qa" aria-label={t("live_class.chat")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white"><MessageSquare className="w-4 h-4" /></a>
+              {!isTrainer && (
+                <button onClick={toggleHand} aria-label={st.my_hand ? t("live_class.lower_my_hand") : t("live_class.raise_hand")} aria-pressed={!!st.my_hand} data-testid="hand-toggle"
+                  className={`p-2 rounded-tile ${st.my_hand ? "bg-warning-fill text-ink" : "bg-[#1E293B] text-subtle hover:text-white"}`}><Hand className="w-4 h-4" /></button>
+              )}
+              <div className="relative">
+                <button onClick={() => setReactOpen(!reactOpen)} aria-expanded={reactOpen} aria-label={t("live_class.react")} data-testid="react-open"
+                  className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white"><Smile className="w-4 h-4" /></button>
+                {reactOpen && (
+                  <div className="absolute bottom-11 left-0 z-20 bg-[#0F172A] border border-ink-soft rounded-card p-1 flex gap-0.5" role="menu" data-testid="react-menu">
+                    {(st.reaction_choices || []).map((e) => (
+                      <button key={e} role="menuitem" onClick={() => react(e)} className="w-9 h-9 rounded-tile text-lg hover:bg-[#1E293B]" data-testid={`react-${e}`}>{e}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <a href="#chat" aria-label={t("live_class.chat")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white"><MessageSquare className="w-4 h-4" /></a>
               {isTrainer ? (
                 <button onClick={() => setPollOpen(true)} aria-label={t("live_class.new_poll")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white" data-testid="new-poll"><BarChart2 className="w-4 h-4" /></button>
               ) : (
                 <a href="#poll" aria-label={t("live_class.poll")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white"><BarChart2 className="w-4 h-4" /></a>
               )}
-              <Link href={isTrainer ? "/trainer/labs" : "/student/labs"} aria-label={t("live_class.lab")} className="p-2 rounded-tile bg-[#1E293B] text-teal hover:text-white"><Cpu className="w-4 h-4" /></Link>
+              <a href={isTrainer ? "/trainer/labs" : "/student/labs"} target="_blank" rel="noopener noreferrer" aria-label={`${t("live_class.lab")} (${t("live_class.new_tab")})`}
+                title={t("live_class.lab_new_tab")} className="p-2 rounded-tile bg-[#1E293B] text-teal hover:text-white" data-testid="open-lab"><Cpu className="w-4 h-4" /></a>
+              {isTrainer && (
+                <button onClick={muteAll} aria-label={t("live_class.mute_all")} title={t("live_class.mute_all")} className="p-2 rounded-tile bg-[#1E293B] text-subtle hover:text-white" data-testid="mute-all"><MicOff className="w-4 h-4" /></button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {isTrainer && (
-                <button onClick={endClass} disabled={busy} className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500 text-red-400 hover:bg-red-950 text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="end-class">
-                  <Square className="w-3.5 h-3.5" /> {t("live_class.end_class")}
+                <button onClick={() => setConfirmEnd(true)} disabled={busy} className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500 text-red-400 hover:bg-red-950 text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="end-class">
+                  <Square className="w-3.5 h-3.5" /> {t("live_class.end_for_all")}
                 </button>
               )}
               <button onClick={leave} className="flex items-center gap-1.5 px-4 py-1.5 bg-danger hover:bg-danger text-white text-xs font-semibold rounded-tile" data-testid="leave">
-                <LogOut className="w-3.5 h-3.5" /> {t("live_class.leave")}
+                <LogOut className="w-3.5 h-3.5" /> {isTrainer ? t("live_class.leave_keep") : t("live_class.leave")}
               </button>
             </div>
           </div>
@@ -401,6 +446,12 @@ export default function LiveClassroomPage() {
 
         {/* Right column */}
         <aside className="w-80 bg-[#141A29] border-l border-[#2D3748] p-4 flex-col gap-4 overflow-y-auto hidden lg:flex">
+          {st.chat && (
+            <LivePanels sessionId={sessionId} isTrainer={isTrainer} t={t} onChange={load} onToast={setToast}
+              c={{ chat: st.chat, pinned: st.pinned || [], hands: st.hands || [], my_hand: !!st.my_hand, reactions: st.reactions || [],
+                   reaction_choices: st.reaction_choices || [], spotlight: st.spotlight || null, all_participants: st.all_participants || [],
+                   participant_count: st.participant_count || 0 }} />
+          )}
           <section id="poll" className="bg-[#1E293B] border border-ink-soft rounded-card p-3.5 space-y-2.5" data-testid="live-poll">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-line">{t("live_class.live_poll")}</span>
@@ -474,6 +525,14 @@ export default function LiveClassroomPage() {
               ) : <p className="text-caption text-subtle">{t("live_class.not_joined")}</p>}
             </section>
           )}
+
+          {/* Class check-in lives here (not in the sidebar): for a student not yet marked present, while the class is live */}
+          {!isTrainer && live && !a?.marked_present && (
+            <section className="bg-[#0F172A] border border-ink-soft rounded-card p-3.5 space-y-2 text-xs" data-testid="live-checkin">
+              <div className="font-semibold text-line">{t("checkin.title")}</div>
+              <CheckinBox t={t} dark onDone={load} />
+            </section>
+          )}
         </aside>
       </div>
 
@@ -490,6 +549,19 @@ export default function LiveClassroomPage() {
             <div className="flex gap-2">
               <button onClick={() => setPollOpen(false)} className="flex-1 py-2 bg-[#1E293B] text-xs font-semibold rounded-tile">✕</button>
               <button onClick={launchPoll} className="flex-1 py-2 bg-teal text-xs font-semibold rounded-tile" data-testid="launch-poll">{t("live_class.launch_poll")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmEnd && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" role="alertdialog" aria-modal="true" aria-labelledby="end-title" data-testid="end-confirm">
+          <div className="bg-[#141A29] border border-ink-soft rounded-card max-w-sm w-full p-5 space-y-3">
+            <h3 id="end-title" className="text-sm font-semibold">{t("live_class.end_confirm_title")}</h3>
+            <p className="text-xs text-line-strong">{t("live_class.end_confirm_body")}</p>
+            <div className="flex gap-2">
+              <button autoFocus onClick={() => setConfirmEnd(false)} className="flex-1 py-2 bg-[#1E293B] text-xs font-semibold rounded-tile">{t("live_class.keep_going")}</button>
+              <button onClick={() => { setConfirmEnd(false); endClass(); }} className="flex-1 py-2 bg-danger text-white text-xs font-semibold rounded-tile" data-testid="end-confirm-ok">{t("live_class.end_for_all")}</button>
             </div>
           </div>
         </div>

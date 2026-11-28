@@ -7,10 +7,15 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
 import { BookPlus, FileText, Send } from "lucide-react";
+import { CourseMediaPanel, LessonVideo } from "@/components/admin/CourseMedia";
 import { BankPanel } from "@/components/admin/BankPanel";
+import { ConfirmDelete, DeleteButton } from "@/components/ui";
 
-interface CourseRow { id: string; title_en: string; title_ta: string | null; track: string; semester: number; skill_key: string; status: string; lessons: number }
-interface LessonRow { id: string; position: number; title_en: string; title_ta: string | null; body_en: string; body_ta: string | null; duration_min: number }
+interface CourseRow {
+  id: string; title_en: string; title_ta: string | null; track: string; semester: number; skill_key: string; status: string; lessons: number;
+  description_en?: string | null; description_ta?: string | null; thumbnail_url?: string | null; intro_video_url?: string | null;
+}
+interface LessonRow { id: string; position: number; title_en: string; title_ta: string | null; body_en: string; body_ta: string | null; duration_min: number; video_url?: string | null }
 interface Template { key: string; title_en: string; title_ta: string | null; body_en: string | null; body_ta: string | null }
 
 export default function ContentLibraryPage() {
@@ -23,6 +28,7 @@ export default function ContentLibraryPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [del, setDel] = useState<{ kind: "course" | "lesson"; id: string; name: string } | null>(null);
   const [courseForm, setCourseForm] = useState({ title_en: "", title_ta: "", semester: "5", track: "All", skill_key: "future_skills" });
   const [lessonForm, setLessonForm] = useState({ title_en: "", title_ta: "", body_en: "", body_ta: "", duration_min: "20" });
   const [tplForm, setTplForm] = useState({ key: "", title_en: "", title_ta: "", body_en: "", body_ta: "" });
@@ -148,12 +154,23 @@ export default function ContentLibraryPage() {
                       className={`px-3 py-1.5 text-xs font-semibold rounded-tile inline-flex items-center gap-1 ${current.status === "published" ? "border border-line-strong" : "bg-success text-white"}`}>
                       <Send className="w-3.5 h-3.5" />{current.status === "published" ? t("content.unpublish") : t("content.publish")}
                     </button>
+                    {current.status !== "published" && (
+                      <DeleteButton onClick={() => setDel({ kind: "course", id: current.id, name: current.title_en })} testId="course-delete" />
+                    )}
                   </div>
+                  {current.status === "published" && <p className="text-caption text-muted" data-testid="course-delete-hint">{t("content.unpublish_to_delete")}</p>}
+                  <CourseMediaPanel key={current.id} course={current} t={t} onChange={loadCourses} />
                   <ol className="bg-white rounded-card border border-line divide-y divide-line-soft" data-testid="lesson-list">
                     {lessons.map((l) => (
-                      <li key={l.id} className="px-3 py-2 text-xs" data-testid="lesson-row">
-                        <div className="font-semibold">{l.position}. {l.title_en} <span className="font-normal text-muted">/ {l.title_ta || "—"} · {l.duration_min} {t("content.min")}</span></div>
-                        {!l.body_ta && <div className="text-caption text-warning">{t("content.missing_ta")}</div>}
+                      <li key={l.id} className="px-3 py-2 text-xs flex items-start justify-between gap-2" data-testid="lesson-row">
+                        <div className="min-w-0">
+                          <div className="font-semibold">{l.position}. {l.title_en} <span className="font-normal text-muted">/ {l.title_ta || "—"} · {l.duration_min} {t("content.min")}</span></div>
+                          {!l.body_ta && <div className="text-caption text-warning">{t("content.missing_ta")}</div>}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <LessonVideo lessonId={l.id} hasVideo={!!l.video_url} t={t} onChange={loadLessons} />
+                          <DeleteButton onClick={() => setDel({ kind: "lesson", id: l.id, name: l.title_en })} testId="lesson-delete" />
+                        </div>
                       </li>
                     ))}
                   </ol>
@@ -196,6 +213,14 @@ export default function ContentLibraryPage() {
 
           {tab === "bank" && <BankPanel />}
         </div>
+        {del && (
+          <ConfirmDelete itemName={del.name} note={del.kind === "course" ? t("content.delete_course_note") : undefined}
+            onConfirm={async () => {
+              await fetchApi(del.kind === "course" ? `/admin/content/courses/${del.id}` : `/admin/content/lessons/${del.id}`, { method: "DELETE" });
+              if (del.kind === "course") { setSelected(""); await loadCourses(); } else { await loadLessons(); await loadCourses(); }
+            }}
+            onClose={() => setDel(null)} />
+        )}
       </AppShell>
     </RoleGuard>
   );

@@ -7,6 +7,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { downloadWithAuth } from "@/components/admin/AuditTabs";
 import { useLanguage } from "@/lib/LanguageContext";
 import { API_BASE, ApiError, authHeaders, fetchApi } from "@/lib/api";
+import { InviteLinkBox, InvitationsPanel, type InviteResult } from "@/components/invitations/Invitations";
 import { Copy, FileDown, Palette, Users } from "lucide-react";
 
 interface CollegeUser { id: string; name: string; email: string; phone: string | null; role: "college_admin" | "placement_officer"; is_active: boolean; is_me: boolean }
@@ -21,7 +22,8 @@ export default function CollegeSettingsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [userForm, setUserForm] = useState({ name: "", email: "", phone: "", role: "placement_officer" });
-  const [temp, setTemp] = useState<{ email: string; password: string } | null>(null);
+  const [invited, setInvited] = useState<InviteResult | null>(null);
+  const [inviteRefresh, setInviteRefresh] = useState(0);
   const [brand, setBrand] = useState({ logo_url: "", chat_retention_days: "365" });
   const [brandSaved, setBrandSaved] = useState(false);
   const [search, setSearch] = useState("");
@@ -63,10 +65,11 @@ export default function CollegeSettingsPage() {
     e.preventDefault();
     if (userForm.name.trim().length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(userForm.email.trim())) return setError(t("college_settings.err_user"));
     run(async () => {
-      const r = await fetchApi<{ email: string; temporary_password?: string }>("/college/users", {
+      const r = await fetchApi<InviteResult>("/college/users", {
         method: "POST", body: JSON.stringify({ ...userForm, name: userForm.name.trim(), email: userForm.email.trim(), phone: userForm.phone.trim() || null }),
       });
-      setTemp(r.temporary_password ? { email: r.email, password: r.temporary_password } : null);
+      setInvited(r);
+      setInviteRefresh((n) => n + 1);
       setUserForm({ name: "", email: "", phone: "", role: userForm.role });
     });
   };
@@ -136,14 +139,7 @@ export default function CollegeSettingsPage() {
                 </li>
               ))}
             </ul>
-            {temp && (
-              <div className="p-3 rounded-tile bg-warning-soft border border-warning-line text-xs space-y-1" data-testid="user-temp-password">
-                <p className="font-semibold text-warning">{t("admin_colleges.temp_password_title")}</p>
-                <p>{temp.email} · <code className="font-mono font-semibold" data-testid="user-temp-password-value">{temp.password}</code>
-                  <button type="button" className="ml-2 inline-flex items-center gap-1 text-brand font-semibold" onClick={() => navigator.clipboard?.writeText(temp.password)}><Copy className="w-3 h-3" />{t("admin_colleges.copy")}</button></p>
-                <p className="text-warning">{t("admin_colleges.temp_password_note")}</p>
-              </div>
-            )}
+            <InviteLinkBox result={invited} testId="user-invite" />
             <form onSubmit={addUser} noValidate className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end" data-testid="user-form">
               <input className={inputCls} placeholder={t("admin_colleges.admin_name")} value={userForm.name} data-testid="user-name" onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} />
               <input className={inputCls} placeholder={t("admin_colleges.admin_email")} value={userForm.email} data-testid="user-email" onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
@@ -155,6 +151,7 @@ export default function CollegeSettingsPage() {
               <button type="submit" disabled={busy} data-testid="user-save" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("college_settings.add_user")}</button>
             </form>
           </section>
+          <InvitationsPanel basePath="/college/invitations" refreshKey={inviteRefresh} />
 
           {/* Branding and policy */}
           <form onSubmit={saveBrand} noValidate className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="branding-form">

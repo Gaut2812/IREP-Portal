@@ -14,9 +14,10 @@ from sqlalchemy import delete, select
 from core.database import SessionLocal
 from core.security import PLATFORM_TENANT, create_access_token
 from main import app
-from models.schema import (AuditLog, Batch, BatchTrainer, Branch, College, MouTerm, Notification, OutboxEvent, ParentStudent,
+from models.schema import (Invitation, AuditLog, Batch, BatchTrainer, Branch, College, MouTerm, Notification, OutboxEvent, ParentStudent,
                            RosterChangeRequest, Student, Trainer, TrainerNote, User)
 
+from tests.invite_helpers import set_password
 client = TestClient(app)
 
 
@@ -95,7 +96,7 @@ def college():
     cid = client.post("/api/v1/admin/colleges", json={"name": "Batches Test College", "code": code, "city": "Hosur", "state": "TN"},
                       headers=STAFF).json()["id"]
     email = f"admin.{code.lower()}@college.example"
-    temp = client.post(f"/api/v1/admin/colleges/{cid}/admins", json={"name": "Dr. Admin", "email": email}, headers=STAFF).json()["temporary_password"]
+    temp = set_password(client.post(f"/api/v1/admin/colleges/{cid}/admins", json={"name": "Dr. Admin", "email": email}, headers=STAFF).json())
     admin_h = {"Authorization": "Bearer " + client.post("/api/v1/auth/login", json={"role": "college", "identifier": email, "password": temp}).json()["access_token"]}
     tuid, tid = f"usr_trn_{code.lower()}", f"trn_{code.lower()}"
     db = SessionLocal()
@@ -118,6 +119,7 @@ def college():
         db.execute(delete(Branch).where(Branch.college_id == cid))
         db.execute(delete(Trainer).where(Trainer.college_id == cid))
         db.execute(delete(Notification).where(Notification.college_id == cid))
+        db.execute(delete(Invitation).where(Invitation.college_id == cid))
         db.execute(delete(User).where(User.college_id == cid))
         db.execute(delete(OutboxEvent).where(OutboxEvent.college_id == cid))
         db.execute(delete(MouTerm).where(MouTerm.college_id == cid))

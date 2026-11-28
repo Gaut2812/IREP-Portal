@@ -11,15 +11,20 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { fetchApi, WS_BASE } from "@/lib/api";
-import { CheckCircle2, AlertCircle, RefreshCw, Users, GitPullRequest, Sparkles, X, XCircle, ExternalLink } from "lucide-react";
+import { CheckCircle2, AlertCircle, RefreshCw, Users, GitPullRequest, Sparkles, X, XCircle, ExternalLink, Plus, Pencil, Trash2, Target, ChevronDown } from "lucide-react";
+import { ConfirmDelete } from "@/components/ui";
 
 type ColKey = "todo" | "in_progress" | "code_review" | "done";
 interface Task {
   id: string; title: string; tag: string; tag_type: string; assignee_initials: string; assignee_name: string;
   story_points: number; pr_number: string | null; pr_status: string | null; position: number;
+  assignee_student_id: string | null; can_delete: boolean;
 }
+interface Member { student_id: string; name: string; initials: string; role: string; batch: string | null }
 interface Board {
-  team: { id: string; name: string; project_title: string; client: string; repo: string | null; members: number };
+  team: { id: string; name: string; project_title: string; client: string; repo: string | null; members: number; description: string | null; goals: string[] };
+  member_list: Member[];
+  can_manage: boolean;
   sprint: { id: string; number: number; total: number; ends_week: number; goal: string | null } | null;
   change_request: { id: string; code: string; title: string; description: string | null; status: string } | null;
   columns: { key: ColKey; label: string; tasks: Task[] }[];
@@ -40,7 +45,9 @@ function fill(template: string, vars: Record<string, string | number>) {
   return Object.entries(vars).reduce((acc, [k, v]) => acc.replace(`{${k}}`, String(v)), template);
 }
 
-function Card({ task, col, onMove, t }: { task: Task; col: ColKey; onMove: (id: string, to: ColKey) => void; t: (k: string) => string }) {
+function Card({ task, col, onMove, onEdit, onDelete, t }: {
+  task: Task; col: ColKey; onMove: (id: string, to: ColKey) => void; onEdit: (t: Task) => void; onDelete: (t: Task) => void; t: (k: string) => string;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id, data: { col } });
   const style = { transform: CSS.Translate.toString(transform), zIndex: isDragging ? 50 : undefined };
   const prLabel = task.pr_number ? (task.pr_status === "approved" ? "pr_approved" : task.pr_status === "changes_requested" ? "pr_changes" : "pr_pending") : null;
@@ -49,6 +56,11 @@ function Card({ task, col, onMove, t }: { task: Task; col: ColKey; onMove: (id: 
       className={`bg-white p-3 rounded-card border border-line shadow-card space-y-2 ${isDragging ? "opacity-80 shadow-pop ring-2 ring-brand" : "hover:border-brand"}`}>
       <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded" aria-roledescription="draggable card">
         <p className={`text-xs font-semibold leading-tight ${col === "done" ? "text-muted" : "text-ink"}`}>{task.title}</p>
+      </div>
+      <div className="flex items-center gap-1 justify-end -mt-1">
+        <span className="text-caption text-subtle mr-auto">{task.story_points} {t("board.pts")}</span>
+        <button type="button" onClick={() => onEdit(task)} className="p-1 rounded-tile text-subtle hover:text-brand hover:bg-brand-soft" aria-label={`${t("board.edit_task")}: ${task.title}`} data-testid={`edit-${task.id}`}><Pencil className="w-3.5 h-3.5" /></button>
+        {task.can_delete && <button type="button" onClick={() => onDelete(task)} className="p-1 rounded-tile text-subtle hover:text-danger hover:bg-danger-soft" aria-label={`${t("board.delete_task")}: ${task.title}`} data-testid={`delete-${task.id}`}><Trash2 className="w-3.5 h-3.5" /></button>}
       </div>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
@@ -99,6 +111,9 @@ export default function SprintBoardPage() {
   const [form, setForm] = useState({ yesterday: "", today: "", blockers: "" });
   const [savingStandup, setSavingStandup] = useState(false);
   const [standupDone, setStandupDone] = useState(false);
+  const [taskForm, setTaskForm] = useState<{ id: string | null; title: string; tag_type: string; story_points: number; assignee: string } | null>(null);
+  const [savingTask, setSavingTask] = useState(false);
+  const [delTask, setDelTask] = useState<Task | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
 
@@ -188,6 +203,29 @@ export default function SprintBoardPage() {
     }
   };
 
+  const openNewTask = () => setTaskForm({ id: null, title: "", tag_type: "feature", story_points: 3, assignee: "" });
+  const openEditTask = (task: Task) => setTaskForm({ id: task.id, title: task.title, tag_type: task.tag_type, story_points: task.story_points,
+    assignee: task.assignee_student_id || "" });
+  const saveTask = async () => {
+    if (!taskForm || taskForm.title.trim().length < 3) return;
+    setSavingTask(true);
+    try {
+      const body = { title: taskForm.title.trim(), tag_type: taskForm.tag_type, story_points: taskForm.story_points };
+      if (taskForm.id) {
+        await fetchApi(`/tasks/${taskForm.id}`, { method: "PATCH", body: JSON.stringify({ ...body, ...(taskForm.assignee ? { assignee_student_id: taskForm.assignee } : { unassign: true }) }) });
+      } else {
+        await fetchApi(`/teams/${teamId}/tasks`, { method: "POST", body: JSON.stringify({ ...body, assignee_student_id: taskForm.assignee || null }) });
+      }
+      setToast({ text: taskForm.id ? t("board.task_saved") : t("board.task_added"), ok: true });
+      setTaskForm(null);
+      load();
+    } catch (err: any) {
+      setToast({ text: err?.detail || t("board.error_title"), ok: false });
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
   const m = board?.metrics;
   const build = board?.build;
 
@@ -226,18 +264,51 @@ export default function SprintBoardPage() {
                     </button>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                <button onClick={openNewTask} disabled={!board.sprint} className="px-3.5 py-1.5 border border-brand text-brand hover:bg-brand-soft text-xs font-semibold rounded-tile flex items-center gap-1.5 disabled:opacity-50" data-testid="add-task">
+                  <Plus className="w-3.5 h-3.5" /><span>{t("board.add_task")}</span>
+                </button>
                 <button onClick={() => setStandupOpen(true)} className="px-3.5 py-1.5 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-tile shadow-card flex items-center gap-1.5" data-testid="standup-button">
                   {standupDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
                   <span>{standupDone ? t("board.standup_done") : t("board.daily_standup")}</span>
                 </button>
+                </div>
               </div>
+
+              {/* Project details: what the team builds, its goals, repo and this sprint's goal */}
+              <details open className="bg-white rounded-card border border-line shadow-card group" data-testid="project-details">
+                <summary className="px-4 py-3 cursor-pointer list-none flex items-center justify-between gap-2 text-xs font-semibold text-ink">
+                  <span className="flex items-center gap-2"><Target className="w-4 h-4 text-brand" />{t("board.project_details")}</span>
+                  <ChevronDown className="w-4 h-4 text-muted transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="md:col-span-2 space-y-3">
+                    <p className="text-ink-soft leading-relaxed" data-testid="project-description">{board.team.description || t("board.no_description")}</p>
+                    {board.team.goals.length > 0 && (
+                      <div>
+                        <div className="font-semibold text-ink mb-1">{t("board.goals")}</div>
+                        <ul className="list-disc pl-5 space-y-0.5 text-ink-soft" data-testid="project-goals">{board.team.goals.map((g) => <li key={g}>{g}</li>)}</ul>
+                      </div>
+                    )}
+                  </div>
+                  <dl className="space-y-2">
+                    {board.sprint?.goal && <div><dt className="text-muted">{fill(t("board.sprint_goal"), { n: board.sprint.number })}</dt><dd className="text-ink font-medium">{board.sprint.goal}</dd></div>}
+                    <div><dt className="text-muted">{t("board.team_members")}</dt>
+                      <dd className="flex flex-wrap gap-1 mt-0.5">{board.member_list.map((mm) => (
+                        <span key={mm.student_id} className={mm.role === "lead" ? "chip-blue" : "chip-green"} title={mm.role === "lead" ? t("board.lead") : undefined}>{mm.name}{mm.role === "lead" ? ` · ${t("board.lead")}` : ""}</span>
+                      ))}</dd>
+                    </div>
+                    {board.team.repo && <div><dt className="text-muted">{t("board.repo")}</dt><dd><a href={`https://github.com/${board.team.repo}`} target="_blank" rel="noreferrer" className="text-brand hover:underline inline-flex items-center gap-1 font-mono">{board.team.repo}<ExternalLink className="w-3 h-3" /></a></dd></div>}
+                  </dl>
+                </div>
+              </details>
 
               {/* Columns */}
               <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {board.columns.map((c) => (
                     <Column key={c.key} col={c.key} tasks={c.tasks} t={t}>
-                      {c.tasks.map((task) => <Card key={task.id} task={task} col={c.key} onMove={(id, to) => move(id, to)} t={t} />)}
+                      {c.tasks.map((task) => <Card key={task.id} task={task} col={c.key} onMove={(id, to) => move(id, to)} onEdit={openEditTask} onDelete={setDelTask} t={t} />)}
                     </Column>
                   ))}
                 </div>
@@ -305,6 +376,49 @@ export default function SprintBoardPage() {
               <div className="text-caption text-muted">{fill(t("board.client"), { c: board.team.client })}</div>
             </div>
           </div>
+        )}
+
+        {taskForm && board && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="task-dialog-title" data-testid="task-dialog">
+            <div className="bg-white rounded-card max-w-md w-full p-6 space-y-3 shadow-pop border border-line">
+              <h3 id="task-dialog-title" className="text-base font-semibold text-ink">{taskForm.id ? t("board.edit_task") : t("board.add_task")}</h3>
+              <label className="block text-xs font-semibold text-ink">{t("board.task_title")}
+                <input value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} autoFocus maxLength={255} data-testid="task-title"
+                  className="mt-1 w-full px-3 py-2 border border-line rounded-tile bg-surface-2 font-normal focus:outline-none focus:border-brand" />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-xs font-semibold text-ink">{t("board.task_tag")}
+                  <select value={taskForm.tag_type} onChange={(e) => setTaskForm({ ...taskForm, tag_type: e.target.value })} data-testid="task-tag"
+                    className="mt-1 w-full px-2 py-2 border border-line rounded-tile bg-surface-2 font-normal">
+                    {["feature", "frontend", "backend", "ai", "qa", "devops"].map((k) => <option key={k} value={k}>{t(`board.tag_${k}`)}</option>)}
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-ink">{t("board.story_points")}
+                  <select value={taskForm.story_points} onChange={(e) => setTaskForm({ ...taskForm, story_points: Number(e.target.value) })} data-testid="task-points"
+                    className="mt-1 w-full px-2 py-2 border border-line rounded-tile bg-surface-2 font-normal">
+                    {[1, 2, 3, 5, 8, 13].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label className="block text-xs font-semibold text-ink">{t("board.assignee")}
+                <select value={taskForm.assignee} onChange={(e) => setTaskForm({ ...taskForm, assignee: e.target.value })} data-testid="task-assignee"
+                  className="mt-1 w-full px-2 py-2 border border-line rounded-tile bg-surface-2 font-normal">
+                  <option value="">{t("board.unassigned")}</option>
+                  {board.member_list.map((mm) => <option key={mm.student_id} value={mm.student_id}>{mm.name}</option>)}
+                </select>
+              </label>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setTaskForm(null)} className="flex-1 py-2 bg-line-soft text-ink font-semibold text-xs rounded-card">{t("board.cancel")}</button>
+                <button onClick={saveTask} disabled={savingTask || taskForm.title.trim().length < 3} className="flex-1 py-2 bg-brand text-white font-semibold text-xs rounded-card disabled:opacity-50" data-testid="task-save">{t("board.save_task")}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {delTask && (
+          <ConfirmDelete itemName={delTask.title}
+            onConfirm={async () => { await fetchApi(`/tasks/${delTask.id}`, { method: "DELETE" }); setToast({ text: t("board.task_deleted"), ok: true }); await load(); }}
+            onClose={() => setDelTask(null)} />
         )}
 
         {toast && (

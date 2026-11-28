@@ -64,6 +64,7 @@ test.describe("Screen 07 on LiveKit", () => {
 
       // trainer ends: attendance summary, and LiveKit closes the room for the student
       await trainer.page.getByTestId("end-class").click();
+      await trainer.page.getByTestId("end-confirm-ok").click();          // "End for everyone" asks first
       await expect(trainer.page.getByTestId("toast")).toBeVisible();
       await expect(student.page.getByTestId("live-lobby")).toContainText("இந்த வகுப்பு முடிந்தது", { timeout: 20_000 });
 

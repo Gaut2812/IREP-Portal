@@ -3,6 +3,7 @@
 /** Screen 09 · Attendance (trainer). Spec: docs/screens/09-trainer-attendance.md */
 import React, { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
@@ -69,6 +70,7 @@ export default function TrainerAttendancePage() {
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("attendance.title")}>
+        <HowItWorks topic="attendance" steps={5} className="mb-4 max-w-6xl" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-6xl">
           <section className="bg-white rounded-card border border-line p-3 space-y-1 h-fit" data-testid="att-sessions">
             {error && <p className="text-xs text-red-600" role="alert" data-testid="att-error">{error}</p>}

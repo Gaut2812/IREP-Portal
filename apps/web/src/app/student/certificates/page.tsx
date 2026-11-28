@@ -7,16 +7,27 @@ import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi, fetchBlob } from "@/lib/api";
-import { Award, BadgeCheck, Clock, FileUp, XCircle } from "lucide-react";
+import { ConfirmDelete, DeleteButton } from "@/components/ui";
+import { Award, BadgeCheck, Clock, Download, FileUp, XCircle } from "lucide-react";
 
 interface Cert {
   id: string; title: string; issuer: string; type: string; status: string; status_label: string; verified: boolean;
   issued_on: string | null; exam_date: string | null; verify_code: string | null; credential_id: string | null;
-  has_proof: boolean; decision_note: string | null; voucher: boolean;
+  has_proof: boolean; decision_note: string | null; voucher: boolean; can_delete: boolean;
 }
 
 const ICON: Record<string, React.ComponentType<{ className?: string }>> = { earned: BadgeCheck, scheduled: Clock, pending_proof: Clock, rejected: XCircle };
 const CHIP: Record<string, string> = { earned: "bg-success-soft text-success", scheduled: "bg-info-soft text-info", pending_proof: "bg-warning-soft text-warning", rejected: "bg-danger-soft text-danger" };
+
+/** Save an earned certificate's PDF (the API builds it with the verification code). */
+async function saveCertificate(endpoint: string, title: string) {
+  const url = URL.createObjectURL(await fetchBlob(endpoint));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${title.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "certificate"}.pdf`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
 
 export default function StudentCertificatesPage() {
   const { t, language } = useLanguage();
@@ -26,6 +37,7 @@ export default function StudentCertificatesPage() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [delCert, setDelCert] = useState<Cert | null>(null);
 
   const load = useCallback(async () => {
     try { setCerts((await fetchApi<{ certificates: Cert[] }>(`/student/certificates?lang=${language}`)).certificates); }
@@ -111,7 +123,14 @@ export default function StudentCertificatesPage() {
                             onChange={(e) => uploadProof(c, e.target.files?.[0])} />
                         </label>
                       )}
+                      {c.status === "earned" && (
+                        <button type="button" onClick={() => saveCertificate(`/student/certificates/${c.id}/download`, c.title).catch(() => setError(t("certs.download_failed")))}
+                          data-testid={`cert-download-${c.id}`} className="px-2.5 py-1 bg-brand text-white text-caption font-semibold rounded-tile inline-flex items-center gap-1">
+                          <Download className="w-3.5 h-3.5" />{t("certs.download")}
+                        </button>
+                      )}
                       {c.has_proof && <button type="button" onClick={() => viewProof(c)} className="px-2.5 py-1 border border-line-strong text-caption font-semibold rounded-tile">{t("certs.view_proof")}</button>}
+                      {c.can_delete && <DeleteButton onClick={() => setDelCert(c)} className="ml-auto" testId={`cert-delete-${c.id}`} />}
                     </div>
                   </li>
                 );
@@ -133,6 +152,15 @@ export default function StudentCertificatesPage() {
             <button type="submit" disabled={busy} className="w-full px-3 py-2 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="cert-submit">{t("certs.submit")}</button>
           </form>
         </div>
+        {delCert && (
+          <ConfirmDelete itemName={delCert.title} note={t("certs.delete_note")}
+            onConfirm={async () => {
+              await fetchApi(`/student/certificates/${delCert.id}`, { method: "DELETE" });
+              setMsg(t("certs.deleted"));
+              await load();
+            }}
+            onClose={() => setDelCert(null)} />
+        )}
       </AppShell>
     </RoleGuard>
   );

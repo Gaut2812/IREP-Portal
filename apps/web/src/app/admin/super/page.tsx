@@ -9,6 +9,7 @@ import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
+import { InviteLinkBox, type InviteResult } from "@/components/invitations/Invitations";
 
 type StaffRole = "irep_admin" | "super_admin";
 interface Staff { id: string; name: string; email: string; role: StaffRole; is_active: boolean; two_factor: string; is_you: boolean }
@@ -29,7 +30,7 @@ export default function SuperAdminPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [invite, setInvite] = useState({ name: "", email: "", role: "irep_admin" as StaffRole });
-  const [invited, setInvited] = useState<{ email: string; password?: string } | null>(null);
+  const [invited, setInvited] = useState<InviteResult | null>(null);
   const [sess, setSess] = useState({ college_id: "", minutes: "60", reason: "" });
 
   const load = useCallback(async () => {
@@ -58,8 +59,8 @@ export default function SuperAdminPage() {
     e.preventDefault();
     if (invite.name.trim().length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(invite.email.trim())) { setError(t("super_admin.invite_invalid")); return; }
     act(async () => {
-      const r = await fetchApi<{ email: string; temporary_password?: string }>("/admin/staff", { method: "POST", body: JSON.stringify({ ...invite, email: invite.email.trim(), name: invite.name.trim() }) });
-      setInvited({ email: r.email, password: r.temporary_password });
+      const r = await fetchApi<InviteResult>("/admin/staff", { method: "POST", body: JSON.stringify({ ...invite, email: invite.email.trim(), name: invite.name.trim() }) });
+      setInvited(r);
       setInvite({ name: "", email: "", role: "irep_admin" });
     });
   };
@@ -129,11 +130,7 @@ export default function SuperAdminPage() {
                   </select>
                   <button type="submit" disabled={busy} data-testid="invite-send" className="px-3.5 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("super_admin.invite")}</button>
                 </form>
-                {invited && (
-                  <p className="text-caption text-success bg-success-faint rounded-tile p-2" data-testid="invite-result">
-                    {invited.password ? `${t("super_admin.invited_dev")} ${invited.email}: ${invited.password}` : `${t("super_admin.invited")} ${invited.email}`}
-                  </p>
-                )}
+                <InviteLinkBox result={invited} testId="invite-result" />
               </section>
 
               <section className={card} data-testid="sessions-section">

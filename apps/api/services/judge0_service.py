@@ -61,8 +61,35 @@ class ExecutionSummaryDTO:
     raw_server_error: Optional[str] = None
 
 
+@dataclass
+class ProgramRunDTO:
+    """One run of a program on the student's own input (the coding lab's terminal)."""
+    status: str            # "Finished", "Compile Error", "Runtime Error", "Time Limit Exceeded", "Unavailable"
+    stdout: str = ""
+    stderr: str = ""
+    compile_output: str = ""
+    runtime_ms: int = 0
+    memory_mb: float = 0.0
+    message: Optional[str] = None
+
+
+MAX_OUTPUT_CHARS = 64_000
+
+
+def _clip(text: Optional[str]) -> str:
+    text = text or ""
+    return text if len(text) <= MAX_OUTPUT_CHARS else text[:MAX_OUTPUT_CHARS] + "\n… output cut at 64 KB"
+
+
 class CodeExecutionEngine(ABC):
     """Abstract interface for code execution engines."""
+
+    # True only for an engine that really executes code (Judge0). The fake one pattern-matches for CI, so the
+    # judge driver (services/code_harness.py) is added only for a real engine.
+    runs_real_code: bool = False
+
+    def run_program(self, code: str, language: str, stdin: str, time_limit_ms: int = 5000, memory_limit_mb: int = 256) -> ProgramRunDTO:
+        return ProgramRunDTO(status="Unavailable", message="The code runner is not set up on this server.")
 
     @abstractmethod
     def execute_test_case(
@@ -96,8 +123,61 @@ def _extract_case_attr(tc: Any, attr: str, default: Any = "") -> Any:
         return tc.get(attr, default)
     return getattr(tc, attr, default)
 
+def _b64(val: Optional[str]) -> Optional[str]:
+    if not val:
+        return None
+    try:
+        return base64.b64decode(val.encode("ascii")).decode("utf-8", errors="replace").strip()
+    except Exception:
+        return val.strip()
+
+
 class Judge0HttpAdapter(CodeExecutionEngine):
     """Production execution adapter communicating with live Judge0 REST API."""
+
+    runs_real_code = True
+
+    def _submit(self, code: str, lang_id: int, stdin: str, time_limit_ms: int, memory_limit_mb: int):
+        """POST one synchronous submission. Returns (response JSON, None) or (None, error text)."""
+        import httpx
+        payload = {
+            "source_code": base64.b64encode(code.encode("utf-8")).decode("ascii"),
+            "language_id": lang_id,
+            "stdin": base64.b64encode((stdin or "").encode("utf-8")).decode("ascii"),
+            "cpu_time_limit": max(0.5, time_limit_ms / 1000.0),
+            "wall_time_limit": max(1.0, time_limit_ms / 1000.0 * 3),
+            "memory_limit": max(1024, memory_limit_mb * 1024),
+            "max_file_size": 1024,
+            "enable_network": False,   # the sandbox has no network
+        }
+        url = f"{self.base_url}/submissions?base64_encoded=true&wait=true"
+        timeout = max(self.timeout, payload["wall_time_limit"] + 10.0)       # outlast the sandbox's own wall-time limit
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(url, json=payload, headers=self._get_headers())
+                response.raise_for_status()
+                return response.json(), None
+        except Exception as e:
+            logger.error(f"[Judge0HttpAdapter] Failed to contact Judge0 at {url}: {e}")
+            return None, str(e)
+
+    def run_program(self, code: str, language: str, stdin: str, time_limit_ms: int = 5000, memory_limit_mb: int = 256) -> ProgramRunDTO:
+        lang_id = JUDGE0_LANGUAGE_IDS.get(language.lower())
+        if not lang_id:
+            return ProgramRunDTO(status="Compile Error", compile_output=f"Unsupported language: {language}")
+        data, err = self._submit(code, lang_id, stdin, time_limit_ms, memory_limit_mb)
+        if data is None:
+            return ProgramRunDTO(status="Unavailable", message="The code runner did not answer. Try again in a moment.")
+        sid = data.get("status", {}).get("id", JUDGE0_STATUS_INTERNAL_ERROR)
+        status = {JUDGE0_STATUS_ACCEPTED: "Finished", JUDGE0_STATUS_TIME_LIMIT_EXCEEDED: "Time Limit Exceeded",
+                  JUDGE0_STATUS_COMPILATION_ERROR: "Compile Error"}.get(sid, "Runtime Error")
+        if sid == JUDGE0_STATUS_INTERNAL_ERROR:
+            status = "Unavailable"
+        return ProgramRunDTO(status=status, stdout=_clip(_b64(data.get("stdout"))), stderr=_clip(_b64(data.get("stderr"))),
+                             compile_output=_clip(_b64(data.get("compile_output"))),
+                             runtime_ms=int(float(data.get("time") or 0.0) * 1000),
+                             memory_mb=round(float(data.get("memory") or 0.0) / 1024.0, 2),
+                             message=(data.get("status") or {}).get("description") if status == "Runtime Error" else None)
 
     def __init__(self, base_url: Optional[str] = None, auth_token: Optional[str] = None, auth_header: Optional[str] = None):
         self.base_url = (base_url or settings.JUDGE0_URL).rstrip("/")
@@ -126,8 +206,6 @@ class Judge0HttpAdapter(CodeExecutionEngine):
         time_limit_ms: int = 2000,
         memory_limit_mb: int = 256
     ) -> TestCaseResultDTO:
-        import httpx
-
         lang_id = JUDGE0_LANGUAGE_IDS.get(language.lower())
         if not lang_id:
             return TestCaseResultDTO(
@@ -141,26 +219,8 @@ class Judge0HttpAdapter(CodeExecutionEngine):
                 raw_server_error=f"Language '{language}' not mapped in JUDGE0_LANGUAGE_IDS"
             )
 
-        payload = {
-            "source_code": base64.b64encode(code.encode("utf-8")).decode("ascii"),
-            "language_id": lang_id,
-            "stdin": base64.b64encode(input_data.encode("utf-8")).decode("ascii"),
-            "expected_output": base64.b64encode(expected_output.encode("utf-8")).decode("ascii"),
-            "cpu_time_limit": max(0.5, time_limit_ms / 1000.0),
-            "memory_limit": max(1024, memory_limit_mb * 1024),
-            "max_file_size": 1024,
-            "enable_network": False  # Enforce sandbox network boundary (Condition 3)
-        }
-
-        url = f"{self.base_url}/submissions?base64_encoded=true&wait=true"
-        try:
-            with httpx.Client(timeout=self.timeout) as client:
-                response = client.post(url, json=payload, headers=self._get_headers())
-                response.raise_for_status()
-                data = response.json()
-        except Exception as e:
-            err_msg = str(e)
-            logger.error(f"[Judge0HttpAdapter] Failed to contact Judge0 at {url}: {err_msg}")
+        data, err = self._submit(code, lang_id, input_data, time_limit_ms, memory_limit_mb)
+        if data is None:
             return TestCaseResultDTO(
                 test_case_id=test_case_id,
                 name=test_name,
@@ -169,33 +229,21 @@ class Judge0HttpAdapter(CodeExecutionEngine):
                 memory_mb=0.0,
                 is_hidden=is_hidden,
                 error_output="Execution service unavailable.",
-                raw_server_error=f"Judge0 connection error: {err_msg}"
+                raw_server_error=f"Judge0 connection error: {err}"
             )
 
-        # Parse Judge0 response
         status_id = data.get("status", {}).get("id", JUDGE0_STATUS_INTERNAL_ERROR)
-        time_sec = float(data.get("time") or 0.0)
-        runtime_ms = int(time_sec * 1000)
-        memory_kb = float(data.get("memory") or 0.0)
-        memory_mb = round(memory_kb / 1024.0, 2)
-
-        def decode_b64(val: Optional[str]) -> Optional[str]:
-            if not val:
-                return None
-            try:
-                return base64.b64decode(val.encode("ascii")).decode("utf-8", errors="replace").strip()
-            except Exception:
-                return val.strip()
-
-        stdout = decode_b64(data.get("stdout"))
-        compile_output = decode_b64(data.get("compile_output"))
-        stderr = decode_b64(data.get("stderr"))
+        runtime_ms = int(float(data.get("time") or 0.0) * 1000)
+        memory_mb = round(float(data.get("memory") or 0.0) / 1024.0, 2)
+        stdout = _b64(data.get("stdout"))
+        compile_output = _b64(data.get("compile_output"))
+        stderr = _b64(data.get("stderr"))
         raw_error = compile_output or stderr
 
+        # Judge0 only runs the program (no expected_output is sent); the answer is compared here, ignoring JSON spacing
         if status_id == JUDGE0_STATUS_ACCEPTED:
-            status_str = "Passed"
-        elif status_id == JUDGE0_STATUS_WRONG_ANSWER:
-            status_str = "Wrong Answer"
+            from services.code_harness import outputs_match
+            status_str = "Passed" if outputs_match(stdout, expected_output) else "Wrong Answer"
         elif status_id == JUDGE0_STATUS_TIME_LIMIT_EXCEEDED:
             status_str = "Time Limit Exceeded"
         elif status_id == JUDGE0_STATUS_COMPILATION_ERROR:

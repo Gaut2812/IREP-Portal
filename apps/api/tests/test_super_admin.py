@@ -17,9 +17,10 @@ from sqlalchemy import delete, select
 from core.database import SessionLocal
 from core.security import PLATFORM_TENANT, create_access_token
 from main import app
-from models.schema import (AuditLog, Batch, Branch, College, ConsentRecord, ParentStudent, Student, SupportSession,
+from models.schema import (Invitation, AuditLog, Batch, Branch, College, ConsentRecord, ParentStudent, Student, SupportSession,
                            User)
 
+from tests.invite_helpers import set_password
 client = TestClient(app)
 REPO = Path(__file__).resolve().parents[3]
 
@@ -45,6 +46,7 @@ def invited():
             u = db.execute(select(User).where(User.email == e)).scalar_one_or_none()
             if u:
                 db.execute(delete(SupportSession).where(SupportSession.staff_user_id == u.id))
+                db.execute(delete(Invitation).where(Invitation.user_id == u.id))
                 db.delete(u)
         db.commit()
     finally:
@@ -96,19 +98,19 @@ def test_invite_list_role_and_deactivate_staff(invited):
     r = client.post("/api/v1/admin/staff", json={"name": "Ops Person", "email": email}, headers=SUPER)
     assert r.status_code == 201
     new = r.json()
-    assert new["role"] == "irep_admin" and new["two_factor"] == "required" and new["temporary_password"]
+    assert new["role"] == "irep_admin" and new["two_factor"] == "required" and set_password(new)
     assert client.post("/api/v1/admin/staff", json={"name": "Again", "email": email.upper()}, headers=SUPER).status_code == 409
     assert any(i["email"] == email for i in client.get("/api/v1/admin/staff", headers=SUPER).json()["items"])
 
     # the new staff member signs in (development: one-time password) and is IREP staff, not super admin
-    tok = client.post("/api/v1/auth/login", json={"role": "admin", "identifier": email, "password": new["temporary_password"]})
+    tok = client.post("/api/v1/auth/login", json={"role": "admin", "identifier": email, "password": set_password(new)})
     assert tok.status_code == 200 and tok.json()["user"]["role"] == "irep_admin"
 
     assert client.put(f"/api/v1/admin/staff/{new['id']}/role", json={"role": "super_admin"}, headers=SUPER).json()["role"] == "super_admin"
     assert client.put(f"/api/v1/admin/staff/{new['id']}/role", json={"role": "irep_admin"}, headers=SUPER).json()["role"] == "irep_admin"
     assert client.post(f"/api/v1/admin/staff/{new['id']}/deactivate", headers=SUPER).json()["is_active"] is False
     assert client.post("/api/v1/auth/login", json={"role": "admin", "identifier": email,
-                                                    "password": new["temporary_password"]}).status_code == 401
+                                                    "password": set_password(new)}).status_code == 401
     assert client.post(f"/api/v1/admin/staff/{new['id']}/reactivate", headers=SUPER).json()["is_active"] is True
 
     db = SessionLocal()
@@ -228,7 +230,9 @@ def college():
         db.execute(delete(ConsentRecord).where(ConsentRecord.college_id == cid))
         db.execute(delete(ParentStudent).where(ParentStudent.college_id == cid))
         db.execute(delete(Student).where(Student.id.in_(sids or ["_"])))
+        db.execute(delete(Invitation).where(Invitation.user_id.in_(uids or ["_"])))
         db.execute(delete(User).where(User.id.in_(uids or ["_"])))
+        db.execute(delete(Invitation).where(Invitation.college_id == cid))
         db.execute(delete(User).where(User.college_id == cid))
         db.execute(delete(Batch).where(Batch.college_id == cid))
         db.execute(delete(Branch).where(Branch.college_id == cid))

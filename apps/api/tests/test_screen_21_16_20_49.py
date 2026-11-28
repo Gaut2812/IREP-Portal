@@ -60,9 +60,12 @@ def test_trainer_approval_releases_the_card_to_the_parent(november):
     assert all(c["id"] != CARD for c in client.get("/api/v1/parent/reports", headers=RAMESH).json()["cards"])   # draft: hidden
     assert client.get(f"/api/v1/parent/reports/{CARD}", headers=RAMESH).status_code == 404
 
-    client.put(f"/api/v1/trainer/reports/{CARD}", json={"trainer_remark_en": TEXT["trainer_remark_en"]}, headers=ARUN)
-    no_ta = client.post(f"/api/v1/trainer/reports/{CARD}/approve", headers=ARUN)
-    assert no_ta.status_code == 422 and "Tamil" in no_ta.json()["detail"]
+    # the trainer writes English only: Tamil is translated on save, so parents still read the card in Tamil
+    saved = client.put(f"/api/v1/trainer/reports/{CARD}", json={"trainer_remark_en": TEXT["trainer_remark_en"]}, headers=ARUN).json()
+    assert saved["trainer_remark_ta"] and saved["trainer_remark_ta"] != TEXT["trainer_remark_en"]
+    assert saved["missing"] == ["how_to_help_en"]
+    no_help = client.post(f"/api/v1/trainer/reports/{CARD}/approve", headers=ARUN)
+    assert no_help.status_code == 422 and "help text" in no_help.json()["detail"]
     assert client.put(f"/api/v1/trainer/reports/{CARD}", json=TEXT, headers=ARUN).status_code == 200
     ok = client.post(f"/api/v1/trainer/reports/{CARD}/approve", headers=ARUN)
     assert ok.status_code == 200 and ok.json()["status"] == "approved"

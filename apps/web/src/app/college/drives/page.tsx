@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
@@ -75,6 +76,7 @@ export default function DrivesPage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("drives.title")} pageSubtitle={<>{t("drives.help")} <Link href="/college/events" className="text-brand font-semibold underline">{t("drives.go_events")}</Link></>}>
+        <HowItWorks topic="drives" steps={4} className="mb-4 max-w-6xl" />
         <div className="space-y-6 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="drives-error">{error}</p>}
           {msg && <p className="text-xs text-success" role="status" data-testid="drives-msg">{msg}</p>}

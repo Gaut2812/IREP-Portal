@@ -196,8 +196,9 @@ def request_parent_otp(req: ParentOTPRequest, request: Request, background: Back
     try:
         return _request_parent_otp(req, request, background, db)
     finally:
-        left = settings.OTP_RESPONSE_FLOOR_MS / 1000 - (time.monotonic() - started)
-        if left > 0:
+        # loop: time.sleep may wake a few ms early (Windows timer), which would leak a timing difference
+        floor = started + settings.OTP_RESPONSE_FLOOR_MS / 1000
+        while (left := floor - time.monotonic()) > 0:
             time.sleep(left)
 
 
@@ -264,7 +265,8 @@ def _request_parent_otp(req: ParentOTPRequest, request: Request, background: Bac
     out = {"success": True, "message": f"If this number is registered, a code has been sent {where}. It is valid for {OTP_TTL_MINUTES} minutes.",
            "message_ta": f"இந்த எண் பதிவு செய்யப்பட்டிருந்தால், குறியீடு {where_ta} அனுப்பப்பட்டது. இது {OTP_TTL_MINUTES} நிமிடங்கள் செல்லுபடியாகும்.",
            "expires_in": OTP_TTL_MINUTES * 60, "channel": settings.PARENT_OTP_CHANNEL.lower()}
-    if settings.ENVIRONMENT == "development":
+    # development and the public demo (infra/demo, demo data only) show the code on screen; production never does
+    if settings.ENVIRONMENT.lower() in ("development", "demo"):
         out["demo_otp"] = otp
     return out
 
@@ -307,6 +309,58 @@ def verify_parent_otp(req: ParentOTPVerify, request: Request, db: Session = Depe
     record_audit(db, _as_payload(parent), "auth.login", "user", parent.id, {"method": "otp"}, ip_address=_client_ip(request))
     db.commit()
     return _issue(parent)
+
+
+class InviteToken(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+
+
+class InviteAccept(InviteToken):
+    password: str = Field(min_length=1, max_length=128)
+
+
+def _invite_guard(db: Session, request: Request) -> Optional[str]:
+    if keycloak_mode():
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Invitations are handled by single sign-on. Use the link in your email.")
+    ip = _client_ip(request)
+    now = datetime.datetime.utcnow()
+    _too_many(_ip_count(db, "auth.invite_failed", ip, now - datetime.timedelta(minutes=OTP_WINDOW_MINUTES)),
+              settings.LOGIN_IP_FAILS_PER_WINDOW, OTP_WINDOW_MINUTES, "failed invitation attempts from this network")
+    return ip
+
+
+def _invite_failed(db: Session, ip: Optional[str], e: HTTPException) -> None:
+    if e.status_code in (404, 410):
+        record_audit(db, None, "auth.invite_failed", "invitation", None, {"status": e.status_code}, college_id="unknown", ip_address=ip)
+        db.commit()
+
+
+# POST (not GET with the token in the URL): the token stays out of access logs
+@router.post("/invitations/lookup")
+def invitation_lookup(req: InviteToken, request: Request, db: Session = Depends(get_db)):
+    """Phase 5 (local mode): who the link is for, so /auth/set-password can greet them."""
+    from services.invitations import describe
+    ip = _invite_guard(db, request)
+    try:
+        return describe(db, req.token)
+    except HTTPException as e:
+        _invite_failed(db, ip, e)
+        raise
+
+
+@router.post("/invitations/accept", response_model=AuthResponse)
+def invitation_accept(req: InviteAccept, request: Request, db: Session = Depends(get_db)):
+    """Set the password from the one-time link and sign in."""
+    from services.invitations import accept
+    ip = _invite_guard(db, request)
+    try:
+        user = accept(db, req.token, req.password)
+    except HTTPException as e:
+        _invite_failed(db, ip, e)
+        raise
+    record_audit(db, _as_payload(user), "auth.login", "user", user.id, {"method": "invitation"}, ip_address=ip)
+    db.commit()
+    return _issue(user)
 
 
 @router.get("/me")

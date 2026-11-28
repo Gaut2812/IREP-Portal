@@ -1,0 +1,62 @@
+# IREP demo. Caddy gets and renews the HTTPS certificate on its own (DNS A record -> this VM, ports 80/443 open).
+# DEMO_GATE=gate (default) asks for one shared user name and password before anything else (DEMO_GATE_USER,
+# DEMO_GATE_HASH from `caddy hash-password`, DEMO_GATE_TOKEN a random cookie value), so strangers cannot use the
+# demo. DEMO_GATE=open removes it.
+{
+	email {$ACME_EMAIL}
+	order rate_limit before basic_auth
+}
+
+(open) {
+}
+
+(gate) {
+	# Pages ask for the gate password. Passing it sets a secret cookie (DEMO_GATE_TOKEN). The API's own sign-in
+	# uses the Authorization header, so API and media calls are gated by that cookie instead of a password prompt.
+	@api_without_cookie {
+		path /api/* /media/*
+		not header Cookie *irep_demo_gate={$DEMO_GATE_TOKEN}*
+	}
+	respond @api_without_cookie "Open the demo in the browser first." 401
+	@pages not path /api/* /media/* /health
+	route @pages {
+		basic_auth {
+			{$DEMO_GATE_USER} {$DEMO_GATE_HASH}
+		}
+		header Set-Cookie "irep_demo_gate={$DEMO_GATE_TOKEN}; Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=Lax"
+	}
+}
+
+{$APP_DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+	encode zstd gzip
+	request_body {
+		max_size 25MB
+	}
+	rate_limit {
+		zone signin_per_ip {
+			match {
+				method POST
+				path /api/v1/auth/login /api/v1/auth/parent/otp/request /api/v1/auth/parent/otp/verify
+			}
+			key {remote_host}
+			events {$SIGNIN_RATE_PER_MIN:120}
+			window 1m
+		}
+	}
+	# one explicit route: Caddy keeps this order (gate, hidden docs, API, website)
+	route {
+		import {$DEMO_GATE}
+		@docs path /docs* /redoc* /openapi.json
+		respond @docs 404
+		@api path /api/* /media/* /health
+		reverse_proxy @api api:8000
+		reverse_proxy web:3000
+	}
+}

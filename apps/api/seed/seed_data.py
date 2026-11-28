@@ -4,6 +4,7 @@ import datetime
 from sqlalchemy import select
 from core.database import SessionLocal, engine, Base
 from core.security import get_password_hash
+from services.code_harness import make_stub
 from models.schema import (
     College, User, Student, Trainer, ParentStudent,
     SessionItem, SessionAttendance, CodingProblem, TestCase, CodingSubmission, SubmissionResult,
@@ -13,6 +14,10 @@ from models.schema import (
     ProctorEvent, TopicScore, StudentProject, StudentSkill, ProjectDemoEvent,
     PullRequest, PullRequestFile, PullRequestComment
 )
+
+# The reference answer: checks the hidden tests (tests/test_code_harness.py); students get make_stub() of it.
+CONNECTED_COMPONENTS_REFERENCE = "class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        parent = list(range(n))\n        \n        def find(x):\n            if parent[x] != x:\n                parent[x] = find(parent[x])\n            return parent[x]\n            \n        def union(x, y):\n            rx, ry = find(x), find(y)\n            if rx != ry:\n                parent[rx] = ry\n                return 1\n            return 0\n            \n        return n - sum(union(u, v) for u, v in edges)"
+
 
 def get_screen24_test_cases():
     cases = [
@@ -807,7 +812,9 @@ def init_db_and_seed():
             constraints="1 <= n <= 2000\n0 <= edges.length <= 5000\nedges[i].length == 2\n0 <= ai <= bi < n\nai != bi\nThere are no repeated edges.",
             time_limit_ms=2000,
             memory_limit_mb=256,
-            starter_code="class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        parent = list(range(n))\n        \n        def find(x):\n            if parent[x] != x:\n                parent[x] = find(parent[x])\n            return parent[x]\n            \n        def union(x, y):\n            rx, ry = find(x), find(y)\n            if rx != ry:\n                parent[rx] = ry\n                return 1\n            return 0\n            \n        return n - sum(union(u, v) for u, v in edges)",
+            starter_code=make_stub(CONNECTED_COMPONENTS_REFERENCE),
+            starter_codes={"python": make_stub(CONNECTED_COMPONENTS_REFERENCE)},
+            io_mode="function",
             trainer_notes="Notice how path compression in find() flattens the tree. For best worst-case complexity, add union-by-rank.",
             trainer_author="Arun K."
         )

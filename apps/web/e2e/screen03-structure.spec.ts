@@ -17,7 +17,10 @@ test.describe("Screen 03: Branches and batches (/college/structure)", () => {
     await page.goto("/login");
     await page.getByTestId("role-college").click();
     await page.getByTestId("login-identifier").fill(email);
-    await page.getByTestId("login-password").fill(admin.temporary_password);
+    const token = String(admin.invite_link).split("#token=")[1];               // Phase 5: accept the invitation first
+    const password = "FirstAdmin2026-ok";
+    expect((await page.request.post(`${API}/auth/invitations/accept`, { data: { token, password } })).ok()).toBeTruthy();
+    await page.getByTestId("login-password").fill(password);
     await page.getByTestId("login-submit").click();
     await page.waitForURL("**/college");
 

@@ -1,5 +1,9 @@
 from typing import List, Dict, Any
 from models.schema import CodingProblem, TestCase
+from services.code_harness import make_stub
+
+# Each problem's "starter_code" below is its REFERENCE ANSWER (used by tests/test_code_harness.py to prove the
+# expected outputs). Students get make_stub() of it: the signatures with empty bodies.
 
 WEEKLY_DSA_DATA: List[Dict[str, Any]] = [
     {
@@ -369,8 +373,9 @@ def seed_weekly_problems(db, college_id="col_demo_001"):
                 constraints=p_data["constraints"],
                 time_limit_ms=2000,
                 memory_limit_mb=256,
-                starter_code=p_data["starter_code"],
-                starter_codes={"python": p_data["starter_code"]},
+                starter_code=make_stub(p_data["starter_code"]),
+                starter_codes={"python": make_stub(p_data["starter_code"])},
+                io_mode="function",
                 trainer_notes=p_data["trainer_notes"],
                 trainer_author=p_data["trainer_author"]
             )
@@ -393,5 +398,28 @@ def seed_weekly_problems(db, college_id="col_demo_001"):
             seeded_count += 1
             
     db.commit()
+    repair_starter_codes(db, college_id)
     return seeded_count
+
+
+def repair_starter_codes(db, college_id="col_demo_001"):
+    """Older seeds shipped the reference answer as starter code. Swap it for the stub (only where the stored
+    starter is still exactly the answer, so a trainer's own edit is kept) and mark the problem as a function one."""
+    from sqlalchemy import select
+    from seed.seed_data import CONNECTED_COMPONENTS_REFERENCE
+    answers = {p["id"]: p["starter_code"] for p in WEEKLY_DSA_DATA}
+    answers["prob_connected_components"] = CONNECTED_COMPONENTS_REFERENCE
+    fixed = 0
+    for prob in db.execute(select(CodingProblem).where(CodingProblem.college_id == college_id,
+                                                       CodingProblem.id.in_(list(answers)))).scalars():
+        ref = answers[prob.id]
+        if (prob.starter_code or "").strip() == ref.strip() or not prob.starter_code:
+            prob.starter_code = make_stub(ref)
+            prob.starter_codes = {"python": prob.starter_code}
+            fixed += 1
+        elif (prob.starter_codes or {}).get("python", "").strip() == ref.strip():
+            prob.starter_codes = {**prob.starter_codes, "python": prob.starter_code}
+        prob.io_mode = "function"
+    db.commit()
+    return fixed
 

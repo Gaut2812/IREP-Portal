@@ -29,7 +29,7 @@ def get_for_caller(db: Session, model, item_id: str, user: TokenPayload) -> Item
     """Tenant-scoped lookup. Students also need the item published to their batch;
     trainers and college staff preview drafts of their own college. Else 404."""
     item = db.execute(select(model).where(model.id == item_id, model.college_id == user.college_id)).scalar_one_or_none()
-    if item is None:
+    if item is None or item.status == "deleted":
         raise HTTPException(status_code=404, detail="Not found")
     if normalize_role(user.role) == "student" and not visible_to(item, caller_student(db, user)):
         raise HTTPException(status_code=404, detail="Not found")

@@ -36,12 +36,27 @@ def _student_by_name(db, name: str, batch_pref: str):
     return rows[0] if rows else None
 
 
+PHOENIX_DESCRIPTION = ("A web app for a neighbourhood clinic: patients book a slot online and get a token number, the "
+                       "front desk sees the day's queue, and doctors see each patient's history before the visit.")
+PHOENIX_GOALS = "\n".join([
+    "Patients book, move or cancel an appointment in under a minute",
+    "Front desk sees a live token queue for the day",
+    "AI triage suggests urgency from the symptoms typed in",
+    "SMS reminder 24 hours before every visit, in Tamil and English",
+])
+
+
 def seed_screen30(db, college_id: str = "col_demo_001") -> None:
     now = datetime.datetime.now()
+    # project details on the board (added later; also filled on an existing database, only where still empty)
+    team = db.get(Team, TEAM)
+    if team is not None:
+        team.description = team.description or PHOENIX_DESCRIPTION
+        team.goals = team.goals or PHOENIX_GOALS
     if not db.execute(select(Team).filter_by(id=TEAM)).first():
         db.add(Team(id=TEAM, college_id=college_id, name="Team Phoenix", project_title="Clinic Appointment System",
                     project_id="proj_clinic_02", client_name="Trainer (Arun K.)", repo_full_name="irep-demo/clinic-appointment-system",
-                    trainer_id="trn_arun_01"))
+                    trainer_id="trn_arun_01", description=PHOENIX_DESCRIPTION, goals=PHOENIX_GOALS))
         db.flush()
         db.add(Sprint(id="sprint_phoenix_1", college_id=college_id, team_id=TEAM, number=1, total_sprints=3, ends_week=4, status="closed", velocity=30,
                       goal="Login, roles and appointment CRUD"))

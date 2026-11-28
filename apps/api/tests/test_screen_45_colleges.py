@@ -14,8 +14,9 @@ from sqlalchemy import delete, select
 from core.database import SessionLocal
 from core.security import PLATFORM_TENANT, create_access_token
 from main import app
-from models.schema import AuditLog, College, MouTerm, OutboxEvent, User
+from models.schema import Invitation, AuditLog, College, MouTerm, OutboxEvent, User
 
+from tests.invite_helpers import set_password
 client = TestClient(app)
 
 
@@ -40,6 +41,7 @@ def code():
         if ids:
             db.execute(delete(MouTerm).where(MouTerm.college_id.in_(ids)))
             db.execute(delete(OutboxEvent).where(OutboxEvent.college_id.in_(ids)))
+            db.execute(delete(Invitation).where(Invitation.college_id.in_(ids)))
             db.execute(delete(User).where(User.college_id.in_(ids)))
             db.execute(delete(College).where(College.id.in_(ids)))
             db.commit()
@@ -122,7 +124,7 @@ def test_first_admin_signs_in_to_their_own_college_only(code):
     email = f"coordinator.{code.lower()}@college.example"
     r = client.post(f"/api/v1/admin/colleges/{cid}/admins", json={"name": "Dr. Meera Iyer", "email": email}, headers=STAFF)
     assert r.status_code == 201 and r.json()["college_status"] == "active"
-    temp = r.json()["temporary_password"]
+    temp = set_password(r.json())
     assert client.post(f"/api/v1/admin/colleges/{cid}/admins", json={"name": "Dup", "email": email.upper()}, headers=STAFF).status_code == 409
 
     login = client.post("/api/v1/auth/login", json={"role": "college", "identifier": email, "password": temp})

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
@@ -453,6 +454,7 @@ export default function TrainerCodeReviewsPage() {
   return (
     <RoleGuard allowedRoles={["trainer", "college"]}>
       <AppShell pageTitle={t("trainer_reviews.title")} pageSubtitle={t("trainer_reviews.subtitle")}>
+        <HowItWorks topic="code_review" steps={4} className="mb-4 max-w-6xl" />
         <div className="max-w-[1600px] space-y-6 pb-12">
 
           {/* Main Two-Panel Workspace */}

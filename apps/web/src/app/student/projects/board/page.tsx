@@ -8,7 +8,7 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import { Users } from "lucide-react";
 
-/** Sidebar "Projects" entry: send the student to their own team's board. */
+/** Sidebar "Sprint Board" entry: send the student to their own team's board. */
 export default function MyTeamBoardRedirect() {
   const router = useRouter();
   const { t } = useLanguage();

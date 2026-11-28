@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from core.security import TokenPayload, require_role
 from core.tenant import get_child_for_parent, get_user_name
-from models.schema import Batch, DiscussionGroup, Event, GroupMessage, ParentStudent, Rsvp, Student
+from models.schema import Batch, DiscussionGroup, DriveRound, Event, GroupMessage, MockDrive, ParentStudent, Rsvp, Student
 from services.audit import record_audit
 from services.drives import ensure_for_event as ensure_drive_for_event
 from services.notifications import notify_user
@@ -40,12 +40,18 @@ class EventIn(BaseModel):
     audience: str = "all"
     batch_id: Optional[str] = None
     rsvp_enabled: bool = True
+    rsvp_deadline: Optional[datetime.datetime] = None     # replies close then; default: when the event starts
 
 
 class RsvpIn(BaseModel):
     status: str = "yes"
     guests: int = 1
     child_id: Optional[str] = None
+    reason: Optional[str] = Field(default=None, max_length=255)    # optional, only kept for "no"
+
+
+def rsvp_closes_at(e: Event) -> datetime.datetime:
+    return min(e.rsvp_deadline, e.starts_at) if e.rsvp_deadline else e.starts_at
 
 
 def _when(e: Event) -> str:
@@ -69,7 +75,8 @@ def _college_row(e: Event, counts: dict) -> dict:
     return {"id": e.id, "title_en": e.title_en, "title_ta": e.title_ta, "kind": e.kind, "starts_at": e.starts_at.isoformat(),
             "ends_at": e.ends_at.isoformat() if e.ends_at else None, "when": _when(e), "location": e.location,
             "description_en": e.description_en, "description_ta": e.description_ta, "audience": e.audience, "batch_id": e.batch_id,
-            "rsvp_enabled": e.rsvp_enabled, "status": e.status, "published_at": e.published_at.isoformat() if e.published_at else None,
+            "rsvp_enabled": e.rsvp_enabled, "rsvp_deadline": e.rsvp_deadline.isoformat() if e.rsvp_deadline else None,
+            "status": e.status, "published_at": e.published_at.isoformat() if e.published_at else None,
             "rsvp": counts.get(e.id, {"yes": 0, "maybe": 0, "no": 0, "guests": 0})}
 
 
@@ -88,6 +95,8 @@ def _validate(db: Session, req: EventIn, user: TokenPayload) -> None:
         raise HTTPException(status_code=422, detail="Audience must be students, parents or all")
     if req.ends_at and req.ends_at <= req.starts_at:
         raise HTTPException(status_code=422, detail="The event must end after it starts")
+    if req.rsvp_deadline and req.rsvp_deadline > req.starts_at:
+        raise HTTPException(status_code=422, detail="The reply deadline must be before the event starts")
     if req.batch_id and not db.execute(select(Batch.id).where(Batch.id == req.batch_id, Batch.college_id == user.college_id)).first():
         raise HTTPException(status_code=404, detail="Batch not found")
 
@@ -123,7 +132,12 @@ def create_event(req: EventIn, current_user: TokenPayload = Depends(COLLEGE), db
 @router.get("/college/events/{event_id}")
 def get_event(event_id: str, current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
     e = _college_event(db, event_id, current_user)
-    return _college_row(e, _counts(db, [e.id]))
+    row = _college_row(e, _counts(db, [e.id]))
+    # why parents can't come, without names (aggregates only, rule 8)
+    row["decline_reasons"] = [r for r in db.execute(select(Rsvp.reason).where(
+        Rsvp.event_id == e.id, Rsvp.college_id == current_user.college_id, Rsvp.status == "no", Rsvp.reason.is_not(None))
+        .order_by(Rsvp.updated_at.desc()).limit(50)).scalars()]
+    return row
 
 
 @router.put("/college/events/{event_id}")
@@ -149,6 +163,28 @@ def _audience_users(db: Session, e: Event):
         ParentStudent.college_id == e.college_id, ParentStudent.student_id.in_([s.id for s in students] or ["_"]))).scalars())) \
         if e.audience in ("parents", "all") else []
     return student_users, parent_users
+
+
+@router.delete("/college/events/{event_id}")
+def delete_event(event_id: str, current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
+    """Delete a draft for good (nobody was told about it). A published event is cancelled instead, so the
+    people who replied are told and the RSVPs stay on record."""
+    e = _college_event(db, event_id, current_user)
+    if e.status != "draft":
+        raise HTTPException(status_code=409, detail="Only a draft can be deleted; cancel a published event instead")
+    drive = db.execute(select(MockDrive).where(MockDrive.event_id == e.id)).scalar_one_or_none()
+    if drive is not None:                                             # L29: its draft drive goes with it
+        if drive.status != "draft":
+            raise HTTPException(status_code=409, detail="This event's mock drive is already published")
+        for rnd in db.execute(select(DriveRound).where(DriveRound.drive_id == drive.id)).scalars():
+            db.delete(rnd)
+        db.flush()
+        db.delete(drive)
+        db.flush()
+    record_audit(db, current_user, "event.deleted", "event", e.id, {"title": e.title_en, "kind": e.kind})
+    db.delete(e)
+    db.commit()
+    return {"success": True}
 
 
 @router.post("/college/events/{event_id}/publish")
@@ -217,8 +253,10 @@ def _parent_row(e: Event, r: Optional[Rsvp], lang: str, now: datetime.datetime) 
             "starts_at": e.starts_at.isoformat(), "when": _when(e), "location": e.location,
             "description": e.description_ta if ta and e.description_ta else e.description_en,
             "rsvp_enabled": e.rsvp_enabled, "upcoming": e.starts_at > now,
-            "can_rsvp": e.rsvp_enabled and e.starts_at > now and e.status == "published",
-            "rsvp_status": r.status if r else None, "guests": r.guests if r else 0}
+            "can_rsvp": e.rsvp_enabled and rsvp_closes_at(e) > now and e.status == "published",
+            "rsvp_closes_at": rsvp_closes_at(e).isoformat() if e.rsvp_enabled else None,
+            "rsvp_status": r.status if r else None, "guests": r.guests if r else 0, "reason": r.reason if r else None,
+            "replied_at": (r.updated_at or r.created_at).isoformat() if r and (r.updated_at or r.created_at) else None}
 
 
 def _parent_events_q(child: Student):
@@ -244,14 +282,15 @@ def parent_events(lang: str = "en", child_id: Optional[str] = None, current_user
 @router.post("/parent/events/{event_id}/rsvp")
 def rsvp_event(event_id: str, req: RsvpIn, current_user: TokenPayload = Depends(PARENT), db: Session = Depends(get_db)):
     """L05 RSVP up. Upcoming published events that take RSVPs, for the parent's child; else 404."""
-    rsvp = save_parent_rsvp(db, current_user, event_id, req.status, req.guests, req.child_id)
+    rsvp = save_parent_rsvp(db, current_user, event_id, req.status, req.guests, req.child_id, reason=req.reason)
     db.commit()
-    return {"success": True, "event_id": event_id, "rsvp_status": rsvp.status, "guests": rsvp.guests}
+    return {"success": True, "event_id": event_id, "rsvp_status": rsvp.status, "guests": rsvp.guests, "reason": rsvp.reason}
 
 
 def save_parent_rsvp(db: Session, current_user: TokenPayload, event_id: str, status_: str, guests: int,
-                     child_id: Optional[str] = None) -> Rsvp:
-    """One RSVP per parent per event (also used by the portfolio's Demo Day card). Caller commits."""
+                     child_id: Optional[str] = None, reason: Optional[str] = None) -> Rsvp:
+    """One RSVP per parent per event (also used by the portfolio's Demo Day card). A reply can be changed until the
+    college's reply deadline, or until the event starts. Caller commits."""
     if status_ not in ("yes", "no", "maybe"):
         raise HTTPException(status_code=422, detail="status must be yes, no or maybe")
     if guests < 0 or guests > 10:
@@ -260,15 +299,22 @@ def save_parent_rsvp(db: Session, current_user: TokenPayload, event_id: str, sta
     event = db.execute(_parent_events_q(child).where(Event.id == event_id)).scalar_one_or_none()
     if not event or not event.rsvp_enabled or event.starts_at <= datetime.datetime.now():
         raise HTTPException(status_code=404, detail="Event not found or does not take RSVPs")
+    if rsvp_closes_at(event) <= datetime.datetime.now():
+        raise HTTPException(status_code=409, detail="Replies for this event are closed")
+    if status_ == "no":
+        guests = 0
+    reason = (reason or "").strip()[:255] or None if status_ == "no" else None
     rsvp = db.execute(select(Rsvp).where(Rsvp.event_id == event.id, Rsvp.parent_user_id == current_user.sub,
                                          Rsvp.college_id == current_user.college_id)).scalar_one_or_none()
+    changed_from = rsvp.status if rsvp else None
     if rsvp:
-        rsvp.status, rsvp.guests, rsvp.student_id = status_, guests, child.id
+        rsvp.status, rsvp.guests, rsvp.student_id, rsvp.reason = status_, guests, child.id, reason
     else:
         rsvp = Rsvp(id=f"rsvp_{uuid.uuid4().hex[:16]}", college_id=current_user.college_id, event_id=event.id,
-                    parent_user_id=current_user.sub, student_id=child.id, status=status_, guests=guests)
+                    parent_user_id=current_user.sub, student_id=child.id, status=status_, guests=guests, reason=reason)
         db.add(rsvp)
-    record_audit(db, current_user, "event.rsvp", "event", event.id, {"status": status_, "guests": guests})
+    record_audit(db, current_user, "event.rsvp", "event", event.id,
+                 {"status": status_, "guests": guests, "changed_from": changed_from, "reason": bool(reason)})
     return rsvp
 
 

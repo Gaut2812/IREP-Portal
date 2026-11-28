@@ -24,6 +24,8 @@ interface MonacoEditorWrapperProps {
   language: string;
   onChange: (val: string) => void;
   readOnly?: boolean;
+  fontSize?: number;
+  minimap?: boolean;
 }
 
 export const MonacoEditorWrapper: React.FC<MonacoEditorWrapperProps> = ({
@@ -31,6 +33,8 @@ export const MonacoEditorWrapper: React.FC<MonacoEditorWrapperProps> = ({
   language,
   onChange,
   readOnly = false,
+  fontSize = 14,
+  minimap = false,
 }) => {
   const monacoLang = MONACO_LANG_MAP[language] || "python";
 
@@ -44,12 +48,18 @@ export const MonacoEditorWrapper: React.FC<MonacoEditorWrapperProps> = ({
         theme="vs-dark"
         onChange={(val) => onChange(val || "")}
         options={{
-          fontSize: 13,
+          fontSize,
           fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace",
           fontLigatures: true,
-          minimap: { enabled: false },
+          minimap: { enabled: minimap },
+          bracketPairColorization: { enabled: true },
+          guides: { bracketPairs: true, indentation: true },
+          autoClosingBrackets: "always",
+          formatOnPaste: true,
+          quickSuggestions: true,
+          smoothScrolling: true,
           scrollBeyondLastLine: false,
-          wordWrap: "on",
+          wordWrap: "off",
           lineNumbers: "on",
           renderLineHighlight: "line",
           cursorStyle: "line",

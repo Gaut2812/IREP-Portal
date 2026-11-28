@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
-import { fetchApi } from "@/lib/api";
+import { ApiError, fetchApi } from "@/lib/api";
 import {
   Clock, CheckCircle2, Bookmark, ArrowLeft, ArrowRight, Check,
   AlertTriangle, Maximize2, Minimize2, ShieldAlert, RotateCcw,
@@ -73,6 +73,17 @@ interface ResultData {
   questions_review: QuestionReview[];
 }
 
+function readLocal(attemptId: string): { answers: Record<string, string>; marked: number[] } | null {
+  try {
+    const raw = localStorage.getItem(`irep_test:${attemptId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function clearLocal(attemptId: string | null) {
+  if (!attemptId) return;
+  try { localStorage.removeItem(`irep_test:${attemptId}`); } catch { /* ignore */ }
+}
+
 export default function PracticeTestPage() {
   const params = useParams();
   const router = useRouter();
@@ -87,7 +98,7 @@ export default function PracticeTestPage() {
   const [testData, setTestData] = useState<TestData | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
 
-  const [currentQ, setCurrentQ] = useState(12);
+  const [currentQ, setCurrentQ] = useState(1);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [markedForReview, setMarkedForReview] = useState<number[]>([]);
   const [secondsLeft, setSecondsLeft] = useState<number>(1800);
@@ -95,6 +106,15 @@ export default function PracticeTestPage() {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [maxTabSwitches, setMaxTabSwitches] = useState(3);
+  const [tabWarning, setTabWarning] = useState<number | null>(null);      // shown when the student comes back
+  const [autoSubmitReason, setAutoSubmitReason] = useState<"tabs" | null>(null);
+  const [online, setOnline] = useState(true);
+  const [heartbeatSec, setHeartbeatSec] = useState(15);
+  const [maxPauseSec, setMaxPauseSec] = useState(600);
+  const [pausedSec, setPausedSec] = useState(0);
+  const [resumeNote, setResumeNote] = useState<string | null>(null);
+  const leftWhileTesting = useRef(false);
   const [showCopyNotice, setShowCopyNotice] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -105,6 +125,8 @@ export default function PracticeTestPage() {
   const [expandedExplanations, setExpandedExplanations] = useState<Record<number, boolean>>({});
 
   const dirtyRef = useRef(false);
+  const onlineRef = useRef(true);
+  onlineRef.current = online;
   const answersRef = useRef(answers);
   answersRef.current = answers;
   const reviewRef = useRef(markedForReview);
@@ -127,6 +149,7 @@ export default function PracticeTestPage() {
         time_remaining_sec: number;
         saved_answers: Record<string, string>;
         marked_for_review: number[];
+        heartbeat_sec?: number; max_pause_sec?: number; paused_seconds?: number; max_tab_switches?: number; tab_switches?: number;
       }>(`/student/tests/${testId}/attempts`, {
         method: "POST"
       });
@@ -134,9 +157,17 @@ export default function PracticeTestPage() {
       setAttemptId(attemptRes.attempt_id);
       setSecondsLeft(attemptRes.time_remaining_sec > 0 ? attemptRes.time_remaining_sec : data.time_remaining_sec || duration);
 
-      // Initialize saved answers
+      if (attemptRes.heartbeat_sec) setHeartbeatSec(attemptRes.heartbeat_sec);
+      if (attemptRes.max_pause_sec) setMaxPauseSec(attemptRes.max_pause_sec);
+      setPausedSec(attemptRes.paused_seconds || 0);
+      if (attemptRes.max_tab_switches) setMaxTabSwitches(attemptRes.max_tab_switches);
+      setTabSwitchCount(attemptRes.tab_switches || 0);
+
+      // Initialize saved answers: the server's, then anything kept on this device that never reached it (offline)
+      const local = readLocal(attemptRes.attempt_id);
+      if (local) dirtyRef.current = true;
       const initialAnswers: Record<number, string> = {};
-      const srcAnswers = { ...data.saved_answers, ...attemptRes.saved_answers };
+      const srcAnswers = { ...data.saved_answers, ...attemptRes.saved_answers, ...(local?.answers || {}) };
       Object.entries(srcAnswers).forEach(([k, v]) => {
         if (v) initialAnswers[parseInt(k, 10)] = v;
       });
@@ -144,13 +175,15 @@ export default function PracticeTestPage() {
 
       const combinedReview = Array.from(new Set([
         ...(data.marked_for_review || []),
-        ...(attemptRes.marked_for_review || [])
+        ...(attemptRes.marked_for_review || []),
+        ...(local?.marked || [])
       ]));
       setMarkedForReview(combinedReview);
 
-      // If Question 12 exists, default to 12 as per PDF 4 mockup, else Q1
-      const q12 = data.questions.find((q) => q.number === 12);
-      setCurrentQ(q12 ? 12 : 1);
+      // Resume on the first unanswered question (Q1 on a fresh attempt; the last one if all are answered)
+      const ordered = [...data.questions].sort((a, b) => a.number - b.number);
+      const firstOpen = ordered.find((q) => !initialAnswers[q.number]);
+      setCurrentQ(firstOpen ? firstOpen.number : ordered[ordered.length - 1]?.number ?? 1);
     } catch (err: any) {
       console.error("Failed to load test:", err);
       setError(err?.message || t("practice_test.error_loading"));
@@ -168,7 +201,7 @@ export default function PracticeTestPage() {
   // 2. Timer Countdown Engine
   // One interval for the whole attempt (not rebuilt every second). The updater
   // only counts down; submitting is a side effect, so it lives in its own effect.
-  const timerRunning = !loading && !isSubmitted && !!attemptId;
+  const timerRunning = !loading && !isSubmitted && !!attemptId && online;   // paused while the connection is lost
   useEffect(() => {
     if (!timerRunning) return;
     const timer = setInterval(() => {
@@ -187,7 +220,7 @@ export default function PracticeTestPage() {
 
   // 3. Background Autosave (Every 10 seconds if dirty)
   const saveAnswersBatch = useCallback(async () => {
-    if (!attemptId || !dirtyRef.current || isSubmitted) return;
+    if (!attemptId || !dirtyRef.current || isSubmitted || !onlineRef.current) return;
 
     try {
       await fetchApi(`/student/tests/attempts/${attemptId}/answers`, {
@@ -198,6 +231,7 @@ export default function PracticeTestPage() {
         })
       });
       dirtyRef.current = false;
+      clearLocal(attemptId);
     } catch (err) {
       console.warn("Autosave batch failed:", err);
     }
@@ -217,19 +251,20 @@ export default function PracticeTestPage() {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setTabSwitchCount((prev) => {
-          const next = prev + 1;
-          if (attemptId) {
-            fetchApi(`/student/tests/attempts/${attemptId}/proctor-events`, {
-              method: "POST",
-              body: JSON.stringify({
-                event_type: "tab_switch",
-                details: `Tab switch event #${next}`
-              })
-            }).catch(() => {});
-          }
-          return next;
-        });
+        saveAnswersBatch();                        // nothing typed is lost while the student is away
+        leftWhileTesting.current = true;
+        if (!attemptId) return;
+        fetchApi<{ tab_switches: number; max_tab_switches: number }>(`/student/tests/attempts/${attemptId}/proctor-events`, {
+          method: "POST",
+          body: JSON.stringify({ event_type: "tab_switch", details: "Left the test page" })
+        }).then((r) => {
+          setTabSwitchCount(r.tab_switches);
+          setMaxTabSwitches(r.max_tab_switches);
+          if (r.tab_switches > r.max_tab_switches) setAutoSubmitReason("tabs");
+        }).catch(() => setTabSwitchCount((n) => n + 1));
+      } else if (leftWhileTesting.current) {
+        leftWhileTesting.current = false;
+        setTabWarning(Date.now());
       }
     };
 
@@ -261,6 +296,54 @@ export default function PracticeTestPage() {
       setIsFullscreen(false);
     }
   };
+
+  // Answers are also kept on this device until the server has them (a lost connection or a closed tab loses nothing)
+  useEffect(() => {
+    if (!attemptId || isSubmitted || !dirtyRef.current) return;
+    try { localStorage.setItem(`irep_test:${attemptId}`, JSON.stringify({ answers, marked: markedForReview })); } catch { /* storage blocked */ }
+  }, [answers, markedForReview, attemptId, isSubmitted]);
+
+  // Connection: a heartbeat while online; going offline pauses the timer; coming back resumes it on the server's clock
+  const heartbeat = useCallback(async (): Promise<boolean> => {
+    if (!attemptId || isSubmitted) return true;
+    try {
+      const r = await fetchApi<{ time_remaining_sec: number; credited_sec: number; paused_seconds: number; tab_switches: number }>(
+        `/student/tests/attempts/${attemptId}/heartbeat`, { method: "POST" });
+      setSecondsLeft(r.time_remaining_sec);
+      setPausedSec(r.paused_seconds);
+      if (!onlineRef.current || r.credited_sec > 0) {
+        setResumeNote(r.credited_sec > 0 ? t("practice_test.resumed_credit").replace("{n}", String(Math.round(r.credited_sec / 60) || 1)) : t("practice_test.resumed"));
+        setTimeout(() => setResumeNote(null), 6000);
+      }
+      setOnline(true);
+      return true;
+    } catch (e) {
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) return true;   // answered: not a connection problem
+      setOnline(false);
+      return false;
+    }
+  }, [attemptId, isSubmitted, t]);
+
+  useEffect(() => {
+    if (!attemptId || isSubmitted) return;
+    const goOffline = () => setOnline(false);
+    const goOnline = () => { heartbeat().then((ok) => { if (ok) saveAnswersBatch(); }); };
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    // online: check in every heartbeat_sec; offline: retry every 5 s (navigator.onLine is not always right)
+    const id = setInterval(() => {
+      heartbeat().then((ok) => { if (ok && dirtyRef.current) saveAnswersBatch(); });
+    }, (online ? heartbeatSec : 5) * 1000);
+    return () => { clearInterval(id); window.removeEventListener("offline", goOffline); window.removeEventListener("online", goOnline); };
+  }, [attemptId, isSubmitted, online, heartbeatSec, heartbeat, saveAnswersBatch]);
+
+  // Too many tab switches: the test is submitted with what was answered
+  useEffect(() => {
+    if (autoSubmitReason === "tabs" && !isSubmitted && !submitting) {
+      autoSubmittedRef.current = true;
+      performSubmit();
+    }
+  }, [autoSubmitReason]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 5. User Actions
   const handleSelectOption = (opt: string) => {
@@ -317,6 +400,7 @@ export default function PracticeTestPage() {
       setResultData(res);
       setIsSubmitted(true);
       setShowSubmitModal(false);
+      clearLocal(attemptId);
     } catch (err: any) {
       // inline message instead of a blocking alert(); answers stay on screen for a retry
       setSubmitError(err?.detail || err?.message || "Submission failed. Please retry.");
@@ -513,7 +597,7 @@ export default function PracticeTestPage() {
                         : "bg-line-soft text-muted hover:bg-line"
                     }`}
                   >
-                    {filter === "all" ? "All (30)" : filter === "correct" ? `Correct (${resultData.score})` : `Incorrect (${30 - resultData.score})`}
+                    {filter === "all" ? `${t("practice_test.filter_all")} (${resultData.questions_review.length})` : filter === "correct" ? `${t("practice_test.filter_correct")} (${resultData.score})` : `${t("practice_test.filter_incorrect")} (${resultData.questions_review.length - resultData.score})`}
                   </button>
                 ))}
               </div>
@@ -643,9 +727,9 @@ export default function PracticeTestPage() {
             <ShieldAlert className="w-4 h-4 text-brand" />
             <span className="font-semibold text-ink">{testData.category}</span>
             {tabSwitchCount > 0 && (
-              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-danger-soft text-danger font-semibold text-caption animate-pulse">
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-danger-soft text-danger font-semibold text-caption" data-testid="tab-switch-count">
                 <AlertTriangle className="w-3 h-3" />
-                <span>Tab switches: {tabSwitchCount}</span>
+                <span>{t("practice_test.tab_switches").replace("{n}", String(tabSwitchCount)).replace("{max}", String(maxTabSwitches))}</span>
               </span>
             )}
           </div>
@@ -659,6 +743,35 @@ export default function PracticeTestPage() {
             </button>
           </div>
         </div>
+
+        <p className="text-caption text-muted px-1" data-testid="test-rules">
+          {t("practice_test.rules").replace("{max}", String(maxTabSwitches)).replace("{pause}", String(Math.round(maxPauseSec / 60)))}
+        </p>
+
+        {!online && (
+          <div role="alert" data-testid="offline-banner" className="p-3 bg-warning-soft border border-warning-fill rounded-card text-xs text-warning font-medium flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{t("practice_test.offline").replace("{left}", String(Math.max(0, Math.round((maxPauseSec - pausedSec) / 60))))}</span>
+          </div>
+        )}
+        {online && resumeNote && (
+          <div role="status" data-testid="resumed-banner" className="p-3 bg-success-soft border border-success-line rounded-card text-xs text-success font-medium">{resumeNote}</div>
+        )}
+
+        {tabWarning !== null && !isSubmitted && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-labelledby="tab-warn-title" data-testid="tab-warning">
+            <div className="bg-white rounded-card border border-danger-line shadow-pop max-w-md w-full p-5 space-y-3">
+              <h2 id="tab-warn-title" className="text-heading font-semibold text-danger flex items-center gap-2"><AlertTriangle className="w-5 h-5" />{t("practice_test.tab_warn_title")}</h2>
+              <p className="text-body text-ink-soft">{t("practice_test.tab_warn_body")}</p>
+              <p className="text-body font-semibold text-ink" data-testid="tab-warning-count">
+                {t("practice_test.tab_warn_count").replace("{n}", String(tabSwitchCount)).replace("{max}", String(maxTabSwitches))}
+              </p>
+              <p className="text-label text-muted">{t("practice_test.tab_warn_saved")}</p>
+              <button type="button" autoFocus onClick={() => setTabWarning(null)} data-testid="tab-warning-ok"
+                className="w-full py-2 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-tile">{t("practice_test.tab_warn_ok")}</button>
+            </div>
+          </div>
+        )}
 
         {/* Copy Notice Toast */}
         {showCopyNotice && (
@@ -764,7 +877,7 @@ export default function PracticeTestPage() {
                 <span>{t("practice_test.time_remaining")}</span>
                 <Clock className="w-3.5 h-3.5 text-danger" />
               </div>
-              <div className="text-3xl font-semibold text-danger tracking-tight">
+              <div className="text-3xl font-semibold text-danger tracking-tight" data-testid="test-timer" data-paused={online ? "false" : "true"}>
                 {formatTime(secondsLeft)}
               </div>
               <div className="w-full bg-danger-soft h-1.5 rounded-full overflow-hidden">

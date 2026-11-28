@@ -28,7 +28,7 @@ interface LiveData {
 interface Player { recording_id: string; title: string; url: string; expires_at: string; chapters: { at_sec: number; title: string }[] }
 
 const STATUS_CHIP: Record<string, string> = {
-  Attended: "chip-green", Completed: "chip-green", Missed: "chip-red", Upcoming: "chip-amber", Live: "chip-green", Scheduled: "bg-slate-100 text-slate-600", Cancelled: "bg-slate-100 text-slate-400 line-through",
+  Attended: "chip-green", Completed: "chip-green", Missed: "chip-red", Excused: "chip-amber", Upcoming: "chip-amber", Live: "chip-green", Scheduled: "bg-slate-100 text-slate-600", Cancelled: "bg-slate-100 text-slate-400 line-through",
 };
 
 function fill(template: string, vars: Record<string, string | number>) {

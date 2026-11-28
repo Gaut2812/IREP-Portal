@@ -6,3 +6,5 @@ export { Badge, Button, buttonClass, Input, Select, Field, inputClass, Tabs, Emp
 export { Table, THead, Th, Tr, Td } from "./Table";
 export { PageHeader } from "./PageHeader";
 export { BrandMark } from "./BrandMark";
+export { ConfirmDelete, DeleteButton } from "./ConfirmDelete";
+export { HowItWorks } from "./HowItWorks";

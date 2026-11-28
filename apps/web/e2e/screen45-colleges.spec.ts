@@ -34,17 +34,18 @@ test.describe("Screen 45: Colleges and MoU terms (/admin/colleges)", () => {
     await page.getByTestId("admin-name").fill("Dr. Lakshmi Narayanan");
     await page.getByTestId("admin-email").fill(email);
     await page.getByTestId("admin-save").click();
-    const password = await page.getByTestId("temp-password-value").innerText();
+    const link = await page.getByTestId("invite-link-value").inputValue();
     await expect(page.getByTestId("college-status")).toHaveText("Active");
+    await expect(page.getByTestId("invitation-row").filter({ hasText: email }).getByTestId("invitation-status")).toHaveText("Waiting");
 
-    // the new admin signs in with the one-time password and lands on their own (empty) college
+    // the new admin opens the one-time link, sets a password and lands on their own (empty) college
     const ctx = await browser.newContext();
     const p2 = await ctx.newPage();
-    await p2.goto("/login");
-    await p2.getByTestId("role-college").click();
-    await p2.getByTestId("login-identifier").fill(email);
-    await p2.getByTestId("login-password").fill(password);
-    await p2.getByTestId("login-submit").click();
+    const u = new URL(link);
+    await p2.goto(u.pathname + u.hash);
+    await p2.getByTestId("set-password-new").fill("FirstAdmin2026-ok");
+    await p2.getByTestId("set-password-again").fill("FirstAdmin2026-ok");
+    await p2.getByTestId("set-password-submit").click();
     await p2.waitForURL("**/college");
     await ctx.close();
   });

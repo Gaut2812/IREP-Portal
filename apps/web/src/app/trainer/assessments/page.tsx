@@ -2,19 +2,20 @@
 
 /** Screen 22 · Assessments (trainer): publish problems (24) and tests (23) to batches, read results back (L13);
  *  import from the IREP bank (46, L37). */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
 import { Download, Plus, Send, Undo2 } from "lucide-react";
+import { ConfirmDelete, DeleteButton } from "@/components/ui";
 
 type Kind = "problem" | "test";
 interface Item {
   kind: Kind; id: string; title: string; status: string; batch_ids: string[] | null; batches: "all" | string[]; due_at: string | null;
   source_id: string | null; difficulty?: string; topic?: string; trainer_notes?: string | null; questions?: number; imported?: boolean;
 }
-interface Results { students: { student_id: string; name: string; batch: string | null; attempts: number; result: string | null; score: string | null; done: boolean }[]; summary: { students: number; attempted: number; done: number } }
+interface Results { students: { student_id: string; name: string; batch: string | null; attempts: number; result: string | null; score: string | null; done: boolean; tab_switches?: number | null; paused_min?: number | null }[]; summary: { students: number; attempted: number; done: number } }
 interface Q { question_text: string; option_a: string; option_b: string; option_c: string; option_d: string; correct_option: string }
 
 const EMPTY_P = { title: "", statement: "", constraints: "", difficulty: "Easy", topic: "", trainer_notes: "", sample_in: "", sample_out: "", hidden_in: "", hidden_out: "" };
@@ -36,6 +37,7 @@ export default function AssessmentsPage() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +47,22 @@ export default function AssessmentsPage() {
     }
   }, [t]);
   useEffect(() => { load(); }, [load]);
+
+  // Deep links from the trainer dashboard: ?tab=tests&new=1 opens the create form,
+  // ?problem=<id> (or ?test=<id>) opens that item's results. Read once, after the list loads.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (!data || deepLinked.current) return;
+    deepLinked.current = true;
+    const q = new URLSearchParams(window.location.search);
+    const wantTab = q.get("tab");
+    if (wantTab === "problems" || wantTab === "tests" || wantTab === "bank") setTab(wantTab);
+    if (q.get("new") === "1" && wantTab !== "bank") { setCreating(true); setSel(null); return; }
+    const problemId = q.get("problem"), testId = q.get("test");
+    const it = problemId ? data.problems.find((x) => x.id === problemId) : testId ? data.tests.find((x) => x.id === testId) : undefined;
+    if (it) { setTab(it.kind === "problem" ? "problems" : "tests"); pick(it); }
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { if (tab === "bank") fetchApi<{ problems: Item[]; tests: Item[] }>("/trainer/bank").then(setBank).catch(() => setError(t("assess.load_failed"))); }, [tab, t]);
 
   const pick = async (it: Item) => {
@@ -84,6 +102,16 @@ export default function AssessmentsPage() {
     await refreshSel(sel.kind, sel.id);
     setMsg(t("assess.unpublished"));
   });
+
+  // Delete: removed for good if no student used it, else hidden and its results kept (the API decides; 409 says why not)
+  const removeSel = async () => {
+    if (!sel) return;
+    const r = await fetchApi<{ mode: "removed" | "hidden" }>(`/trainer/assessments/${sel.kind}/${sel.id}`, { method: "DELETE" });
+    setSel(null);
+    setResults(null);
+    setData(await fetchApi("/trainer/assessments"));
+    setMsg(r.mode === "hidden" ? t("assess.deleted_hidden") : t("assess.deleted"));
+  };
 
   const saveNotes = () => sel && run(async () => {
     await fetchApi(`/trainer/assessments/problem/${sel.id}/notes`, { method: "PUT", body: JSON.stringify({ trainer_notes: notes }) });
@@ -226,7 +254,10 @@ export default function AssessmentsPage() {
                 <div className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="assess-detail">
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="text-sm font-semibold text-ink" data-testid="assess-heading">{sel.title}</h2>
-                    <span className={`text-caption font-semibold px-2 py-0.5 rounded-full ${chip(sel.status)}`} data-testid="assess-status">{t(`assess.status_${sel.status}`)}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-caption font-semibold px-2 py-0.5 rounded-full ${chip(sel.status)}`} data-testid="assess-status">{t(`assess.status_${sel.status}`)}</span>
+                      <DeleteButton onClick={() => setConfirmDel(true)} testId="assess-delete" />
+                    </div>
                   </div>
                   <div>
                     <div className="text-caption font-semibold text-muted mb-1">{t("assess.publish_to")}</div>
@@ -258,10 +289,10 @@ export default function AssessmentsPage() {
                     <div>
                       <div className="text-caption font-semibold text-muted">{t("assess.results")}: {results.summary.attempted}/{results.summary.students} {t("assess.attempted")} · {results.summary.done} {t("assess.done")}</div>
                       <table className="w-full text-xs mt-1" data-testid="assess-results">
-                        <thead><tr className="text-left text-muted"><th className="py-1">{t("assess.student")}</th><th>{t("assess.attempts")}</th><th>{t("assess.result")}</th><th>{t("assess.score")}</th></tr></thead>
+                        <thead><tr className="text-left text-muted"><th className="py-1">{t("assess.student")}</th><th>{t("assess.attempts")}</th><th>{t("assess.result")}</th><th>{t("assess.score")}</th>{sel?.kind === "test" && <><th>{t("assess.tab_switches")}</th><th>{t("assess.paused_min")}</th></>}</tr></thead>
                         <tbody>
                           {results.students.filter((r) => r.attempts > 0).slice(0, 50).map((r) => (
-                            <tr key={r.student_id} className="border-t border-line-soft" data-testid="result-row"><td className="py-1">{r.name}</td><td>{r.attempts}</td><td>{r.result}</td><td>{r.score}</td></tr>
+                            <tr key={r.student_id} className="border-t border-line-soft" data-testid="result-row"><td className="py-1">{r.name}</td><td>{r.attempts}</td><td>{r.result}</td><td>{r.score}</td>{sel?.kind === "test" && <><td className={r.tab_switches ? "text-danger font-semibold" : ""} data-testid="result-tab-switches">{r.tab_switches ?? "—"}</td><td>{r.paused_min ? r.paused_min : "—"}</td></>}</tr>
                           ))}
                         </tbody>
                       </table>
@@ -273,6 +304,9 @@ export default function AssessmentsPage() {
             </section>
           </div>
         </div>
+        {confirmDel && sel && (
+          <ConfirmDelete itemName={sel.title} note={t("assess.delete_note")} onConfirm={removeSel} onClose={() => setConfirmDel(false)} />
+        )}
       </AppShell>
     </RoleGuard>
   );

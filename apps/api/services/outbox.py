@@ -86,6 +86,8 @@ def _load_handlers() -> None:
     import routers.admin_colleges  # noqa: F401  (identity.invite_user)
     import routers.audit_consent  # noqa: F401  (data_request.build_export)
     import routers.super_admin  # noqa: F401  (identity.set_enabled)
+    import services.file_cleanup  # noqa: F401  (storage.delete)
+    import services.invitations  # noqa: F401  (invite.send)
 
 
 def dispatch_pending(session_factory: Callable[[], Session], limit: int = 100) -> dict:

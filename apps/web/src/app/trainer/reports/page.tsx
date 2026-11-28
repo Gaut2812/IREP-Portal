@@ -14,7 +14,8 @@ interface Card {
   rows: { area: string; prev: string; curr: string; status: string; color: string }[];
   trainer_remark_en: string | null; trainer_remark_ta: string | null; how_to_help_en: string | null; how_to_help_ta: string | null;
 }
-const FIELDS = ["trainer_remark_en", "trainer_remark_ta", "how_to_help_en", "how_to_help_ta"] as const;
+// English only: the API translates both into Tamil for parents (no separate Tamil boxes)
+const FIELDS = ["trainer_remark_en", "how_to_help_en"] as const;
 
 function thisMonth() {
   const d = new Date();
@@ -131,6 +132,7 @@ export default function TrainerReportsPage() {
                     </label>
                   ))}
                 </div>
+                <p className="text-caption text-muted" data-testid="tamil-auto-note">{t("reports.tamil_auto")}</p>
                 {card.status === "draft" ? (
                   <div className="flex gap-2">
                     <button type="button" disabled={busy} onClick={() => save(false)} data-testid="card-save" className="px-3 py-1.5 border border-line-strong text-xs font-semibold rounded-tile disabled:opacity-50">{t("reports.save_draft")}</button>

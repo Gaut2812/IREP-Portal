@@ -282,7 +282,7 @@ export default function TrainerDashboardPage() {
                         <Td align="right">{prob.total_submissions}</Td>
                         <Td align="right" className="font-medium text-success">{prob.solved_percentage}%</Td>
                         <Td align="right">
-                          <Link href={`/student/coding/${prob.id}`} className={buttonClass("secondary", "sm")}><span>{t("trainer_dashboard.dsa_open")}</span><ExternalLink className="w-3.5 h-3.5" /></Link>
+                          <Link href={`/trainer/assessments?problem=${prob.id}`} className={buttonClass("secondary", "sm")}><span>{t("trainer_dashboard.dsa_open")}</span><ExternalLink className="w-3.5 h-3.5" /></Link>
                         </Td>
                       </Tr>
                     ))}

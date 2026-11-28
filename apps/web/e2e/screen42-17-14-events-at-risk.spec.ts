@@ -35,12 +35,28 @@ test.describe("Screens 42 and 17: events (/college/events, /parent/events)", () 
     await card.getByTestId("guest-count").selectOption("2");
     await card.getByTestId("rsvp-yes").click();
     await expect(card.getByTestId("rsvp-saved")).toBeVisible();
-    await expect(card.getByTestId("rsvp-yes")).toHaveAttribute("aria-pressed", "true");
-    await ctx.close();
+    await expect(card.getByTestId("rsvp-answer")).toHaveText("Attending · 2 people");
+    await expect(card.getByTestId("rsvp-yes")).toHaveCount(0);                     // a confirmation card, not the buttons
+    await expect(card.getByTestId("rsvp-change-until")).toBeVisible();
 
     await page.reload();
     await expect(row.getByTestId("rsvp-counts")).toContainText("Yes 1");
     await expect(row.getByTestId("rsvp-counts")).toContainText("Guests 2");
+
+    // change the reply to "Can't come": it asks first, takes an optional reason, and the counts move
+    await card.getByTestId("rsvp-change").click();
+    await card.getByTestId("rsvp-no").click();
+    await expect(card.getByTestId("rsvp-no-dialog")).toBeVisible();
+    await card.getByTestId("rsvp-no-reason").fill("Travelling that week");
+    await card.getByTestId("rsvp-no-confirm").click();
+    await expect(card.getByTestId("rsvp-answer")).toHaveText("Can't come");
+    await ctx.close();
+
+    await page.reload();
+    await expect(row.getByTestId("rsvp-counts")).toContainText("Yes 0");
+    await expect(row.getByTestId("rsvp-counts")).toContainText("No 1");
+    await row.getByTestId("decline-reasons-toggle").click();
+    await expect(row.getByTestId("decline-reasons")).toContainText("Travelling that week");
     await row.getByTestId("event-cancel").click();                                   // tidy: parents are told it is off
     await expect(row.getByTestId("event-status")).toHaveText("Cancelled");
   });
@@ -68,7 +84,7 @@ test.describe("Screen 14: at-risk students (/trainer/at-risk)", () => {
     await page.getByTestId("act-parent-call").click();
     const msg = page.getByTestId("risk-msg");
     await expect(msg).toHaveText(/Parent alerted|Quiet hours|already been alerted/);
-    await expect(page.getByTestId("risk-history")).toContainText("Parent call");
+    await expect(page.getByTestId("risk-history")).toContainText("Parent notified");
     const outcome = await msg.innerText();
     test.skip(/Quiet hours/.test(outcome), "The college's quiet hours hold the alert; the API tests cover delivery after them");
 
@@ -80,6 +96,36 @@ test.describe("Screen 14: at-risk students (/trainer/at-risk)", () => {
     await parent.getByTestId("support-alert").filter({ hasText: "4 sessions missed" }).click();
     await parent.waitForURL("**/parent/messages");
     await ctx.close();
+  });
+
+  test("logs a phone call, assigns a mentor and lists the mentee", async ({ page }) => {
+    await loginAs(page, "trainer");
+    await page.goto("/trainer/at-risk");
+    await page.getByTestId("risk-row").first().click();
+    const detail = page.getByTestId("risk-detail");
+    await expect(detail).toBeVisible();
+    const student = (await detail.getByRole("heading", { level: 2 }).innerText()).trim();
+
+    await page.getByTestId("act-log-call").click();
+    await expect(page.getByTestId("risk-error")).toHaveText("Choose how the call went.");
+    await page.getByTestId("call-outcome-call_back").click();
+    await page.getByTestId("risk-note").fill("Father asked for a call after 6 pm");
+    await page.getByTestId("act-log-call").click();
+    await expect(page.getByTestId("risk-msg")).toHaveText("Call logged.");
+    await expect(page.getByTestId("risk-history")).toContainText("Phone call");
+    await expect(page.getByTestId("risk-history")).toContainText("Asked to call back: Father asked for a call after 6 pm");
+
+    const me = await page.getByTestId("mentor-select").locator("option", { hasText: "(me)" }).getAttribute("value");
+    await page.getByTestId("mentor-select").selectOption(me!);
+    await page.getByTestId("act-mentor").click();
+    await expect(page.getByTestId("risk-msg")).toHaveText(/Mentor assigned/);
+    await expect(page.getByTestId("mentor-current")).not.toHaveText("No mentor yet.");
+
+    await page.getByTestId("risk-tab-mentees").click();
+    await expect(page.getByTestId("mentee-row").filter({ hasText: student })).toBeVisible();
+    await page.getByTestId("mentee-row").filter({ hasText: student }).click();
+    await page.getByTestId("act-mentor-remove").click();
+    await expect(page.getByTestId("risk-msg")).toHaveText("Mentor removed.");
   });
 
   test("supports the Tamil toggle", async ({ page }) => {

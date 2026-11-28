@@ -19,13 +19,22 @@ import uuid
 from core.tenant import get_trainer_for_user, get_trainer_batch_ids, get_user_name
 from models.schema import AtRiskFlag, FlagAction, Student as StudentModel, User as UserModel
 from services.trainer_dashboard import build_trainer_dashboard
-from services.at_risk import ACTION_LABEL, reason_text, request_parent_call
+from services.at_risk import ACTION_LABEL, RENOTIFY_AFTER, reason_text, request_parent_call
 from services.audit import record_audit
+from services.notifications import notify_user
 
 
 class FlagActionRequest(BaseModel):
-    action_type: str          # parent_call | extra_saturday | mentor | note
+    action_type: str          # parent_call (= notify parent) | phone_call | extra_saturday | note
     note: Optional[str] = None
+    outcome: Optional[str] = None   # phone_call: reached | no_answer | call_back
+
+
+class MentorRequest(BaseModel):
+    user_id: Optional[str] = None   # a trainer of the college; None removes the mentor
+
+
+PHONE_OUTCOMES = {"reached": "Reached", "no_answer": "No answer", "call_back": "Asked to call back"}
 
 
 class FlagResolveRequest(BaseModel):
@@ -46,7 +55,8 @@ def _flag_for_trainer(flag_id: str, current_user: TokenPayload, db: Session) -> 
     trainer = get_trainer_for_user(current_user, db)
     batch_ids = get_trainer_batch_ids(trainer, db)
     flag = db.execute(select(AtRiskFlag).filter_by(id=flag_id, college_id=current_user.college_id)).scalar_one_or_none()
-    if not flag or (flag.batch_id and flag.batch_id not in batch_ids):
+    # the flag's mentor may be a trainer of another batch of the same college
+    if not flag or (flag.batch_id and flag.batch_id not in batch_ids and flag.mentor_user_id != current_user.sub):
         raise HTTPException(status_code=404, detail="Flag not found")
     return flag
 
@@ -79,7 +89,11 @@ def list_at_risk_flags(
             "reason_key": f.reason_key, "issue": reason_text(f.reason_key, f.reason_text, lg), "severity": f.severity, "status": f.status,
             "suggested_action": f.suggested_action, "action_label": ACTION_LABEL[f.suggested_action][lg],
             "parent_notified": f.parent_notified, "flagged_on": f.flagged_on.isoformat() if f.flagged_on else None,
+            "parent_notified_at": f.parent_notified_at.isoformat() if f.parent_notified_at else None,
+            "mentor": {"user_id": f.mentor_user_id, "name": mentor_names.get(f.mentor_user_id)} if f.mentor_user_id else None,
         }
+    mentor_names = dict(db.execute(select(UserModel.id, UserModel.name).where(
+        UserModel.id.in_([f.mentor_user_id for f in flags if f.mentor_user_id] or ["_"]))).all())
     rows = [row(f) for f in flags]
     from services.study_buddy import calls_by_student
     ai = calls_by_student(db, {f.student_id for f in flags}, days=7)          # L21
@@ -102,9 +116,14 @@ def get_flag(
     flag = _flag_for_trainer(flag_id, current_user, db)
     lg = lang if lang in ("en", "ta") else "en"
     actions = db.execute(select(FlagAction).where(FlagAction.flag_id == flag.id).order_by(FlagAction.created_at)).scalars().all()
+    student = db.execute(select(StudentModel).filter_by(id=flag.student_id)).scalar_one_or_none()
     return {"id": flag.id, "status": flag.status, "issue": reason_text(flag.reason_key, flag.reason_text, lg),
+            "name": get_user_name(db, student.user_id, "Student") if student else None, "batch": student.batch_name if student else None,
+            "renotify_after_days": RENOTIFY_AFTER.days,
             "suggested_action": flag.suggested_action, "action_label": ACTION_LABEL[flag.suggested_action][lg],
             "parent_notified": flag.parent_notified, "resolution_note": flag.resolution_note,
+            "parent_notified_at": flag.parent_notified_at.isoformat() if flag.parent_notified_at else None,
+            "mentor": _mentor_out(db, flag),
             "actions": [{"type": a.action_type, "note": a.note, "by": a.actor_name,
                          "at": a.created_at.isoformat() if a.created_at else None} for a in actions]}
 
@@ -116,8 +135,12 @@ def add_flag_action(
     current_user: TokenPayload = Depends(require_role(["trainer"])),
     db: Session = Depends(get_db),
 ):
-    if req.action_type not in ("parent_call", "extra_saturday", "mentor", "note"):
-        raise HTTPException(status_code=422, detail="Unknown action type")
+    if req.action_type not in ("parent_call", "phone_call", "extra_saturday", "note"):
+        raise HTTPException(status_code=422, detail="Unknown action type (assign a mentor with POST /flags/{id}/mentor)")
+    if req.action_type == "phone_call":
+        if req.outcome not in PHONE_OUTCOMES:
+            raise HTTPException(status_code=422, detail="Say how the call went: reached, no_answer or call_back")
+        req.note = f"{PHONE_OUTCOMES[req.outcome]}" + (f": {req.note.strip()}" if req.note and req.note.strip() else "")
     flag = _flag_for_trainer(flag_id, current_user, db)
     student = db.execute(select(StudentModel).filter_by(id=flag.student_id)).scalar_one()
     student_name = get_user_name(db, student.user_id, "Student")
@@ -138,6 +161,69 @@ def add_flag_action(
     db.commit()
     return {"success": True, "flag_id": flag.id, "status": flag.status, "action_id": action.id,
             "parent_notified": flag.parent_notified, "notified_now": call == "sent", "parent_call": call, "student": student_name}
+
+
+def _mentor_out(db: Session, flag: AtRiskFlag) -> Optional[dict]:
+    if not flag.mentor_user_id:
+        return None
+    name = db.execute(select(UserModel.name).where(UserModel.id == flag.mentor_user_id)).scalar_one_or_none()
+    return {"user_id": flag.mentor_user_id, "name": name, "since": flag.mentor_assigned_at.isoformat() if flag.mentor_assigned_at else None}
+
+
+@router.get("/mentors")
+def mentor_choices(current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    """Trainers of my college who can mentor a student (me first)."""
+    from models.schema import Trainer
+    rows = db.execute(select(UserModel.id, UserModel.name).join(Trainer, Trainer.user_id == UserModel.id)
+                      .where(Trainer.college_id == current_user.college_id, UserModel.is_active.is_(True)).order_by(UserModel.name)).all()
+    return {"mentors": sorted([{"user_id": uid, "name": n, "is_me": uid == current_user.sub} for uid, n in rows], key=lambda m: not m["is_me"])}
+
+
+@router.post("/flags/{flag_id}/mentor")
+def assign_mentor(flag_id: str, req: MentorRequest, current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    """Assign (or remove) the student's mentor: the mentor and the student are told; the mentor sees the student
+    under My mentees. Recorded in the flag's history and the audit log."""
+    from models.schema import Trainer
+    flag = _flag_for_trainer(flag_id, current_user, db)
+    student = db.execute(select(StudentModel).filter_by(id=flag.student_id)).scalar_one()
+    student_name = get_user_name(db, student.user_id, "Student")
+    mentor = None
+    if req.user_id:
+        mentor = db.execute(select(UserModel).join(Trainer, Trainer.user_id == UserModel.id)
+                            .where(UserModel.id == req.user_id, Trainer.college_id == current_user.college_id)).scalar_one_or_none()
+        if mentor is None:
+            raise HTTPException(status_code=404, detail="Pick a trainer of this college")
+    flag.mentor_user_id = mentor.id if mentor else None
+    flag.mentor_assigned_at = datetime.datetime.utcnow() if mentor else None
+    if flag.status == "open":
+        flag.status = "in_progress"
+    db.add(FlagAction(id=f"fa_{uuid.uuid4().hex[:18]}", college_id=current_user.college_id, flag_id=flag.id, action_type="mentor",
+                      note=f"Mentor: {mentor.name}" if mentor else "Mentor removed", actor_user_id=current_user.sub, actor_name=current_user.name))
+    if mentor:
+        if mentor.id != current_user.sub:
+            notify_user(db, mentor.id, f"You are mentoring {student_name}", f"Assigned by {current_user.name}: {reason_text(flag.reason_key, flag.reason_text, 'en')}",
+                        title_ta=f"நீங்கள் {student_name}-க்கு வழிகாட்டி", body_ta=f"{current_user.name} நியமித்தார்: {reason_text(flag.reason_key, flag.reason_text, 'ta')}",
+                        kind="info", link="/trainer/at-risk?tab=mentees", college_id=flag.college_id)
+        if student.user_id:
+            notify_user(db, student.user_id, f"{mentor.name} is your mentor", "They will check in with you about your progress.",
+                        title_ta=f"{mentor.name} உங்கள் வழிகாட்டி", body_ta="உங்கள் முன்னேற்றம் பற்றி அவர் உங்களுடன் பேசுவார்.",
+                        kind="info", link="/student", college_id=flag.college_id)
+    record_audit(db, current_user, "at_risk.mentor", "at_risk_flag", flag.id, {"student_id": flag.student_id, "mentor": flag.mentor_user_id})
+    db.commit()
+    return {"success": True, "mentor": _mentor_out(db, flag), "status": flag.status}
+
+
+@router.get("/mentees")
+def my_mentees(lang: str = "en", current_user: TokenPayload = Depends(require_role(["trainer"])), db: Session = Depends(get_db)):
+    """Students I mentor (open flags where I am the mentor), any batch of my college."""
+    lg = lang if lang in ("en", "ta") else "en"
+    rows = db.execute(select(AtRiskFlag, StudentModel, UserModel.name).join(StudentModel, StudentModel.id == AtRiskFlag.student_id)
+                      .join(UserModel, UserModel.id == StudentModel.user_id)
+                      .where(AtRiskFlag.college_id == current_user.college_id, AtRiskFlag.mentor_user_id == current_user.sub,
+                             AtRiskFlag.status != "resolved").order_by(AtRiskFlag.mentor_assigned_at.desc())).all()
+    return {"mentees": [{"flag_id": f.id, "student_id": st.id, "name": name, "batch": st.batch_name, "issue": reason_text(f.reason_key, f.reason_text, lg),
+                         "score": st.readiness_score, "attendance_pct": st.attendance_pct,
+                         "since": f.mentor_assigned_at.isoformat() if f.mentor_assigned_at else None} for f, st, name in rows]}
 
 
 @router.post("/flags/{flag_id}/resolve")
@@ -167,7 +253,8 @@ def list_trainer_coding_problems(
     db: Session = Depends(get_db)
 ):
     problems = db.execute(
-        select(CodingProblem).filter_by(college_id=current_user.college_id).order_by(CodingProblem.created_at.asc())
+        select(CodingProblem).where(CodingProblem.college_id == current_user.college_id, CodingProblem.status != "deleted")
+        .order_by(CodingProblem.created_at.asc())
     ).scalars().all()
     
     result = []

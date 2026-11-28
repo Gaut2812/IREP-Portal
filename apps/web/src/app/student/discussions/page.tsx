@@ -8,17 +8,22 @@ import { useAuth } from "@/lib/AuthContext";
 import { fetchApi, WS_BASE } from "@/lib/api";
 import {
   Users, Lock, Pin, Send, ThumbsUp, CheckCircle2, ShieldCheck, Code2, AlertCircle, RefreshCw, Flag, Bot, Laptop, BarChart3, Briefcase, Mic, GraduationCap, X,
+  Pencil, Trash2, Check, CheckCheck, Smile, SmilePlus,
 } from "lucide-react";
+import { ConfirmDelete } from "@/components/ui";
 
 interface Group { id: string; name: string; kind: string; icon: string; is_locked: boolean; unread: number; preview: string; my_role: string }
 interface Message {
   id: string; sender_name: string; sender_role: string; sender_initials: string; is_mine: boolean; message_text: string; code_snippet: string | null;
   is_removed: boolean; is_marked_as_answer: boolean; reactions: number; my_reaction: boolean; reported_by_me: boolean; time: string;
+  is_deleted?: boolean; edited?: boolean; can_edit?: boolean; can_delete?: boolean; seen_by?: string[]; seen_count?: number;
+  reaction_summary?: { emoji: string; count: number }[]; my_emoji?: string | null;
 }
 interface Thread {
   group: { id: string; name: string; kind: string; icon: string; is_locked: boolean; pinned_note: string | null; moderators: string[] };
   me: { role: string; can_post: boolean; muted_until: string | null };
   messages: Message[];
+  reactions?: string[];
 }
 interface Info { students: number; moderators: number; online: number; doubts_answered: number; avg_trainer_reply_min: number | null; top_helpers: { name: string; answers: number; medal: string }[] }
 
@@ -48,6 +53,10 @@ export default function DiscussionGroupsPage() {
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
   const [reportFor, setReportFor] = useState<Message | null>(null);
   const [reason, setReason] = useState("");
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [delMsg, setDelMsg] = useState<Message | null>(null);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);     // message id whose reaction picker is open
+  const [composeEmoji, setComposeEmoji] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   const loadGroups = useCallback(async () => {
@@ -113,11 +122,25 @@ export default function DiscussionGroupsPage() {
     }
   };
 
-  const react = async (m: Message) => {
+  const react = async (m: Message, emoji?: string) => {
+    setPickerFor(null);
     try {
-      const res = await fetchApi<{ my_reaction: boolean; reactions: number }>(`/messages/${m.id}/react`, { method: "POST" });
-      setThread((prev) => prev ? { ...prev, messages: prev.messages.map((x) => x.id === m.id ? { ...x, my_reaction: res.my_reaction, reactions: res.reactions } : x) } : prev);
+      const res = await fetchApi<{ my_reaction: boolean; reactions: number; my_emoji: string | null }>(`/messages/${m.id}/react`,
+        emoji ? { method: "POST", body: JSON.stringify({ emoji }) } : { method: "POST" });
+      setThread((prev) => prev ? { ...prev, messages: prev.messages.map((x) => x.id === m.id ? { ...x, my_reaction: res.my_reaction, reactions: res.reactions, my_emoji: res.my_emoji } : x) } : prev);
+      if (selected) loadThread(selected);
     } catch { /* ignore */ }
+  };
+
+  const saveEdit = async () => {
+    if (!editing || !editing.text.trim()) return;
+    try {
+      await fetchApi(`/messages/${editing.id}`, { method: "PATCH", body: JSON.stringify({ message_text: editing.text.trim() }) });
+      setEditing(null);
+      if (selected) await loadThread(selected);
+    } catch (err: any) {
+      setToast({ text: err?.detail || t("discussions.send_failed"), ok: false });
+    }
   };
 
   const markAnswer = async (m: Message) => {
@@ -222,14 +245,49 @@ export default function DiscussionGroupsPage() {
                             {m.is_marked_as_answer && <span className="chip-green text-caption font-semibold flex-shrink-0"><CheckCircle2 className="w-3 h-3" /> {t("discussions.marked_answer")}</span>}
                           </div>
                           <div className="pl-8 space-y-2">
-                            <p className={`text-xs leading-relaxed ${m.is_removed ? "italic text-subtle" : "text-ink-soft"}`}>{m.is_removed ? t("discussions.removed") : m.message_text}</p>
+                            {editing?.id === m.id ? (
+                              <form onSubmit={(e) => { e.preventDefault(); saveEdit(); }} className="flex gap-2" data-testid={`edit-form-${m.id}`}>
+                                <input autoFocus value={editing.text} onChange={(e) => setEditing({ id: m.id, text: e.target.value })} maxLength={4000}
+                                  aria-label={t("discussions.edit")} data-testid={`edit-input-${m.id}`}
+                                  className="flex-1 px-2.5 py-1.5 bg-surface-2 border border-brand rounded-tile text-xs" />
+                                <button type="submit" className="px-2.5 py-1 bg-brand text-white text-caption font-semibold rounded-tile" data-testid={`edit-save-${m.id}`}>{t("discussions.save")}</button>
+                                <button type="button" onClick={() => setEditing(null)} className="px-2 py-1 text-caption text-muted">{t("discussions.cancel_edit")}</button>
+                              </form>
+                            ) : (
+                              <p className={`text-xs leading-relaxed ${m.is_removed || m.is_deleted ? "italic text-subtle" : "text-ink-soft"}`} data-testid={`text-${m.id}`}>
+                                {m.is_removed ? t("discussions.removed") : m.is_deleted ? t("discussions.deleted") : m.message_text}
+                                {m.edited && <span className="text-caption text-subtle not-italic"> · {t("discussions.edited")}</span>}
+                              </p>
+                            )}
                             {m.code_snippet && <pre className="bg-[#1B2236] text-line p-2.5 rounded-tile text-xs font-mono overflow-x-auto whitespace-pre-wrap">{m.code_snippet}</pre>}
-                            {!m.is_removed && (
-                              <div className="flex items-center gap-2">
-                                <button onClick={() => react(m)} aria-pressed={m.my_reaction} data-testid={`react-${m.id}`}
-                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-tile text-caption font-semibold border ${m.my_reaction ? "bg-success-soft border-success-line text-success" : "bg-white border-line text-muted hover:bg-surface-2"}`}>
-                                  👍 <span>{m.reactions}</span>
+                            {!m.is_removed && !m.is_deleted && (
+                              <div className="flex flex-wrap items-center gap-2 relative">
+                                <button onClick={() => react(m)} aria-pressed={m.my_emoji === "👍"} data-testid={`react-${m.id}`}
+                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-tile text-caption font-semibold border ${m.my_emoji === "👍" ? "bg-success-soft border-success-line text-success" : "bg-white border-line text-muted hover:bg-surface-2"}`}>
+                                  👍 <span>{(m.reaction_summary || []).find((r) => r.emoji === "👍")?.count ?? (m.reaction_summary ? 0 : m.reactions)}</span>
                                 </button>
+                                {(m.reaction_summary || []).filter((r) => r.emoji !== "👍").map((r) => (
+                                  <button key={r.emoji} onClick={() => react(m, r.emoji)} aria-pressed={m.my_emoji === r.emoji} data-testid={`reaction-${m.id}-${r.emoji}`}
+                                    className={`px-2 py-0.5 rounded-tile text-caption border ${m.my_emoji === r.emoji ? "bg-brand-soft border-brand-line" : "bg-white border-line"}`}>{r.emoji} {r.count}</button>
+                                ))}
+                                <button onClick={() => setPickerFor(pickerFor === m.id ? null : m.id)} aria-expanded={pickerFor === m.id} aria-label={t("discussions.add_reaction")}
+                                  data-testid={`add-reaction-${m.id}`} className="p-1 rounded-tile text-subtle hover:text-ink hover:bg-surface-2"><SmilePlus className="w-3.5 h-3.5" /></button>
+                                {pickerFor === m.id && (
+                                  <div className="absolute left-0 top-7 z-10 bg-white border border-line rounded-card shadow-pop p-1 flex gap-0.5" role="menu" data-testid={`picker-${m.id}`}>
+                                    {(thread.reactions || ["👍", "❤️", "😂", "😮", "🙏", "👏"]).map((e) => (
+                                      <button key={e} role="menuitem" onClick={() => react(m, e)} className={`w-8 h-8 rounded-tile text-base hover:bg-surface-2 ${m.my_emoji === e ? "bg-brand-soft" : ""}`} data-testid={`pick-${m.id}-${e}`}>{e}</button>
+                                    ))}
+                                  </div>
+                                )}
+                                {m.can_edit && <button onClick={() => setEditing({ id: m.id, text: m.message_text })} className="text-caption text-subtle hover:text-brand inline-flex items-center gap-0.5" data-testid={`edit-${m.id}`}><Pencil className="w-3 h-3" /> {t("discussions.edit")}</button>}
+                                {m.can_delete && <button onClick={() => setDelMsg(m)} className="text-caption text-subtle hover:text-danger inline-flex items-center gap-0.5" data-testid={`delete-${m.id}`}><Trash2 className="w-3 h-3" /> {t("discussions.delete")}</button>}
+                                {m.is_mine && (
+                                  <span className={`ml-auto inline-flex items-center gap-0.5 text-caption ${m.seen_count ? "text-brand" : "text-subtle"}`} data-testid={`ticks-${m.id}`}
+                                    title={m.seen_count ? `${t("discussions.seen_by")}: ${(m.seen_by || []).join(", ")}` : t("discussions.sent")}>
+                                    {m.seen_count ? <CheckCheck className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                                    {m.seen_count ? `${t("discussions.seen")} ${m.seen_count}` : t("discussions.sent")}
+                                  </span>
+                                )}
                                 {isModerator && !m.is_marked_as_answer && <button onClick={() => markAnswer(m)} className="text-caption text-success hover:underline" data-testid={`answer-${m.id}`}>{t("discussions.mark_answer")}</button>}
                                 {!m.is_mine && (m.reported_by_me
                                   ? <span className="text-caption text-subtle">{t("discussions.reported")}</span>
@@ -247,6 +305,18 @@ export default function DiscussionGroupsPage() {
                         <div className="flex items-center gap-2">
                           <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("discussions.ask")} aria-label={t("discussions.ask")} data-testid="message-input"
                             className="flex-1 px-3.5 py-2 bg-surface-2 border border-line rounded-card text-xs text-ink focus:outline-none focus:border-brand focus:bg-white" />
+                          <div className="relative">
+                            <button type="button" onClick={() => setComposeEmoji(!composeEmoji)} aria-expanded={composeEmoji} aria-label={t("discussions.emoji")}
+                              className="p-2 text-muted hover:text-ink" data-testid="emoji-button"><Smile className="w-4 h-4" /></button>
+                            {composeEmoji && (
+                              <div className="absolute bottom-10 right-0 z-10 bg-white border border-line rounded-card shadow-pop p-1.5 grid grid-cols-6 gap-0.5 w-56" role="menu" data-testid="emoji-panel">
+                                {["😀", "😂", "😊", "😍", "🤔", "😮", "😅", "🙏", "👍", "👏", "🎉", "🔥", "💡", "✅", "❌", "❤️", "🚀", "📌"].map((e) => (
+                                  <button key={e} type="button" role="menuitem" onClick={() => { setText((v) => v + e); setComposeEmoji(false); }}
+                                    className="w-8 h-8 rounded-tile text-base hover:bg-surface-2" data-testid={`emoji-${e}`}>{e}</button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <button type="button" onClick={() => setShowCode(!showCode)} aria-pressed={showCode} className="p-2 text-muted hover:text-ink flex items-center gap-1 text-caption" data-testid="toggle-code"><Code2 className="w-4 h-4" /> {t("discussions.code")}</button>
                           <button type="submit" disabled={sending} className="px-4 py-2 bg-brand hover:bg-brand-hover text-white font-semibold text-xs rounded-card flex items-center gap-1.5 disabled:opacity-50" data-testid="send"><span>{t("discussions.send")}</span><Send className="w-3.5 h-3.5" /></button>
                         </div>
@@ -304,6 +374,11 @@ export default function DiscussionGroupsPage() {
           <div role="status" className={`fixed bottom-6 right-6 z-50 text-white text-xs font-semibold px-4 py-3 rounded-card shadow-pop flex items-center gap-2 max-w-sm ${toast.ok ? "bg-ink" : "bg-danger"}`} data-testid="toast">
             {toast.ok ? <CheckCircle2 className="w-4 h-4 text-teal flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />} {toast.text}
           </div>
+        )}
+        {delMsg && (
+          <ConfirmDelete itemName={delMsg.message_text.slice(0, 60)} note={t("discussions.delete_note")}
+            onConfirm={async () => { await fetchApi(`/messages/${delMsg.id}`, { method: "DELETE" }); if (selected) await loadThread(selected); }}
+            onClose={() => setDelMsg(null)} />
         )}
       </AppShell>
     </RoleGuard>

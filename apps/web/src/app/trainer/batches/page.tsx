@@ -9,7 +9,10 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
 import { AlertTriangle, Users } from "lucide-react";
 
-interface BatchRow { id: string; short_name: string; name: string; semester: number; academic_year: string; role: string; students: number; avg_readiness: number | null; avg_attendance: number | null }
+interface BatchRow {
+  id: string; short_name: string; name: string; semester: number; academic_year: string; role: string; students: number;
+  avg_readiness: number | null; avg_attendance: number | null; branch: string | null; branch_code: string | null; college: string | null;
+}
 interface RosterRow { id: string; name: string; register_no: string; readiness_score: number; readiness_band: string; attendance_pct: number; open_flags: number; pending_roster_request: boolean }
 
 const BAND: Record<string, string> = { "Placement Ready": "bg-success-soft text-success", "Nearly Ready": "bg-warning-soft text-warning", "Needs Support": "bg-danger-soft text-danger" };
@@ -54,7 +57,8 @@ export default function TrainerBatchesPage() {
               <button key={b.id} type="button" onClick={() => setSelected(b.id)} data-testid={`batch-card-${b.short_name}`} aria-pressed={selected === b.id}
                 className={`text-left bg-white rounded-card border p-3 ${selected === b.id ? "border-brand ring-1 ring-brand" : "border-line"}`}>
                 <div className="text-sm font-semibold text-ink">{b.short_name}</div>
-                <div className="text-caption text-muted">{t("trainer_batches.sem")} {b.semester} · {b.students} {t("trainer_batches.students")}</div>
+                <div className="text-caption text-ink-soft truncate" data-testid="batch-branch">{[b.branch, b.college].filter(Boolean).join(" · ")}</div>
+                <div className="text-caption text-muted">{t("trainer_batches.sem")} {b.semester} · {b.academic_year} · {b.students} {t("trainer_batches.students")}</div>
                 <div className="text-caption text-muted">{t("trainer_batches.readiness")} {b.avg_readiness ?? "—"} · {t("trainer_batches.attendance")} {b.avg_attendance ?? "—"}%</div>
                 {b.role === "substitute" && <span className="text-caption text-warning font-semibold">{t("trainer_batches.substitute")}</span>}
               </button>

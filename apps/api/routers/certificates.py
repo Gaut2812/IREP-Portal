@@ -49,7 +49,8 @@ def _out(c: Certificate, lang: str = "en", with_proof: bool = True) -> dict:
             "exam_date": c.exam_date.isoformat() if c.exam_date else None, "verify_code": c.verify_code,
             "credential_id": c.credential_id, "has_proof": bool(c.proof_key) if with_proof else None,
             "proof_submitted_at": c.proof_submitted_at.isoformat() if c.proof_submitted_at else None,
-            "decision_note": c.decision_note if c.status == "rejected" else None, "voucher": bool(c.voucher_code)}
+            "decision_note": c.decision_note if c.status == "rejected" else None, "voucher": bool(c.voucher_code),
+            "can_delete": c.cert_type == "external" and c.status in ("pending_proof", "rejected")}
 
 
 def _batch_trainer_users(db: Session, batch_id: Optional[str]) -> list:
@@ -122,6 +123,68 @@ async def add_proof(cert_id: str, file: UploadFile = File(...), credential_id: O
     _store_proof(db, c, st, file, data, current_user)
     db.commit()
     return _out(c)
+
+
+def _certificate_pdf(db: Session, c: Certificate, st: Student) -> Response:
+    """The earned certificate as a one-page PDF: whose it is, what, from whom, when, and the code that verifies it."""
+    from models.schema import College
+    from services.reports import render_pdf
+    name = get_user_name(db, st.user_id, "Student")
+    college = db.get(College, c.college_id)
+    lines = ["", "This certifies that", f"    {name}", f"    Register no. {st.register_no or '-'} · {college.name if college else ''}",
+             "", "has earned", f"    {c.title}", f"    issued by {c.issuer}", "",
+             f"Issued on: {c.issued_on.strftime('%d %B %Y') if c.issued_on else '-'}"]
+    if c.verify_code:
+        lines.append(f"Verification code: {c.verify_code}")
+    if c.credential_id:
+        lines.append(f"Issuer credential: {c.credential_id}")
+    lines += ["", "Issued through the IREP Training Portal."]
+    filename = "".join(ch if ch.isalnum() else "-" for ch in c.title).strip("-")[:60] or "certificate"
+    return Response(content=render_pdf("Certificate", lines), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}.pdf"'})
+
+
+@router.get("/student/certificates/{cert_id}/download")
+def download_my_certificate(cert_id: str, current_user: TokenPayload = Depends(STUDENT), db: Session = Depends(get_db)):
+    """Download an earned certificate as a PDF (pending, scheduled and rejected ones have nothing to download yet)."""
+    st = get_student_for_user(current_user, db)
+    c = db.execute(select(Certificate).where(Certificate.id == cert_id, Certificate.student_id == st.id)).scalar_one_or_none()
+    if c is None:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    if c.status != "earned":
+        raise HTTPException(status_code=409, detail="Only an earned certificate can be downloaded")
+    return _certificate_pdf(db, c, st)
+
+
+@router.get("/parent/certificates/{cert_id}/download")
+def download_child_certificate(cert_id: str, child_id: Optional[str] = None, current_user: TokenPayload = Depends(PARENT),
+                               db: Session = Depends(get_db)):
+    child = get_child_for_parent(current_user, db, child_id)
+    if not is_granted(db, child.id, "parent_data_processing"):
+        raise HTTPException(status_code=403, detail="Your child's data-sharing consent is needed first")
+    c = db.execute(select(Certificate).where(Certificate.id == cert_id, Certificate.student_id == child.id,
+                                             Certificate.status == "earned")).scalar_one_or_none()
+    if c is None:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    return _certificate_pdf(db, c, child)
+
+
+@router.delete("/student/certificates/{cert_id}")
+def delete_external(cert_id: str, current_user: TokenPayload = Depends(STUDENT), db: Session = Depends(get_db)):
+    """A student removes an external certificate they added, while it waits for the trainer or after a rejection.
+    Earned, scheduled and IREP-issued certificates stay (they are records, not the student's own upload)."""
+    from services.file_cleanup import delete_file_later
+    st = get_student_for_user(current_user, db)
+    c = db.execute(select(Certificate).where(Certificate.id == cert_id, Certificate.student_id == st.id)).scalar_one_or_none()
+    if c is None:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    if c.cert_type != "external" or c.status not in ("pending_proof", "rejected"):
+        raise HTTPException(status_code=409, detail="Only an external certificate that is pending or rejected can be deleted")
+    delete_file_later(db, c.proof_key, college_id=c.college_id, entity_type="certificate", entity_id=c.id)
+    record_audit(db, current_user, "certificate.deleted", "certificate", c.id, {"title": c.title, "status": c.status})
+    db.delete(c)
+    db.commit()
+    return {"success": True}
 
 
 @router.get("/student/certificates/{cert_id}/proof")
@@ -210,9 +273,41 @@ def child_certificates(child_id: Optional[str] = None, lang: str = "en", current
 
 # ------------------------------------------------------------------ Screen 28 (college, L35 aggregates)
 
+@router.get("/college/certifications/holders")
+def college_certificate_holders(search: Optional[str] = Query(None, max_length=64), batch: Optional[str] = Query(None, max_length=128),
+                                issuer: Optional[str] = Query(None, max_length=128), page: int = Query(1, ge=1),
+                                current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
+    """D1 (27 Nov 2026): who holds which earned certificate, for placement. Names, register numbers, title, issuer and
+    date only: never proof files, decision notes or anything a trainer wrote (rule 8). Each read is audited."""
+    from models.schema import User
+    PAGE = 50
+    cid = current_user.college_id
+    q = (select(Certificate.id, Certificate.title, Certificate.issuer, Certificate.cert_type, Certificate.issued_on, Certificate.verify_code,
+                Student.id, Student.register_no, User.name, Batch.name)
+         .join(Student, Student.id == Certificate.student_id).join(User, User.id == Student.user_id)
+         .outerjoin(Batch, Batch.id == Student.batch_id)
+         .where(Certificate.college_id == cid, Student.college_id == cid, Certificate.status == "earned"))
+    if search and search.strip():
+        like = f"%{search.strip()}%"
+        q = q.where((User.name.ilike(like)) | (Student.register_no.ilike(like)) | (Certificate.title.ilike(like)))
+    if batch:
+        q = q.where(Batch.name == batch)
+    if issuer:
+        q = q.where(Certificate.issuer == issuer)
+    total = db.execute(select(func.count()).select_from(q.subquery())).scalar_one()
+    rows = db.execute(q.order_by(Certificate.issued_on.desc(), User.name).offset((page - 1) * PAGE).limit(PAGE)).all()
+    record_audit(db, current_user, "college.certificate_holders_read", "certificate", None,
+                 {"search": bool(search), "batch": batch, "issuer": issuer, "page": page, "rows": len(rows)})
+    db.commit()
+    return {"total": total, "page": page, "page_size": PAGE,
+            "holders": [{"certificate_id": c_id, "title": title, "issuer": iss, "type": ctype, "issued_on": on.isoformat() if on else None,
+                         "verify_code": vc, "student_id": sid, "register_no": reg, "name": name, "batch": bname}
+                        for c_id, title, iss, ctype, on, vc, sid, reg, name, bname in rows]}
+
+
 @router.get("/college/certifications")
 def college_certifications(months: int = Query(6, ge=1, le=24), current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
-    """Counts only: no names, files or notes."""
+    """Aggregates (names are in /college/certifications/holders): no files or notes."""
     cid = current_user.college_id
     base = select(Certificate).where(Certificate.college_id == cid)
     by_status = dict(db.execute(select(Certificate.status, func.count(Certificate.id)).where(Certificate.college_id == cid)

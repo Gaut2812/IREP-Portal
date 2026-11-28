@@ -39,9 +39,10 @@ COMPONENT_LABELS = {**{k: v for k, v in SKILL_LABELS.items()}, "attendance": {"e
 def get_config(db: Session, college_id: str) -> ReadinessConfig:
     cfg = db.execute(select(ReadinessConfig).filter_by(college_id=college_id)).scalars().first()
     if not cfg:
-        cfg = ReadinessConfig(id=f"rcfg_{college_id}", college_id=college_id, weights=DEFAULT_WEIGHTS, version=1)
-        db.add(cfg)
-        db.flush()
+        # every caller only reads it: hand back the defaults without writing, so a page view never opens a
+        # write transaction (on SQLite that blocked the super-admin request audit and failed the request)
+        cfg = ReadinessConfig(id=f"rcfg_{college_id}", college_id=college_id, weights=dict(DEFAULT_WEIGHTS),
+                              band_ready_min=75, band_nearly_min=60, version=1)
     return cfg
 
 

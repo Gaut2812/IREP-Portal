@@ -35,6 +35,13 @@ class SendIn(BaseModel):
     auto_translate: bool = True
 
 
+class EditIn(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+DM_EDIT_WINDOW_MIN = 15          # same rule as the discussion groups (C2.10)
+
+
 class ModerateIn(BaseModel):
     action: str = Field(pattern="^(remove|keep|mute)$")
     reason: Optional[str] = Field(default=None, max_length=500)
@@ -117,7 +124,7 @@ def _thread_row(db: Session, t: TrainerDirectThread, me: str, unread: dict, view
         name, chip, initials = (trainer.name if trainer else "Trainer"), (f"Trainer · {child['name']}" if child else "Trainer"), (trainer.avatar_initials if trainer else "T")
     return {
         "id": t.id, "kind": "thread", "name": name, "category": t.contact_category, "role_chip": chip, "avatar": initials,
-        "unread": unread.get(t.id, 0), "last_message": (last.text_en if last else "") or "", "time": _when(last.created_at if last else None),
+        "unread": unread.get(t.id, 0), "last_message": (last.text_en if last and not last.deleted_at else "") or "", "time": _when(last.created_at if last else None),
         "sort": (last.created_at if last else t.created_at).isoformat(),
     }
 
@@ -165,13 +172,21 @@ def thread_messages(thread_id: str, lang: Optional[str] = None,
             m.read_at = now
     out = []
     for m in msgs:
+        mine = m.sender_user_id == current_user.sub
+        if m.deleted_at:
+            out.append({"id": m.id, "is_mine": mine, "sender_name": m.sender_name, "original_lang": m.original_lang, "text": "", "original_text": "",
+                        "translated": False, "deleted": True, "edited": False, "can_edit": False, "can_delete": False,
+                        "time": (m.created_at + _offset()).strftime("%I:%M %p").lstrip("0"), "date": _when(m.created_at), "read": m.read_at is not None})
+            continue
         original = m.text_ta if m.original_lang == "ta" and m.text_ta else m.text_en
         display = original
         if lang in ("en", "ta") and lang != m.original_lang:
             stored = m.text_ta if lang == "ta" else m.text_en
             display = stored if stored and stored != original else translate(db, original, lang, t.college_id, src=m.original_lang)
-        out.append({"id": m.id, "is_mine": m.sender_user_id == current_user.sub, "sender_name": m.sender_name, "original_lang": m.original_lang,
+        out.append({"id": m.id, "is_mine": mine, "sender_name": m.sender_name, "original_lang": m.original_lang,
                     "text": display, "original_text": original, "translated": display != original,
+                    "deleted": False, "edited": m.edited_at is not None, "can_delete": mine,
+                    "can_edit": mine and m.created_at is not None and now - m.created_at <= datetime.timedelta(minutes=DM_EDIT_WINDOW_MIN),
                     "time": (m.created_at + _offset()).strftime("%I:%M %p").lstrip("0"), "date": _when(m.created_at), "read": m.read_at is not None})
     db.commit()
     contact = db.execute(select(User).filter_by(id=t.contact_user_id)).scalar_one_or_none() if t.contact_user_id else None
@@ -180,7 +195,7 @@ def thread_messages(thread_id: str, lang: Optional[str] = None,
     return {
         "thread": {"id": t.id, "category": t.contact_category, "contact_name": t.contact_name, "contact_role": contact.role if contact else "college",
                    "prefers_tamil": prefers_ta, "trainer_name": trainer.name if trainer else "", "child": _child(db, t.student_id)},
-        "messages": out,
+        "messages": out, "edit_window_min": DM_EDIT_WINDOW_MIN,
     }
 
 
@@ -215,12 +230,67 @@ def send_thread_message(thread_id: str, req: SendIn, current_user: TokenPayload 
     return {"success": True, "message_id": m.id, "translated_to_tamil": bool(text_ta and src == "en")}
 
 
+def _own_message(db: Session, message_id: str, current_user: TokenPayload) -> DirectMessage:
+    m = db.execute(select(DirectMessage).filter_by(id=message_id, college_id=current_user.college_id)).scalar_one_or_none()
+    if not m or m.deleted_at:
+        raise HTTPException(status_code=404, detail="Message not found")
+    _thread_for(db, m.thread_id, current_user)                   # 404 when the thread is not the caller's
+    if m.sender_user_id != current_user.sub:
+        raise HTTPException(status_code=403, detail="You can only change your own messages")
+    return m
+
+
+def _refresh_preview(db: Session, thread_id: str) -> None:
+    t = db.get(TrainerDirectThread, thread_id)
+    last = db.execute(select(DirectMessage).where(DirectMessage.thread_id == thread_id, DirectMessage.deleted_at.is_(None))
+                      .order_by(DirectMessage.created_at.desc())).scalars().first()
+    if t is not None:
+        t.last_message_preview = (last.text_en[:255] if last else "")
+
+
+@router.patch("/direct-messages/{message_id}")
+def edit_thread_message(message_id: str, req: EditIn, current_user: TokenPayload = Depends(require_role(THREAD_ROLES)),
+                        db: Session = Depends(get_db)):
+    """The sender edits their message within DM_EDIT_WINDOW_MIN; the other side sees "edited". First text kept (audit)."""
+    m = _own_message(db, message_id, current_user)
+    if datetime.datetime.utcnow() - m.created_at > datetime.timedelta(minutes=DM_EDIT_WINDOW_MIN):
+        raise HTTPException(status_code=409, detail=f"Messages can be edited for {DM_EDIT_WINDOW_MIN} minutes after sending")
+    text = req.text.strip()
+    if m.first_text is None:
+        m.first_text = m.text_ta if m.original_lang == "ta" and m.text_ta else m.text_en
+    src = detect_lang(text)
+    m.original_lang = src
+    m.text_en = text if src == "en" else translate(db, text, "en", m.college_id, src="ta")
+    m.text_ta = text if src == "ta" else None
+    m.edited_at = datetime.datetime.utcnow()
+    _refresh_preview(db, m.thread_id)
+    record_audit(db, current_user, "thread.message_edited", "thread", m.thread_id, {"message_id": m.id})
+    db.commit()
+    publish_sync(f"thread:{m.thread_id}", {"type": "message_edited", "thread_id": m.thread_id, "message_id": m.id})
+    return {"success": True, "id": m.id, "edited": True}
+
+
+@router.delete("/direct-messages/{message_id}")
+def delete_thread_message(message_id: str, current_user: TokenPayload = Depends(require_role(THREAD_ROLES)),
+                          db: Session = Depends(get_db)):
+    """Delete for everyone: both sides see "This message was deleted". The text is kept for audit, not shown."""
+    m = _own_message(db, message_id, current_user)
+    if m.first_text is None:
+        m.first_text = m.text_ta if m.original_lang == "ta" and m.text_ta else m.text_en
+    m.deleted_at = datetime.datetime.utcnow()
+    _refresh_preview(db, m.thread_id)
+    record_audit(db, current_user, "thread.message_deleted", "thread", m.thread_id, {"message_id": m.id})
+    db.commit()
+    publish_sync(f"thread:{m.thread_id}", {"type": "message_deleted", "thread_id": m.thread_id, "message_id": m.id})
+    return {"success": True, "id": m.id, "deleted": True}
+
+
 @router.post("/direct-messages/{message_id}/translate")
 def translate_message(message_id: str, to: str = "ta", current_user: TokenPayload = Depends(require_role(THREAD_ROLES)), db: Session = Depends(get_db)):
     if to not in ("en", "ta"):
         raise HTTPException(status_code=422, detail="to must be en or ta")
     m = db.execute(select(DirectMessage).filter_by(id=message_id, college_id=current_user.college_id)).scalar_one_or_none()
-    if not m:
+    if not m or m.deleted_at:
         raise HTTPException(status_code=404, detail="Message not found")
     _thread_for(db, m.thread_id, current_user)
     original = m.text_ta if m.original_lang == "ta" and m.text_ta else m.text_en

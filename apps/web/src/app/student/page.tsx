@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
+import { Badge, Button, Card, CardHeader, EmptyState, ProgressBar, StatTile, buttonClass, type Tone } from "@/components/ui";
 import { useLanguage } from "@/lib/LanguageContext";
+import { TileDetails, type DetailKind } from "@/components/dashboard/TileDetails";
 import { fetchApi } from "@/lib/api";
 import {
   TrendingUp, Award, Flame, CheckCircle2, Calendar, ArrowRight, Clock,
@@ -36,7 +38,13 @@ interface WhyScore {
   history: { date: string; score: number }[];
 }
 
-const COLOR_HEX: Record<string, string> = { teal: "#2BB3A0", blue: "#2B5CD0", purple: "#7C5CE0", orange: "#F59E0B", green: "#15803D" };
+/** Where an upcoming item opens. Kinds without a student screen (guest talk, demo day) stay plain text. */
+const EVENT_HREF: Record<string, string> = { test: "/student/tests", exam: "/student/tests", interview: "/student/interviews", drive: "/student/interviews" };
+
+const BAND_TONE: Record<string, Tone> = { "Placement Ready": "success", "Nearly Ready": "warning", "Needs Support": "danger" };
+
+/** Skill bars: brand blue, green when strong, amber when it needs work (same rule as readiness components). */
+const skillTone = (pct: number): Tone => (pct < 60 ? "warning" : pct >= 80 ? "success" : "brand");
 
 function fill(template: string, vars: Record<string, string | number>) {
   return Object.entries(vars).reduce((acc, [k, v]) => acc.replace(`{${k}}`, String(v)), template);
@@ -55,6 +63,34 @@ function kindChipClass(kind: string) {
   return "chip-green";
 }
 
+/** Readiness snapshots as bars. Each column has a fixed height so the bar's % height resolves (it collapsed to 0 before). */
+function ScoreHistory({ history, readyMin, title }: { history: { date: string; score: number }[]; readyMin: number; title: string }) {
+  const short = (d: string) => {
+    const dt = new Date(d);
+    return Number.isNaN(dt.getTime()) ? d : dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  };
+  return (
+    <div data-testid="score-history">
+      <div className="text-xs font-semibold text-ink mb-2 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5 text-brand" /> {title}</div>
+      <div className="relative">
+        <div className="absolute inset-x-0 border-t border-dashed border-success-line" style={{ bottom: `${readyMin}%` }} aria-hidden="true" />
+        <div className="flex items-end gap-1.5 h-28">
+          {history.map((h) => (
+            <div key={h.date} className="flex-1 h-full flex flex-col justify-end items-center min-w-0" title={`${h.date}: ${h.score}`}>
+              <span className="text-caption text-ink-soft tabular mb-0.5">{h.score}</span>
+              <div className={`w-full max-w-10 rounded-t ${h.score >= readyMin ? "bg-success-fill" : "bg-brand"}`}
+                style={{ height: `${Math.max(2, Math.min(100, h.score))}%` }} data-testid="score-bar" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex gap-1.5 mt-1">
+        {history.map((h) => <span key={h.date} className="flex-1 text-center text-caption text-muted truncate">{short(h.date)}</span>)}
+      </div>
+    </div>
+  );
+}
+
 export default function StudentDashboardPage() {
   const { t, language } = useLanguage();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -63,17 +99,21 @@ export default function StudentDashboardPage() {
   const [whyOpen, setWhyOpen] = useState(false);
   const [why, setWhy] = useState<WhyScore | null>(null);
   const [whyLoading, setWhyLoading] = useState(false);
+  const [detail, setDetail] = useState<DetailKind | null>(null);
 
+  // only the latest request may set state: a slower reply for the old language must not overwrite the new one
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const req = ++latest.current;
     setLoading(true);
     setError(null);
     try {
       const res = await fetchApi<DashboardData>(`/student/dashboard?lang=${language}`);
-      setData(res);
+      if (req === latest.current) setData(res);
     } catch (err: any) {
-      setError(err?.detail || err?.message || "error");
+      if (req === latest.current) setError(err?.detail || err?.message || "error");
     } finally {
-      setLoading(false);
+      if (req === latest.current) setLoading(false);
     }
   }, [language]);
 
@@ -98,285 +138,270 @@ export default function StudentDashboardPage() {
     return t("dashboard.band_needs_support");
   };
 
-  const card = "bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm";
+  const tile = "bg-surface p-5 rounded-card border border-line shadow-card min-w-0";
 
   return (
     <RoleGuard allowedRoles={["student", "trainer"]}>
       <AppShell pageTitle={t("dashboard.title")}>
-        <div className="space-y-6 max-w-7xl mx-auto" data-testid="student-dashboard">
+        <div className="space-y-6 max-w-7xl" data-testid="student-dashboard">
           {loading && (
             <div className="space-y-6 animate-pulse" aria-busy="true" aria-label={t("dashboard.loading")}>
-              <div className="h-8 w-64 bg-white rounded-lg" />
+              <div className="h-8 w-64 bg-surface rounded-tile" />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map((i) => <div key={i} className="h-28 bg-white rounded-xl border border-[#E2E8F0]" />)}
+                {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 bg-surface rounded-card border border-line" />)}
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="h-64 bg-white rounded-xl border border-[#E2E8F0]" />
-                <div className="h-64 bg-white rounded-xl border border-[#E2E8F0]" />
+                <div className="h-64 bg-surface rounded-card border border-line" />
+                <div className="h-64 bg-surface rounded-card border border-line" />
               </div>
             </div>
           )}
 
           {!loading && error && (
-            <div className="bg-white rounded-2xl border border-[#FECACA] p-8 text-center space-y-3 max-w-md mx-auto">
-              <AlertCircle className="w-8 h-8 text-[#D93636] mx-auto" />
-              <h2 className="text-base font-bold text-[#0F1F3A]">{t("dashboard.error_title")}</h2>
-              <p className="text-xs text-[#64748B]">{error}</p>
-              <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg">
-                <RefreshCw className="w-3.5 h-3.5" /> {t("dashboard.retry")}
-              </button>
-            </div>
+            <Card className="text-center space-y-3 max-w-md mx-auto border-danger-line">
+              <AlertCircle className="w-8 h-8 text-danger mx-auto" />
+              <h2 className="text-heading font-semibold text-ink">{t("dashboard.error_title")}</h2>
+              <p className="text-body text-muted">{error}</p>
+              <Button onClick={load}><RefreshCw className="w-4 h-4" /> {t("dashboard.retry")}</Button>
+            </Card>
           )}
 
           {!loading && !error && data && (
             <>
               {/* Greeting */}
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-[#0F1F3A]">{data.student.greeting}</h2>
-                  <p className="text-xs text-[#64748B] mt-0.5">
+                <div className="min-w-0">
+                  <h2 className="text-heading font-semibold text-ink">{data.student.greeting}</h2>
+                  <p className="text-label text-muted mt-0.5">
                     {t("dashboard.semester")} {data.student.semester} · {data.student.track}{data.student.week_label ? ` · ${data.student.week_label}` : ""}
                   </p>
                 </div>
-                <Link href="/student/coding/prob_connected_components" className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white text-xs font-bold rounded-lg shadow-sm">
+                <Link href="/student/coding" className={buttonClass("primary", "md")}>
                   <span>{t("dashboard.resume_practice")}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
 
               {/* Row 1: four KPI cards (PDF 2) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <button type="button" onClick={openWhy} data-testid="readiness-card" className={`${card} text-left space-y-2 hover:border-[#2B5CD0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD0] cursor-pointer`}>
-                  <div className="flex items-center justify-between text-xs text-[#64748B] font-medium">
+                <button type="button" onClick={openWhy} data-testid="readiness-card"
+                  className={`${tile} text-left hover:border-brand transition-colors cursor-pointer`}>
+                  <div className="flex items-center justify-between gap-2 text-label font-medium text-muted">
                     <span>{t("dashboard.readiness_score")}</span>
-                    {data.student.has_snapshot && <span className={bandChipClass(data.student.readiness_band)}>{bandLabel(data.student.readiness_band)}</span>}
+                    {data.student.has_snapshot && <Badge tone={BAND_TONE[data.student.readiness_band] ?? "neutral"}>{bandLabel(data.student.readiness_band)}</Badge>}
                   </div>
                   {data.student.has_snapshot ? (
                     <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-black text-[#0F1F3A]">{data.student.readiness_score}<span className="text-base text-[#64748B]">/100</span></span>
-                        <span className={`text-xs font-bold ${data.student.readiness_delta >= 0 ? "text-[#15803D]" : "text-[#D93636]"}`}>
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-kpi font-semibold text-ink tabular">{data.student.readiness_score}<span className="text-heading text-muted font-normal">/100</span></span>
+                        <span className={`text-label font-medium ${data.student.readiness_delta >= 0 ? "text-success" : "text-danger"}`}>
                           {data.student.readiness_delta >= 0 ? "+" : ""}{data.student.readiness_delta} {t("dashboard.this_month")}
                         </span>
                       </div>
-                      <div className="text-[11px] text-[#2B5CD0] flex items-center gap-1 font-semibold">
-                        <Info className="w-3 h-3" /> {t("dashboard.why_score")}
+                      <div className="mt-1.5 text-label text-brand flex items-center gap-1 font-medium">
+                        <Info className="w-4 h-4" /> {t("dashboard.why_score")}
                       </div>
                     </>
                   ) : (
-                    <div className="text-xs text-[#64748B]">{t("dashboard.empty_desc")}</div>
+                    <div className="mt-2 text-label text-muted">{t("dashboard.empty_desc")}</div>
                   )}
                 </button>
 
-                <div className={`${card} space-y-2`}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("dashboard.problems_solved")}</div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-[#0F1F3A]">{data.student.problems_solved}</span>
-                    {data.student.problems_delta > 0 && <span className="text-xs font-bold text-[#15803D]">▲ {data.student.problems_delta} {t("dashboard.this_month")}</span>}
-                  </div>
-                  <div className="text-[11px] text-[#64748B] flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-[#2B5CD0]" /> {data.student.batch}</div>
-                </div>
+                <button type="button" onClick={() => setDetail("problems")} className="text-left rounded-card hover:ring-1 hover:ring-brand" data-testid="tile-problems">
+                <StatTile label={t("dashboard.problems_solved")}
+                  value={<span className="flex items-baseline gap-2">
+                    {data.student.problems_solved}
+                    {data.student.problems_delta > 0 && <span className="text-label font-medium text-success">▲ {data.student.problems_delta} {t("dashboard.this_month")}</span>}
+                  </span>}
+                  hint={<span className="flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-brand" /> {t("dashboard.by_topic")}</span>} />
+                </button>
 
-                <div className={`${card} space-y-2`}>
-                  <div className="flex items-center justify-between text-xs text-[#64748B] font-medium">
+                <div className={tile}>
+                  <div className="flex items-center justify-between gap-2 text-label font-medium text-muted">
                     <span>{t("dashboard.attendance")}</span>
-                    <span className={data.student.attendance_pct >= data.student.attendance_target ? "chip-green" : "chip-amber"}>
+                    <Badge tone={data.student.attendance_pct >= data.student.attendance_target ? "success" : "warning"}>
                       {data.student.attendance_pct >= data.student.attendance_target ? t("dashboard.on_track") : t("dashboard.below_target")}
-                    </span>
+                    </Badge>
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-[#0F1F3A]">{data.student.attendance_pct}%</span>
-                    <span className="text-xs text-[#64748B]">{t("dashboard.target")} {data.student.attendance_target}%</span>
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <span className="text-kpi font-semibold text-ink tabular">{data.student.attendance_pct}%</span>
+                    <span className="text-label text-muted">{t("dashboard.target")} {data.student.attendance_target}%</span>
                   </div>
-                  <div className="text-[11px] text-[#64748B] flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-[#2BB3A0]" />
+                  <div className="mt-1.5 text-label text-muted flex items-center gap-1">
+                    <Calendar className="w-4 h-4 text-teal" />
                     {fill(t("dashboard.sessions_attended"), { a: data.student.sessions_attended, b: data.student.sessions_total })}
                   </div>
                 </div>
 
-                <div className={`${card} space-y-2`}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("dashboard.practice_streak")}</div>
-                  <div className="text-3xl font-black text-[#0F1F3A]">🔥 {data.student.streak_days} {t("dashboard.days")}</div>
-                  <div className="text-[11px] text-[#64748B] flex items-center gap-1"><Flame className="w-3 h-3 text-[#F59E0B]" /> {t("dashboard.best")}: {data.student.streak_best} {t("dashboard.days")}</div>
-                </div>
+                <button type="button" onClick={() => setDetail("streak")} className="text-left rounded-card hover:ring-1 hover:ring-brand" data-testid="tile-streak">
+                <StatTile label={t("dashboard.practice_streak")}
+                  value={`🔥 ${data.student.streak_days} ${t("dashboard.days")}`}
+                  hint={<span className="flex items-center gap-1"><Flame className="w-4 h-4 text-warning-fill" /> {t("dashboard.best")}: {data.student.streak_best} {t("dashboard.days")}</span>} />
+                </button>
               </div>
 
               {/* Row 2: skills + this week */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-                    <h3 className="font-bold text-sm text-[#0F1F3A]">{t("dashboard.skill_progress")}</h3>
-                    <span className="text-[11px] font-semibold text-[#64748B]">{t("dashboard.semester")} {data.student.semester}</span>
-                  </div>
-                  <div className="space-y-3.5" data-testid="skill-progress">
+                <Card>
+                  <CardHeader title={t("dashboard.skill_progress")} subtitle={`${t("dashboard.semester")} ${data.student.semester}`}
+                    actions={<button type="button" onClick={() => setDetail("skills")} className="text-label font-medium text-brand hover:underline" data-testid="open-skill-how">{t("dashboard.how_skills_grow")}</button>} />
+                  <div className="space-y-4" data-testid="skill-progress">
                     {data.skill_progress.map((item) => (
-                      <div key={item.key} className="space-y-1">
-                        <div className="flex justify-between text-xs font-semibold">
-                          <span className="text-[#0F1F3A]">{item.skill}</span>
-                          <span className="text-[#64748B]">{item.percentage}%</span>
+                      <div key={item.key}>
+                        <div className="flex justify-between gap-3 text-body mb-1.5">
+                          <span className="text-ink">{item.skill}</span>
+                          <span className="text-ink font-medium tabular">{item.percentage}%</span>
                         </div>
-                        <div className="w-full bg-[#F1F5F9] rounded-full h-2 overflow-hidden" role="progressbar" aria-valuenow={item.percentage} aria-valuemin={0} aria-valuemax={100} aria-label={item.skill}>
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.percentage}%`, backgroundColor: COLOR_HEX[item.color] || COLOR_HEX.teal }} />
-                        </div>
+                        <ProgressBar value={item.percentage} tone={skillTone(item.percentage)} label={item.skill} />
                       </div>
                     ))}
                   </div>
-                </div>
+                </Card>
 
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-                    <h3 className="font-bold text-sm text-[#0F1F3A]">{t("dashboard.this_week")}</h3>
-                    <span className="text-[11px] font-semibold text-[#64748B]">{data.student.week_label}</span>
-                  </div>
+                <Card>
+                  <CardHeader title={t("dashboard.this_week")} subtitle={data.student.week_label} />
                   {data.this_week.length === 0 ? (
-                    <p className="text-xs text-[#64748B] py-6 text-center">{t("dashboard.no_sessions")}</p>
+                    <EmptyState title={t("dashboard.no_sessions")} />
                   ) : (
-                    <div className="space-y-2.5" data-testid="this-week">
+                    <ul className="divide-y divide-line-soft -my-2" data-testid="this-week">
                       {data.this_week.map((row) => (
-                        <Link key={row.id} href="/student/live" className="flex items-center justify-between p-2.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] hover:bg-[#F1F5F9] transition-all">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="w-10 text-center font-bold text-xs text-[#0F1F3A] bg-white py-1 rounded border border-[#E2E8F0] flex-shrink-0">{row.day}</span>
-                            <span className="text-xs font-medium text-[#0F1F3A] truncate">{row.topic}</span>
-                          </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${row.is_lab ? "bg-[#EDE9FE] text-[#6D28D9]" : "bg-[#EFF6FF] text-[#1D4ED8]"}`}>{row.duration}</span>
-                        </Link>
+                        <li key={row.id}>
+                          <Link href="/student/live" className="flex items-center justify-between gap-3 py-2.5 group">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="w-11 text-center text-label font-medium text-ink-soft bg-surface-2 py-1 rounded-tile border border-line flex-shrink-0">{row.day}</span>
+                              <span className="text-body text-ink truncate group-hover:text-brand">{row.topic}</span>
+                            </div>
+                            <Badge tone={row.is_lab ? "violet" : "brand"} className="flex-shrink-0">{row.duration}</Badge>
+                          </Link>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
-                </div>
+                </Card>
               </div>
 
               {/* Row 3: project, upcoming, badges */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between text-xs text-[#64748B] font-medium mb-1">
-                      <span>{t("dashboard.current_project")}</span>
-                      {data.current_project && <span className="chip-purple">{data.current_project.progress_pct}% {t("dashboard.complete")}</span>}
-                    </div>
+                <Card className="flex flex-col">
+                  <CardHeader title={t("dashboard.current_project")}
+                    actions={data.current_project ? <Badge tone="violet">{data.current_project.progress_pct}% {t("dashboard.complete")}</Badge> : undefined} />
+                  <div className="flex-1">
                     {data.current_project ? (
                       <>
-                        <h4 className="font-bold text-sm text-[#0F1F3A]">{data.current_project.title}</h4>
-                        <p className="text-xs text-[#64748B] mt-0.5">{data.current_project.subtitle}</p>
-                        <div className="mt-4 space-y-1.5">
-                          <div className="w-full bg-[#F1F5F9] rounded-full h-2"><div className="h-full bg-[#2BB3A0] rounded-full" style={{ width: `${data.current_project.progress_pct}%` }} /></div>
-                          <div className="text-[11px] text-[#64748B] pt-1">
-                            {fill(t("dashboard.tasks_open"), { n: data.current_project.open_tasks })}
-                            {data.current_project.pending_prs > 0 && ` · ${fill(t("dashboard.prs_pending"), { n: data.current_project.pending_prs })}`}
-                          </div>
+                        <div className="text-body font-medium text-ink">{data.current_project.title}</div>
+                        <p className="text-label text-muted mt-0.5">{data.current_project.subtitle}</p>
+                        <ProgressBar value={data.current_project.progress_pct} tone="brand" className="mt-4" />
+                        <div className="text-label text-muted mt-2">
+                          {fill(t("dashboard.tasks_open"), { n: data.current_project.open_tasks })}
+                          {data.current_project.pending_prs > 0 && ` · ${fill(t("dashboard.prs_pending"), { n: data.current_project.pending_prs })}`}
                         </div>
                       </>
                     ) : (
-                      <p className="text-xs text-[#64748B] py-4">{t("dashboard.no_project")}</p>
+                      <EmptyState title={t("dashboard.no_project")} />
                     )}
                   </div>
-                  <Link href="/student/projects/board" className="text-xs font-bold text-[#2B5CD0] hover:underline flex items-center gap-1 pt-2">
-                    <span>{t("dashboard.open_board")}</span><ExternalLink className="w-3 h-3" />
+                  <Link href="/student/projects/board" className="mt-4 text-body font-medium text-brand hover:underline underline-offset-2 inline-flex items-center gap-1">
+                    <span>{t("dashboard.open_board")}</span><ExternalLink className="w-4 h-4" />
                   </Link>
-                </div>
+                </Card>
 
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <div className="flex items-center justify-between text-xs text-[#64748B] font-medium border-b border-[#E2E8F0] pb-2">
-                    <span>{t("dashboard.upcoming")}</span><Clock className="w-3.5 h-3.5 text-[#64748B]" />
-                  </div>
+                <Card>
+                  <CardHeader title={t("dashboard.upcoming")} actions={<Clock className="w-4 h-4 text-subtle" />} />
                   {data.upcoming_events.length === 0 ? (
-                    <p className="text-xs text-[#64748B] py-4 text-center">{t("dashboard.no_upcoming")}</p>
+                    <EmptyState title={t("dashboard.no_upcoming")} />
                   ) : (
-                    <div className="space-y-2.5" data-testid="upcoming-events">
-                      {data.upcoming_events.map((e) => (
-                        <div key={e.id} className="flex items-center justify-between text-xs gap-2">
-                          <span className="font-semibold text-[#0F1F3A] truncate">{e.title}</span>
+                    <ul className="divide-y divide-line-soft -my-2" data-testid="upcoming-events">
+                      {data.upcoming_events.map((e) => {
+                        const href = EVENT_HREF[e.kind];
+                        const inner = (<>
+                          <span className={`text-body text-ink truncate ${href ? "group-hover:text-brand" : ""}`}>{e.title}</span>
                           <span className={`${kindChipClass(e.kind)} flex-shrink-0`}>{e.date}</span>
-                        </div>
-                      ))}
-                    </div>
+                        </>);
+                        return (
+                          <li key={e.id}>
+                            {href
+                              ? <Link href={href} className="flex items-center justify-between gap-3 py-2.5 group">{inner}</Link>
+                              : <div className="flex items-center justify-between gap-3 py-2.5">{inner}</div>}
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
-                </div>
+                </Card>
 
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <div className="flex items-center justify-between text-xs text-[#64748B] font-medium border-b border-[#E2E8F0] pb-2">
-                    <span>{t("dashboard.badges_earned")}</span><Award className="w-3.5 h-3.5 text-[#2BB3A0]" />
-                  </div>
+                <Card>
+                  <CardHeader title={t("dashboard.badges_earned")}
+                    actions={<button type="button" onClick={() => setDetail("badges")} className="text-label font-medium text-brand hover:underline inline-flex items-center gap-1" data-testid="open-all-badges"><Award className="w-4 h-4 text-teal" />{t("dashboard.all_badges")}</button>} />
                   {data.badges.length === 0 ? (
-                    <p className="text-xs text-[#64748B] py-4 text-center">{t("dashboard.no_badges")}</p>
+                    <EmptyState title={t("dashboard.no_badges")} />
                   ) : (
                     <>
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#2BB3A0] to-[#2B5CD0] flex items-center justify-center text-white text-xl shadow-md">{data.badges[0].icon}</div>
-                        <div>
-                          <div className="text-[10px] text-[#64748B] uppercase font-bold">{t("dashboard.latest")}</div>
-                          <div className="text-xs font-bold text-[#0F1F3A]">{data.badges[0].name}</div>
-                          <div className="text-[11px] text-[#64748B]">{data.badges[0].description}</div>
+                        <div className="w-12 h-12 rounded-card bg-gradient-to-tr from-teal to-brand flex items-center justify-center text-white text-xl flex-shrink-0">{data.badges[0].icon}</div>
+                        <div className="min-w-0">
+                          <div className="text-caption text-muted">{t("dashboard.latest")}</div>
+                          <div className="text-body font-medium text-ink">{data.badges[0].name}</div>
+                          <div className="text-label text-muted">{data.badges[0].description}</div>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 pt-1">
+                      <div className="flex flex-wrap gap-2 pt-4">
                         {data.badges.slice(1).map((b) => (
-                          <span key={b.id} title={`${b.name} – ${b.description}`} className="w-7 h-7 rounded-lg bg-[#F1F5F9] border border-[#E2E8F0] flex items-center justify-center text-xs">{b.icon}</span>
+                          <span key={b.id} title={`${b.name} – ${b.description}`} className="w-8 h-8 rounded-tile bg-surface-2 border border-line flex items-center justify-center text-body">{b.icon}</span>
                         ))}
                       </div>
                     </>
                   )}
-                </div>
+                </Card>
               </div>
             </>
           )}
         </div>
 
+        {detail && <TileDetails kind={detail} onClose={() => setDetail(null)} t={t} lang={language} />}
+
         {/* Why this score drawer */}
         {whyOpen && (
           <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={t("dashboard.why_title")}>
             <button type="button" className="absolute inset-0 bg-black/40" onClick={() => setWhyOpen(false)} aria-label={t("dashboard.close")} />
-            <div className="relative w-full max-w-md bg-white h-full shadow-2xl p-6 overflow-y-auto space-y-4" data-testid="why-score-drawer">
+            <div className="relative w-full max-w-md bg-white h-full shadow-pop p-6 overflow-y-auto space-y-4" data-testid="why-score-drawer">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-[#0F1F3A] flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#2BB3A0]" /> {t("dashboard.why_title")}</h3>
-                  <p className="text-xs text-[#64748B] mt-1">{t("dashboard.why_desc")}</p>
+                  <h3 className="text-base font-semibold text-ink flex items-center gap-2"><Sparkles className="w-4 h-4 text-teal" /> {t("dashboard.why_title")}</h3>
+                  <p className="text-xs text-muted mt-1">{t("dashboard.why_desc")}</p>
                 </div>
-                <button onClick={() => setWhyOpen(false)} className="p-1.5 rounded-lg hover:bg-[#F1F5F9]" aria-label={t("dashboard.close")}><X className="w-4 h-4 text-[#64748B]" /></button>
+                <button onClick={() => setWhyOpen(false)} className="p-1.5 rounded-tile hover:bg-line-soft" aria-label={t("dashboard.close")}><X className="w-4 h-4 text-muted" /></button>
               </div>
-              {whyLoading && <div className="h-40 bg-[#F1F5F9] rounded-xl animate-pulse" />}
+              {whyLoading && <div className="h-40 bg-line-soft rounded-card animate-pulse" />}
               {!whyLoading && why && (
                 <>
                   <div className="flex items-baseline gap-3">
-                    <span className="text-4xl font-black text-[#0F1F3A]">{why.score}</span>
+                    <span className="text-4xl font-semibold text-ink">{why.score}</span>
                     <span className={bandChipClass(why.band)}>{bandLabel(why.band)}</span>
                   </div>
-                  <p className="text-[11px] text-[#64748B]">{fill(t("dashboard.bands"), { ready: why.thresholds.ready_min, nearly: why.thresholds.nearly_min })}{why.snapshot_date ? ` · ${fill(t("dashboard.snapshot_as_of"), { date: why.snapshot_date })}` : ""}</p>
+                  <p className="text-caption text-muted">{fill(t("dashboard.bands"), { ready: why.thresholds.ready_min, nearly: why.thresholds.nearly_min })}{why.snapshot_date ? ` · ${fill(t("dashboard.snapshot_as_of"), { date: why.snapshot_date })}` : ""}</p>
                   <table className="w-full text-xs">
-                    <thead><tr className="text-[#64748B] text-[11px] border-b border-[#E2E8F0]">
+                    <thead><tr className="text-muted text-caption border-b border-line">
                       <th className="text-left pb-2 font-semibold">{t("dashboard.component")}</th>
                       <th className="text-right pb-2 font-semibold">{t("dashboard.value")}</th>
                       <th className="text-right pb-2 font-semibold">{t("dashboard.weight")}</th>
                       <th className="text-right pb-2 font-semibold">{t("dashboard.contribution")}</th>
                     </tr></thead>
-                    <tbody className="divide-y divide-[#F1F5F9]">
+                    <tbody className="divide-y divide-line-soft">
                       {why.components.map((c) => (
                         <tr key={c.key}>
-                          <td className="py-2 font-semibold text-[#0F1F3A]">{c.label}</td>
-                          <td className="py-2 text-right text-[#64748B]">{c.value}</td>
-                          <td className="py-2 text-right text-[#64748B]">{Math.round(c.weight * 100)}%</td>
-                          <td className="py-2 text-right font-bold text-[#0F1F3A]">{c.contribution.toFixed(1)}</td>
+                          <td className="py-2 font-semibold text-ink">{c.label}</td>
+                          <td className="py-2 text-right text-muted">{c.value}</td>
+                          <td className="py-2 text-right text-muted">{Math.round(c.weight * 100)}%</td>
+                          <td className="py-2 text-right font-semibold text-ink">{c.contribution.toFixed(1)}</td>
                         </tr>
                       ))}
-                      <tr className="border-t border-[#E2E8F0]">
-                        <td className="py-2 font-bold text-[#0F1F3A]" colSpan={3}>{t("dashboard.total")}</td>
-                        <td className="py-2 text-right font-black text-[#2BB3A0]">{why.score}</td>
+                      <tr className="border-t border-line">
+                        <td className="py-2 font-semibold text-ink" colSpan={3}>{t("dashboard.total")}</td>
+                        <td className="py-2 text-right font-semibold text-teal">{why.score}</td>
                       </tr>
                     </tbody>
                   </table>
-                  {why.history.length > 1 && (
-                    <div>
-                      <div className="text-xs font-bold text-[#0F1F3A] mb-2 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5 text-[#2B5CD0]" /> {t("dashboard.history")}</div>
-                      <div className="flex items-end gap-1.5 h-20">
-                        {why.history.map((h) => (
-                          <div key={h.date} className="flex-1 flex flex-col items-center gap-1" title={`${h.date}: ${h.score}`}>
-                            <div className="w-full bg-[#2B5CD0]/80 rounded-t" style={{ height: `${h.score}%` }} />
-                            <span className="text-[9px] text-[#64748B]">{h.score}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {why.history.length > 0 && <ScoreHistory history={why.history} readyMin={why.thresholds.ready_min} title={t("dashboard.history")} />}
                 </>
               )}
             </div>

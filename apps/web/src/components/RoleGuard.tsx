@@ -28,7 +28,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
   if (!isLoaded || !user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-6" aria-busy="true">
-        <div className="w-8 h-8 border-2 border-[#2BB3A0] border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-teal border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -36,21 +36,21 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
   if (!allowedRoles.includes(user.role)) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-6">
-        <div className="max-w-md w-full bg-white rounded-2xl border border-[#E2E8F0] p-8 shadow-sm text-center space-y-5">
-          <div className="w-14 h-14 mx-auto rounded-full bg-[#FEE2E2] flex items-center justify-center text-[#DC2626]">
+        <div className="max-w-md w-full bg-white rounded-card border border-line p-8 shadow-card text-center space-y-5">
+          <div className="w-14 h-14 mx-auto rounded-full bg-danger-soft flex items-center justify-center text-danger">
             <ShieldAlert className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-[#0F1F3A]">{t("shell.restricted_title")}</h2>
-            <p className="text-sm text-[#64748B] leading-relaxed">{t("shell.restricted_body")}</p>
+            <h2 className="text-xl font-semibold text-ink">{t("shell.restricted_title")}</h2>
+            <p className="text-sm text-muted leading-relaxed">{t("shell.restricted_body")}</p>
           </div>
           <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
             <Link href={HOME_FOR_ROLE[user.role]}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white text-xs font-bold rounded-xl shadow transition-all">
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-card shadow-card transition-all">
               <ArrowLeft className="w-4 h-4" /><span>{t("shell.go_home")}</span>
             </Link>
             <button onClick={logout}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0F1F3A] text-xs font-bold rounded-xl border border-[#CBD5E1] transition-all">
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-line-soft hover:bg-line text-ink text-xs font-semibold rounded-card border border-line-strong transition-all">
               <LogOut className="w-4 h-4" /><span>{t("shell.sign_in_other")}</span>
             </button>
           </div>

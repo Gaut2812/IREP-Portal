@@ -28,6 +28,30 @@ DEFAULT_CRITERIA = [
     {"key": "project", "label_en": "Project explanation", "label_ta": "புராஜெக்ட் விளக்கம்"},
     {"key": "communication", "label_en": "Communication & confidence", "label_ta": "தொடர்பு & தன்னம்பிக்கை"},
 ]
+# What each rubric line looks for (a college's own criteria may carry help_en / help_ta instead)
+CRITERION_HELP = {
+    "problem_solving": {"en": "Breaks the problem down, asks clarifying questions, picks a sensible approach.",
+                        "ta": "சிக்கலைப் பிரிக்கிறார், தெளிவுபடுத்தும் கேள்விகள் கேட்கிறார், பொருத்தமான அணுகுமுறையைத் தேர்கிறார்."},
+    "coding": {"en": "Working code, edge cases handled, tested on an example.",
+               "ta": "இயங்கும் கோடு, விளிம்பு நிலைகள் கையாளப்பட்டன, ஒரு உதாரணத்தில் சோதிக்கப்பட்டது."},
+    "thinking_aloud": {"en": "Explains each step and the trade-offs while working.",
+                       "ta": "வேலை செய்யும்போது ஒவ்வொரு படியையும் சமரசங்களையும் விளக்குகிறார்."},
+    "core_cs": {"en": "Data structures, complexity, DBMS, OS and networking basics.",
+                "ta": "தரவுக் கட்டமைப்புகள், சிக்கல்நிலை, DBMS, OS, நெட்வொர்க்கிங் அடிப்படைகள்."},
+    "project": {"en": "Explains their project: their part, design choices, what they would improve.",
+                "ta": "தன் புராஜெக்டை விளக்குகிறார்: தன் பங்கு, வடிவமைப்புத் தேர்வுகள், என்ன மேம்படுத்துவார்."},
+    "communication": {"en": "Clear, confident, listens, and handles a hint well.",
+                      "ta": "தெளிவு, தன்னம்பிக்கை, கவனித்துக் கேட்கிறார், குறிப்பை நன்கு கையாள்கிறார்."},
+}
+SCALE_HELP = {"en": "1 not yet · 2 basic · 3 meets the bar · 4 strong · 5 exceptional",
+              "ta": "1 இன்னும் இல்லை · 2 அடிப்படை · 3 தரத்தை எட்டுகிறது · 4 வலுவானது · 5 விதிவிலக்கானது"}
+
+
+def criterion_help(c: dict, lang: str) -> str:
+    lg = "ta" if lang == "ta" else "en"
+    return c.get(f"help_{lg}") or CRITERION_HELP.get(c["key"], {}).get(lg, "")
+
+
 ROUND_LABEL = {
     "technical": {"en": "Technical", "ta": "தொழில்நுட்பம்"},
     "hr": {"en": "HR round", "ta": "HR சுற்று"},
@@ -94,16 +118,27 @@ def build_student_interviews(db: Session, student: Student, lang: str = "en", no
         }
 
     trainers = student_trainer_ids(db, student)
-    booked_slot_ids = set(db.execute(select(InterviewBooking.slot_id)).scalars().all())
+    # every open slot of my trainers in the next 5 weeks (the calendar); booked slots are not "open". The old
+    # first-8-then-drop-booked query could hide free slots behind booked ones.
     slots = db.execute(
         select(InterviewSlot).where(InterviewSlot.college_id == student.college_id, InterviewSlot.trainer_id.in_(trainers or ["_"]),
-                                    InterviewSlot.status == "open", InterviewSlot.starts_at > now)
-        .order_by(InterviewSlot.starts_at).limit(8)
+                                    InterviewSlot.status == "open", InterviewSlot.starts_at > now,
+                                    InterviewSlot.starts_at <= now + datetime.timedelta(days=SLOT_WINDOW_DAYS))
+        .order_by(InterviewSlot.starts_at).limit(120)
     ).scalars().all()
     mine = db.execute(
         select(InterviewBooking, InterviewSlot).join(InterviewSlot, InterviewSlot.id == InterviewBooking.slot_id)
         .where(InterviewBooking.student_id == student.id, InterviewSlot.starts_at > now).order_by(InterviewSlot.starts_at)
     ).all()
+
+    held = {s.round_type for _, s in mine}          # one upcoming round of each type at a time (book_slot enforces it)
+    lg = lang if lang in ("en", "ta") else "en"
+
+    def blocked(s) -> Optional[str]:
+        if s.round_type in held:
+            label = ROUND_LABEL.get(s.round_type, ROUND_LABEL["technical"])[lg]
+            return f"நீங்கள் ஏற்கனவே ஒரு {label} சுற்றைப் பதிவு செய்துள்ளீர்கள்" if lg == "ta" else f"You already have an upcoming {label} booking"
+        return None
 
     return {
         "latest_interview": latest_payload,
@@ -112,9 +147,10 @@ def build_student_interviews(db: Session, student: Student, lang: str = "en", no
         "available_slots": [
             {"id": s.id, **_slot_label(s.starts_at), "starts_at": s.starts_at.isoformat(), "round_type": s.round_type,
              "type_label": ROUND_LABEL.get(s.round_type, ROUND_LABEL["technical"])[lang if lang in ("en", "ta") else "en"],
-             "trainer": trainer_names.get(s.trainer_id, "Trainer")}
-            for s in slots if s.id not in booked_slot_ids
+             "trainer": trainer_names.get(s.trainer_id, "Trainer"), "duration_min": s.duration_min, "blocked_reason": blocked(s)}
+            for s in slots
         ],
+        "window_days": SLOT_WINDOW_DAYS,
         "my_bookings": [
             {"id": b.id, "slot_id": s.id, **_slot_label(s.starts_at), "starts_at": s.starts_at.isoformat(), "round_type": s.round_type,
              "type_label": ROUND_LABEL.get(s.round_type, ROUND_LABEL["technical"])[lang if lang in ("en", "ta") else "en"],
@@ -123,6 +159,9 @@ def build_student_interviews(db: Session, student: Student, lang: str = "en", no
             for b, s in mine
         ],
     }
+
+
+SLOT_WINDOW_DAYS = 35
 
 
 def book_slot(db: Session, student: Student, slot_id: str, now: Optional[datetime.datetime] = None) -> InterviewBooking:

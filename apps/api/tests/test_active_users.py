@@ -16,7 +16,8 @@ from core.config import settings
 from core.database import SessionLocal
 from core.security import PLATFORM_TENANT, create_access_token
 from main import app
-from models.schema import User
+from sqlalchemy import delete
+from models.schema import Invitation, User
 
 client = TestClient(app)
 SUPER = {"Authorization": "Bearer " + create_access_token({"sub": "usr_irep_super_01", "role": "super_admin", "college_id": PLATFORM_TENANT})}
@@ -70,6 +71,7 @@ def staff_member():
     try:
         u = db.get(User, "usr_active_test_01")
         if u:
+            db.execute(delete(Invitation).where(Invitation.user_id == u.id))
             db.delete(u)
         db.commit()
     finally:

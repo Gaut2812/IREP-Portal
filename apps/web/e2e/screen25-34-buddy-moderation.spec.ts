@@ -21,6 +21,7 @@ test.describe("Screen 25: AI Study Buddy (/student/buddy)", () => {
     await expect(page.getByTestId("buddy-answer").last()).toContainText("Good question about Arrays");
     await expect(usage).toContainText(`${before - 1}/`);
     await page.getByTestId("buddy-clear").click();
+    await page.getByTestId("confirm-delete-ok").click();                       // deleting all chats asks first
     await expect(page.getByTestId("buddy-answer")).toHaveCount(0);
   });
 

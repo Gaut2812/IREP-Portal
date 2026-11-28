@@ -14,7 +14,8 @@ interface Card {
   rows: { area: string; prev: string; curr: string; status: string; color: string }[];
   trainer_remark_en: string | null; trainer_remark_ta: string | null; how_to_help_en: string | null; how_to_help_ta: string | null;
 }
-const FIELDS = ["trainer_remark_en", "trainer_remark_ta", "how_to_help_en", "how_to_help_ta"] as const;
+// English only: the API translates both into Tamil for parents (no separate Tamil boxes)
+const FIELDS = ["trainer_remark_en", "how_to_help_en"] as const;
 
 function thisMonth() {
   const d = new Date();
@@ -81,64 +82,65 @@ export default function TrainerReportsPage() {
     await load();
   });
 
-  const chip: Record<string, string> = { none: "bg-[#F1F5F9] text-[#64748B]", draft: "bg-[#FEF3C7] text-[#92400E]", approved: "bg-[#DCFCE7] text-[#166534]", sent: "bg-[#DCFCE7] text-[#166534]" };
-  const cls = "w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs";
+  const chip: Record<string, string> = { none: "bg-line-soft text-muted", draft: "bg-warning-soft text-warning", approved: "bg-success-soft text-success", sent: "bg-success-soft text-success" };
+  const cls = "w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs";
 
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("reports.trainer_title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-6 max-w-6xl">
           <div className="flex flex-wrap items-center gap-2">
             <input type="month" value={month} onChange={(e) => { setMonth(e.target.value); setCard(null); }} aria-label={t("reports.month")} data-testid="report-month"
-              className="px-2.5 py-1.5 border border-[#CBD5E1] rounded-lg text-xs" />
-            <button type="button" disabled={busy} onClick={generate} data-testid="generate-drafts" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1 disabled:opacity-50">
+              className="px-2.5 py-1.5 border border-line-strong rounded-tile text-xs" />
+            <button type="button" disabled={busy} onClick={generate} data-testid="generate-drafts" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile inline-flex items-center gap-1 disabled:opacity-50">
               <FilePlus2 className="w-3.5 h-3.5" />{t("reports.generate")}
             </button>
-            <button type="button" disabled={busy} onClick={approveReady} data-testid="approve-ready" className="px-3 py-1.5 border border-[#86EFAC] text-[#166534] text-xs font-bold rounded-lg disabled:opacity-50">{t("reports.approve_ready")}</button>
-            {data && <span className="text-[11px] text-[#64748B]">{data.month_label} · {t("reports.drafts")} {data.counts.draft} · {t("reports.released_count")} {data.counts.approved + data.counts.sent}</span>}
+            <button type="button" disabled={busy} onClick={approveReady} data-testid="approve-ready" className="px-3 py-1.5 border border-success-line text-success text-xs font-semibold rounded-tile disabled:opacity-50">{t("reports.approve_ready")}</button>
+            {data && <span className="text-caption text-muted">{data.month_label} · {t("reports.drafts")} {data.counts.draft} · {t("reports.released_count")} {data.counts.approved + data.counts.sent}</span>}
           </div>
-          {msg && <p className="text-xs text-[#166534] font-bold" role="status" data-testid="report-msg">{msg}</p>}
+          {msg && <p className="text-xs text-success font-semibold" role="status" data-testid="report-msg">{msg}</p>}
           {error && <p className="text-xs text-red-600" role="alert" data-testid="report-error">{error}</p>}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <ul className="lg:col-span-2 bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] max-h-[70vh] overflow-y-auto" data-testid="card-list">
+            <ul className="lg:col-span-2 bg-white rounded-card border border-line divide-y divide-line-soft max-h-[70vh] overflow-y-auto" data-testid="card-list">
               {data?.students.map((s) => (
                 <li key={s.student_id}>
                   <button type="button" disabled={!s.card_id} onClick={() => s.card_id && openCard(s.card_id)} data-testid="card-row" aria-pressed={card?.id === s.card_id}
-                    className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 ${card?.id === s.card_id ? "bg-[#EFF6FF]" : "hover:bg-[#F8FAFC]"} disabled:cursor-default`}>
-                    <span className="min-w-0"><span className="block text-xs font-bold truncate">{s.name}</span><span className="block text-[11px] text-[#64748B]">{s.batch}</span></span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chip[s.status]}`}>{t(`reports.status_${s.status}`)}</span>
+                    className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 ${card?.id === s.card_id ? "bg-brand-soft" : "hover:bg-surface-2"} disabled:cursor-default`}>
+                    <span className="min-w-0"><span className="block text-xs font-semibold truncate">{s.name}</span><span className="block text-caption text-muted">{s.batch}</span></span>
+                    <span className={`text-caption font-semibold px-2 py-0.5 rounded-full ${chip[s.status]}`}>{t(`reports.status_${s.status}`)}</span>
                   </button>
                 </li>
               ))}
             </ul>
             {card && (
-              <section className="lg:col-span-3 bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3 h-fit" data-testid="card-editor">
-                <h2 className="text-sm font-black text-[#0F1F3A]">{card.name} · {card.month_label}</h2>
+              <section className="lg:col-span-3 bg-white rounded-card border border-line p-4 space-y-3 h-fit" data-testid="card-editor">
+                <h2 className="text-sm font-semibold text-ink">{card.name} · {card.month_label}</h2>
                 <table className="w-full text-xs">
-                  <thead><tr className="text-left text-[#64748B]"><th className="py-1">{t("reports.area")}</th><th>{t("reports.last_month")}</th><th>{t("reports.this_month")}</th><th>{t("reports.status")}</th></tr></thead>
+                  <thead><tr className="text-left text-muted"><th className="py-1">{t("reports.area")}</th><th>{t("reports.last_month")}</th><th>{t("reports.this_month")}</th><th>{t("reports.status")}</th></tr></thead>
                   <tbody>
                     {card.rows.map((r) => (
-                      <tr key={r.area} className="border-t border-[#F1F5F9]"><td className="py-1 font-semibold">{r.area}</td><td>{r.prev}</td><td>{r.curr}</td>
-                        <td className={r.color === "green" ? "text-[#166534]" : "text-[#B45309]"}>{r.status}</td></tr>
+                      <tr key={r.area} className="border-t border-line-soft"><td className="py-1 font-semibold">{r.area}</td><td>{r.prev}</td><td>{r.curr}</td>
+                        <td className={r.color === "green" ? "text-success" : "text-warning"}>{r.status}</td></tr>
                     ))}
                   </tbody>
                 </table>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {FIELDS.map((f) => (
-                    <label key={f} className="text-[11px] text-[#475569]">{t(`reports.${f}`)}
+                    <label key={f} className="text-caption text-ink-soft">{t(`reports.${f}`)}
                       <textarea rows={3} className={cls} value={form[f] || ""} disabled={card.status !== "draft"} data-testid={`field-${f}`}
                         onChange={(e) => setForm({ ...form, [f]: e.target.value })} />
                     </label>
                   ))}
                 </div>
+                <p className="text-caption text-muted" data-testid="tamil-auto-note">{t("reports.tamil_auto")}</p>
                 {card.status === "draft" ? (
                   <div className="flex gap-2">
-                    <button type="button" disabled={busy} onClick={() => save(false)} data-testid="card-save" className="px-3 py-1.5 border border-[#CBD5E1] text-xs font-bold rounded-lg disabled:opacity-50">{t("reports.save_draft")}</button>
-                    <button type="button" disabled={busy} onClick={() => save(true)} data-testid="card-approve" className="px-3 py-1.5 bg-[#166534] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1 disabled:opacity-50">
+                    <button type="button" disabled={busy} onClick={() => save(false)} data-testid="card-save" className="px-3 py-1.5 border border-line-strong text-xs font-semibold rounded-tile disabled:opacity-50">{t("reports.save_draft")}</button>
+                    <button type="button" disabled={busy} onClick={() => save(true)} data-testid="card-approve" className="px-3 py-1.5 bg-success text-white text-xs font-semibold rounded-tile inline-flex items-center gap-1 disabled:opacity-50">
                       <CheckCircle2 className="w-3.5 h-3.5" />{t("reports.approve")}
                     </button>
                   </div>
-                ) : <p className="text-[11px] text-[#166534] font-semibold" data-testid="card-released">{t("reports.released_note")}</p>}
+                ) : <p className="text-caption text-success font-semibold" data-testid="card-released">{t("reports.released_note")}</p>}
               </section>
             )}
           </div>

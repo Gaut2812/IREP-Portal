@@ -51,47 +51,47 @@ export default function AdminBillingPage() {
       .then(() => setCredit({ college_id: "", amount_inr: "", reason: "" })), t("billing.credit_added"));
   };
 
-  const card = "bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3";
-  const field = "px-2.5 py-1.5 border border-[#CBD5E1] rounded-lg text-xs";
+  const card = "bg-white rounded-card border border-line p-4 space-y-3";
+  const field = "px-2.5 py-1.5 border border-line-strong rounded-tile text-xs";
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("billing.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-6 max-w-6xl">
           {forbidden ? (
-            <div className={card} data-testid="billing-forbidden"><p className="text-sm font-bold">{t("billing.super_only")}</p></div>
+            <div className={card} data-testid="billing-forbidden"><p className="text-sm font-semibold">{t("billing.super_only")}</p></div>
           ) : (
             <>
-              <p className="text-xs text-[#64748B]">{t("billing.help")}</p>
+              <p className="text-xs text-muted">{t("billing.help")}</p>
               <div className="flex flex-wrap items-center gap-2">
                 <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} aria-label={t("billing.period")} data-testid="billing-period" className={field} />
-                <button type="button" disabled={busy} data-testid="billing-generate" className="px-3.5 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                <button type="button" disabled={busy} data-testid="billing-generate" className="px-3.5 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50"
                   onClick={() => run(() => post("/admin/billing/generate", { period }), t("billing.generated"))}>{t("billing.generate")}</button>
-                {data && <span className="text-[11px] text-[#64748B]" data-testid="billing-totals">
+                {data && <span className="text-caption text-muted" data-testid="billing-totals">
                   {t("billing.status_draft")} {inr(data.totals_paise.draft || 0)} · {t("billing.status_issued")} {inr(data.totals_paise.issued || 0)} · {t("billing.status_paid")} {inr(data.totals_paise.paid || 0)}</span>}
               </div>
               {error && <p className="text-xs text-red-600" role="alert" data-testid="billing-error">{error}</p>}
-              {msg && <p className="text-xs text-[#166534]" role="status" data-testid="billing-msg">{msg}</p>}
+              {msg && <p className="text-xs text-success" role="status" data-testid="billing-msg">{msg}</p>}
 
               <section className={card} data-testid="billing-invoices">
-                {data && data.invoices.length === 0 && <p className="text-xs text-[#64748B]">{t("billing.none")}</p>}
+                {data && data.invoices.length === 0 && <p className="text-xs text-muted">{t("billing.none")}</p>}
                 <ul className="space-y-2">
                   {data?.invoices.map((inv) => (
-                    <li key={inv.id} className="border border-[#F1F5F9] rounded-lg p-2.5 text-xs space-y-2" data-testid={`invoice-${inv.college_id}`}>
+                    <li key={inv.id} className="border border-line-soft rounded-tile p-2.5 text-xs space-y-2" data-testid={`invoice-${inv.college_id}`}>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <button type="button" onClick={() => setOpen(open === inv.id ? null : inv.id)} className="text-left">
-                          <b className="text-[#0F1F3A]">{inv.college}</b> · {inv.number || t("billing.no_number")} · {inv.students} {t("billing.students")}
+                          <b className="text-ink">{inv.college}</b> · {inv.number || t("billing.no_number")} · {inv.students} {t("billing.students")}
                           {" · "}<b data-testid="invoice-total">{inr(inv.total_paise)}</b>
                         </button>
                         <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_STYLE[inv.status]}`} data-testid="invoice-status">{t(`billing.status_${inv.status}`)}</span>
-                          {inv.status === "draft" && <button type="button" disabled={busy} data-testid="invoice-issue" className="px-2.5 py-1 bg-[#2B5CD0] text-white rounded-lg font-bold"
+                          <span className={`px-2 py-0.5 rounded-full text-caption font-semibold ${STATUS_STYLE[inv.status]}`} data-testid="invoice-status">{t(`billing.status_${inv.status}`)}</span>
+                          {inv.status === "draft" && <button type="button" disabled={busy} data-testid="invoice-issue" className="px-2.5 py-1 bg-brand text-white rounded-tile font-semibold"
                             onClick={() => { if (window.confirm(t("billing.confirm_issue"))) run(() => post(`/admin/billing/invoices/${inv.id}/issue`), t("billing.issued")); }}>{t("billing.issue")}</button>}
-                          {inv.status === "issued" && <button type="button" disabled={busy} data-testid="invoice-pay" className="px-2.5 py-1 bg-[#166534] text-white rounded-lg font-bold"
+                          {inv.status === "issued" && <button type="button" disabled={busy} data-testid="invoice-pay" className="px-2.5 py-1 bg-success text-white rounded-tile font-semibold"
                             onClick={() => { const ref = window.prompt(t("billing.payment_ref")); if (ref && ref.trim().length >= 3) run(() => post(`/admin/billing/invoices/${inv.id}/pay`, { reference: ref.trim() }), t("billing.marked_paid")); }}>{t("billing.mark_paid")}</button>}
-                          {(inv.status === "draft" || inv.status === "issued") && <button type="button" disabled={busy} data-testid="invoice-void" className="px-2.5 py-1 border border-[#CBD5E1] rounded-lg font-bold"
+                          {(inv.status === "draft" || inv.status === "issued") && <button type="button" disabled={busy} data-testid="invoice-void" className="px-2.5 py-1 border border-line-strong rounded-tile font-semibold"
                             onClick={() => { const r = window.prompt(t("billing.void_reason")); if (r && r.trim().length >= 5) run(() => post(`/admin/billing/invoices/${inv.id}/void`, { reason: r.trim() }), t("billing.voided")); }}>{t("billing.void")}</button>}
-                          {inv.has_pdf && <button type="button" data-testid="invoice-pdf" className="px-2.5 py-1 border border-[#CBD5E1] rounded-lg font-bold"
+                          {inv.has_pdf && <button type="button" data-testid="invoice-pdf" className="px-2.5 py-1 border border-line-strong rounded-tile font-semibold"
                             onClick={() => downloadWithAuth(`${API_BASE}/admin/billing/invoices/${inv.id}/pdf`, authHeaders(), `${(inv.number || inv.id).replace(/\//g, "-")}.pdf`).catch(() => setError(t("billing.download_failed")))}>PDF</button>}
                         </div>
                       </div>
@@ -102,7 +102,7 @@ export default function AdminBillingPage() {
               </section>
 
               <section className={card} data-testid="billing-credits">
-                <h2 className="text-sm font-black text-[#0F1F3A]">{t("billing.credits")}</h2>
+                <h2 className="text-sm font-semibold text-ink">{t("billing.credits")}</h2>
                 <form onSubmit={addCredit} noValidate className="flex flex-wrap gap-2 items-end" data-testid="credit-form">
                   <select value={credit.college_id} onChange={(e) => setCredit({ ...credit, college_id: e.target.value })} aria-label={t("billing.college")} data-testid="credit-college" className={field}>
                     <option value="">{t("billing.choose_college")}</option>
@@ -112,11 +112,11 @@ export default function AdminBillingPage() {
                     aria-label={t("billing.amount_inr")} data-testid="credit-amount" className={`${field} w-32`} />
                   <input value={credit.reason} onChange={(e) => setCredit({ ...credit, reason: e.target.value })} placeholder={t("billing.reason")}
                     aria-label={t("billing.reason")} data-testid="credit-reason" className={`${field} flex-1 min-w-[200px]`} />
-                  <button type="submit" disabled={busy} data-testid="credit-add" className="px-3.5 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("billing.add_credit")}</button>
+                  <button type="submit" disabled={busy} data-testid="credit-add" className="px-3.5 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("billing.add_credit")}</button>
                 </form>
                 <ul className="space-y-1 text-xs">
                   {data?.credits.map((c) => (
-                    <li key={c.id} className="flex justify-between border-b border-[#F1F5F9] py-1" data-testid="credit-row">
+                    <li key={c.id} className="flex justify-between border-b border-line-soft py-1" data-testid="credit-row">
                       <span>{c.college} · {c.reason}</span>
                       <span>{inr(c.amount_paise)} · {t("billing.used")} {inr(c.used_paise)}</span>
                     </li>

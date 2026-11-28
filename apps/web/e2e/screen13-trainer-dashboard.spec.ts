@@ -37,12 +37,44 @@ test.describe("Screen 13: Trainer Dashboard (/trainer)", () => {
     await expect(quick.getByRole("link", { name: "Monthly report" })).toBeVisible();
   });
 
+  test("every quick action opens its own screen", async ({ page }) => {
+    await loginAs(page, "trainer");
+    await page.goto("/trainer");
+    const quick = page.getByTestId("quick-actions");
+    await expect(quick.getByRole("link").first()).toBeVisible();
+    const targets: [string, RegExp][] = [
+      ["Mark attendance", /\/trainer\/attendance$/],
+      ["Create test", /\/trainer\/assessments\?tab=tests&new=1$/],
+      ["Review PRs", /\/trainer\/reviews$/],
+      ["Send parent update", /\/trainer\/messages$/],
+      ["Schedule mock", /\/trainer\/interviews$/],
+      ["Monthly report", /\/trainer\/reports$/],
+    ];
+    for (const [name, href] of targets) {
+      await expect(quick.getByRole("link", { name: new RegExp(name, "i") })).toHaveAttribute("href", href);
+    }
+    // "Create test" lands on the tests tab with the create form open
+    await quick.getByRole("link", { name: /Create test/i }).click();
+    await expect(page.getByTestId("assess-tab-tests")).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("the weekly DSA widget opens the trainer's view of a problem, not the student's", async ({ page }) => {
+    await loginAs(page, "trainer");
+    await page.goto("/trainer");
+    const open = page.getByTestId("trainer-dsa-widget").getByRole("link").first();
+    await expect(open).toHaveAttribute("href", /^\/trainer\/assessments\?problem=/);
+  });
+
   test("supports the Tamil toggle", async ({ page }) => {
     await loginAs(page, "trainer", { lang: "ta" });
     await page.goto("/trainer");
     await expect(page.getByRole("heading", { name: "பயிற்சியாளர் டாஷ்போர்டு" })).toBeVisible();
     await expect(page.getByText("பேட்ச் தயார்நிலை மதிப்பெண்")).toBeVisible();
     await expect(page.getByText("ஆதரவு தேவைப்படும் மாணவர்கள்")).toBeVisible();
+    // the weekly DSA widget is translated too (column heads and week filter)
+    const dsa = page.getByTestId("trainer-dsa-widget");
+    await expect(dsa).toContainText("சமர்ப்பிப்புகள்");
+    await expect(dsa.getByRole("combobox")).toContainText("எல்லா வாரங்களும் (1–8)");
   });
 
   test("blocks the student role", async ({ page }) => {

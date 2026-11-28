@@ -3,6 +3,7 @@
 /** Screen 03 · Branches and batches (college admin). Spec: docs/screens/03-branches-and-batches.md */
 import React, { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { API_BASE, ApiError, authHeaders, fetchApi } from "@/lib/api";
@@ -118,40 +119,40 @@ export default function CollegeStructurePage() {
     }
   };
 
-  const inputCls = "w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs";
+  const inputCls = "w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs";
 
   return (
     <RoleGuard allowedRoles={["college"]}>
-      <AppShell pageTitle={t("structure.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
-          <p className="text-xs text-[#64748B]">{t("structure.subtitle")}</p>
+      <AppShell pageTitle={t("structure.title")} pageSubtitle={t("structure.subtitle")}>
+        <HowItWorks topic="branch_batch" steps={4} className="mb-4 max-w-6xl" />
+        <div className="space-y-6 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="structure-error">{error}</p>}
 
           {data && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-3"><div className="text-[11px] text-[#64748B]">{t("structure.branches")}</div><div className="text-xl font-black" data-testid="count-branches">{data.branches.length}</div></div>
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-3"><div className="text-[11px] text-[#64748B]">{t("structure.batches")}</div><div className="text-xl font-black">{data.branches.reduce((n, b) => n + b.batches.length, 0)}</div></div>
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-3"><div className="text-[11px] text-[#64748B]">{t("structure.students")}</div><div className="text-xl font-black" data-testid="count-students">{data.students_total}</div></div>
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-3"><div className="text-[11px] text-[#64748B]">{t("structure.unassigned")}</div><div className="text-xl font-black">{data.unassigned_students}</div></div>
+              <div className="bg-white rounded-card border border-line p-3"><div className="text-caption text-muted">{t("structure.branches")}</div><div className="text-xl font-semibold" data-testid="count-branches">{data.branches.length}</div></div>
+              <div className="bg-white rounded-card border border-line p-3"><div className="text-caption text-muted">{t("structure.batches")}</div><div className="text-xl font-semibold">{data.branches.reduce((n, b) => n + b.batches.length, 0)}</div></div>
+              <div className="bg-white rounded-card border border-line p-3"><div className="text-caption text-muted">{t("structure.students")}</div><div className="text-xl font-semibold" data-testid="count-students">{data.students_total}</div></div>
+              <div className="bg-white rounded-card border border-line p-3"><div className="text-caption text-muted">{t("structure.unassigned")}</div><div className="text-xl font-semibold">{data.unassigned_students}</div></div>
             </div>
           )}
 
           {data && data.branches.length === 0 && (
-            <div className="bg-white rounded-xl border border-dashed border-[#CBD5E1] p-6 text-center text-xs text-[#64748B]" data-testid="structure-empty">{t("structure.empty")}</div>
+            <div className="bg-white rounded-card border border-dashed border-line-strong p-6 text-center text-xs text-muted" data-testid="structure-empty">{t("structure.empty")}</div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <form onSubmit={addBranch} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-2" data-testid="branch-form">
-              <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><GitBranch className="w-4 h-4 text-[#2B5CD0]" />{t("structure.add_branch")}</h2>
+            <form onSubmit={addBranch} noValidate className="bg-white rounded-card border border-line p-4 space-y-2" data-testid="branch-form">
+              <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><GitBranch className="w-4 h-4 text-brand" />{t("structure.add_branch")}</h2>
               <div className="grid grid-cols-3 gap-2">
                 <input className={`${inputCls} col-span-2`} placeholder={t("structure.branch_name")} value={branchForm.name} data-testid="branch-name" onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })} />
                 <input className={inputCls} placeholder={t("structure.branch_code")} value={branchForm.code} data-testid="branch-code" onChange={(e) => setBranchForm({ ...branchForm, code: e.target.value })} />
               </div>
-              <button type="submit" disabled={busy} data-testid="branch-save" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50 inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" />{t("structure.add_branch")}</button>
+              <button type="submit" disabled={busy} data-testid="branch-save" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50 inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" />{t("structure.add_branch")}</button>
             </form>
 
-            <form onSubmit={addBatch} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-2" data-testid="batch-form">
-              <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><Plus className="w-4 h-4 text-[#2B5CD0]" />{t("structure.add_batch")}</h2>
+            <form onSubmit={addBatch} noValidate className="bg-white rounded-card border border-line p-4 space-y-2" data-testid="batch-form">
+              <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><Plus className="w-4 h-4 text-brand" />{t("structure.add_batch")}</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <select className={inputCls} value={batchForm.branch_id} data-testid="batch-branch" onChange={(e) => setBatchForm({ ...batchForm, branch_id: e.target.value })} aria-label={t("structure.branch_name")}>
                   {data?.branches.map((b) => <option key={b.id} value={b.id}>{b.code}</option>)}
@@ -162,41 +163,41 @@ export default function CollegeStructurePage() {
                 </select>
                 <input className={inputCls} value={batchForm.academic_year} data-testid="batch-year" onChange={(e) => setBatchForm({ ...batchForm, academic_year: e.target.value })} aria-label={t("structure.year")} />
               </div>
-              <button type="submit" disabled={busy || !data?.branches.length} data-testid="batch-save" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("structure.add_batch")}</button>
+              <button type="submit" disabled={busy || !data?.branches.length} data-testid="batch-save" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("structure.add_batch")}</button>
             </form>
           </div>
 
           {data?.branches.map((br) => (
-            <section key={br.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-2" data-testid={`branch-${br.code}`}>
-              <h2 className="text-sm font-black text-[#0F1F3A]">{br.name} <span className="text-[#64748B] font-mono font-normal">{br.code}</span></h2>
-              {br.batches.length === 0 && <p className="text-xs text-[#64748B]">{t("structure.no_batches")}</p>}
-              <ul className="divide-y divide-[#F1F5F9]">
+            <section key={br.id} className="bg-white rounded-card border border-line p-4 space-y-2" data-testid={`branch-${br.code}`}>
+              <h2 className="text-sm font-semibold text-ink">{br.name} <span className="text-muted font-mono font-normal">{br.code}</span></h2>
+              {br.batches.length === 0 && <p className="text-xs text-muted">{t("structure.no_batches")}</p>}
+              <ul className="divide-y divide-line-soft">
                 {br.batches.map((b) => (
                   <li key={b.id} className="py-2 text-xs flex flex-wrap items-center justify-between gap-2" data-testid={`batch-${b.short_name}`}>
                     <div>
-                      <span className="font-bold">{b.short_name}</span> · {t("structure.sem")} {b.semester} · {b.academic_year} · <span data-testid="batch-students">{b.students}</span> {t("structure.students").toLowerCase()}
-                      <div className="text-[11px] text-[#64748B]">
+                      <span className="font-semibold">{b.short_name}</span> · {t("structure.sem")} {b.semester} · {b.academic_year} · <span data-testid="batch-students">{b.students}</span> {t("structure.students").toLowerCase()}
+                      <div className="text-caption text-muted">
                         {b.trainers.length ? b.trainers.map((tr) => `${tr.name} (${t(`structure.role_${tr.role}`)})`).join(", ") : t("structure.no_trainer")}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {mapFor === b.id ? (
                         <>
-                          <select className="px-2 py-1 border border-[#E2E8F0] rounded text-xs" value={mapForm.trainer_id} data-testid="map-trainer" onChange={(e) => setMapForm({ ...mapForm, trainer_id: e.target.value })} aria-label={t("structure.trainer")}>
+                          <select className="px-2 py-1 border border-line rounded text-xs" value={mapForm.trainer_id} data-testid="map-trainer" onChange={(e) => setMapForm({ ...mapForm, trainer_id: e.target.value })} aria-label={t("structure.trainer")}>
                             {trainers.map((tr) => <option key={tr.id} value={tr.id}>{tr.name}</option>)}
                           </select>
-                          <select className="px-2 py-1 border border-[#E2E8F0] rounded text-xs" value={mapForm.role} onChange={(e) => setMapForm({ ...mapForm, role: e.target.value })} aria-label={t("structure.role")}>
+                          <select className="px-2 py-1 border border-line rounded text-xs" value={mapForm.role} onChange={(e) => setMapForm({ ...mapForm, role: e.target.value })} aria-label={t("structure.role")}>
                             <option value="primary">{t("structure.role_primary")}</option>
                             <option value="substitute">{t("structure.role_substitute")}</option>
                           </select>
-                          <button type="button" disabled={busy} onClick={() => mapTrainer(b.id)} data-testid="map-save" className="px-2.5 py-1 bg-[#2B5CD0] text-white font-bold rounded">{t("structure.map")}</button>
+                          <button type="button" disabled={busy} onClick={() => mapTrainer(b.id)} data-testid="map-save" className="px-2.5 py-1 bg-brand text-white font-semibold rounded">{t("structure.map")}</button>
                         </>
                       ) : (
                         <button type="button" disabled={!trainers.length} onClick={() => { setMapFor(b.id); setMapForm({ trainer_id: trainers[0]?.id || "", role: "primary" }); }} data-testid="map-open"
-                          className="px-2.5 py-1 border border-[#CBD5E1] rounded font-bold inline-flex items-center gap-1 disabled:opacity-40"><UserCheck className="w-3.5 h-3.5" />{t("structure.map_trainer")}</button>
+                          className="px-2.5 py-1 border border-line-strong rounded font-semibold inline-flex items-center gap-1 disabled:opacity-40"><UserCheck className="w-3.5 h-3.5" />{t("structure.map_trainer")}</button>
                       )}
                       <button type="button" disabled={busy || b.semester >= 7} onClick={() => promote(b)} data-testid="promote"
-                        className="px-2.5 py-1 border border-[#CBD5E1] rounded font-bold inline-flex items-center gap-1 disabled:opacity-40"><ArrowUpCircle className="w-3.5 h-3.5" />{t("structure.promote")}</button>
+                        className="px-2.5 py-1 border border-line-strong rounded font-semibold inline-flex items-center gap-1 disabled:opacity-40"><ArrowUpCircle className="w-3.5 h-3.5" />{t("structure.promote")}</button>
                     </div>
                   </li>
                 ))}
@@ -205,22 +206,22 @@ export default function CollegeStructurePage() {
           ))}
 
           {rosterReqs.some((r) => r.status === "open") && (
-            <section className="bg-white rounded-xl border border-[#FDE68A] p-4 space-y-2" data-testid="roster-requests">
-              <h2 className="text-sm font-black text-[#0F1F3A]">{t("structure.roster_requests")}</h2>
-              <ul className="divide-y divide-[#F1F5F9] text-xs">
+            <section className="bg-white rounded-card border border-warning-line p-4 space-y-2" data-testid="roster-requests">
+              <h2 className="text-sm font-semibold text-ink">{t("structure.roster_requests")}</h2>
+              <ul className="divide-y divide-line-soft text-xs">
                 {rosterReqs.filter((r) => r.status === "open").map((r) => (
                   <li key={r.id} className="py-2 flex flex-wrap items-center justify-between gap-2" data-testid="roster-request">
                     <div>
-                      <span className="font-bold">{r.student_name}</span> · {r.kind === "move" ? `${r.from_batch} → ${r.to_batch}` : `${t("structure.remove_from")} ${r.from_batch}`}
-                      <div className="text-[11px] text-[#64748B]">{r.reason}</div>
+                      <span className="font-semibold">{r.student_name}</span> · {r.kind === "move" ? `${r.from_batch} → ${r.to_batch}` : `${t("structure.remove_from")} ${r.from_batch}`}
+                      <div className="text-caption text-muted">{r.reason}</div>
                     </div>
                     <div className="flex gap-2">
                       <button type="button" disabled={busy} data-testid="roster-approve" onClick={() => run(async () => { await fetchApi(`/college/roster-requests/${r.id}/approve`, { method: "POST" }); })}
-                        className="px-2.5 py-1 bg-[#2B5CD0] text-white font-bold rounded">{t("structure.approve")}</button>
+                        className="px-2.5 py-1 bg-brand text-white font-semibold rounded">{t("structure.approve")}</button>
                       <button type="button" disabled={busy} data-testid="roster-reject" onClick={() => {
                         const reason = window.prompt(t("structure.reject_reason"));
                         if (reason && reason.trim().length >= 5) run(async () => { await fetchApi(`/college/roster-requests/${r.id}/reject`, { method: "POST", body: JSON.stringify({ reason: reason.trim() }) }); });
-                      }} className="px-2.5 py-1 border border-[#CBD5E1] font-bold rounded">{t("structure.reject")}</button>
+                      }} className="px-2.5 py-1 border border-line-strong font-semibold rounded">{t("structure.reject")}</button>
                     </div>
                   </li>
                 ))}
@@ -228,18 +229,18 @@ export default function CollegeStructurePage() {
             </section>
           )}
 
-          <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3" data-testid="import-section">
-            <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><FileUp className="w-4 h-4 text-[#2B5CD0]" />{t("structure.import_title")}</h2>
-            <p className="text-[11px] text-[#64748B]">{t("structure.import_help")} <code className="font-mono">register_no,name,email,phone,branch_code,batch,semester,parent_name,parent_phone,parent_email,parent_consent,parent_consent_ref</code></p>
-            <p className="text-[11px] text-[#64748B]" data-testid="import-consent-help">{t("structure.import_consent_help")}</p>
+          <section className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="import-section">
+            <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><FileUp className="w-4 h-4 text-brand" />{t("structure.import_title")}</h2>
+            <p className="text-caption text-muted">{t("structure.import_help")} <code className="font-mono break-all">register_no,name,email,phone,branch_code,batch,semester,parent_name,parent_phone,parent_email,parent_consent,parent_consent_ref</code></p>
+            <p className="text-caption text-muted" data-testid="import-consent-help">{t("structure.import_consent_help")}</p>
             <div className="flex flex-wrap items-center gap-2">
               <input type="file" accept=".csv,text/csv" data-testid="import-file" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); }} className="text-xs" />
-              <button type="button" disabled={!file || busy} onClick={() => upload(true)} data-testid="import-check" className="px-3 py-1.5 border border-[#CBD5E1] text-xs font-bold rounded-lg disabled:opacity-40">{t("structure.check_file")}</button>
-              <button type="button" disabled={!file || busy || !result?.can_import} onClick={() => upload(false)} data-testid="import-run" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-40">{t("structure.import")}</button>
+              <button type="button" disabled={!file || busy} onClick={() => upload(true)} data-testid="import-check" className="px-3 py-1.5 border border-line-strong text-xs font-semibold rounded-tile disabled:opacity-40">{t("structure.check_file")}</button>
+              <button type="button" disabled={!file || busy || !result?.can_import} onClick={() => upload(false)} data-testid="import-run" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-40">{t("structure.import")}</button>
             </div>
             {result && (
               <div className="text-xs space-y-1" data-testid="import-result">
-                <p className={result.imported ? "text-[#166534] font-bold" : "text-[#0F1F3A]"}>
+                <p className={result.imported ? "text-success font-semibold" : "text-ink"}>
                   {result.imported ? t("structure.imported") : t("structure.checked")}{" "}
                   {t("structure.summary").replace("{new}", String(result.summary.new)).replace("{updated}", String(result.summary.updated))
                     .replace("{parents}", String(result.summary.parents_linked)).replace("{errors}", String(result.summary.errors))}

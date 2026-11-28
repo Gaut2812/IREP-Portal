@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
+import { Badge, Button, Card, CardHeader, EmptyState, Field, Select, StatTile, Table, THead, Th, Tr, Td, buttonClass, inputClass, type Tone } from "@/components/ui";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import { LabApprovalsCard } from "@/components/LabApprovalsCard";
 import {
-  Code2, ExternalLink, Filter, AlertCircle, RefreshCw, CheckCircle2, X
+  Code2, ExternalLink, Filter, AlertCircle, RefreshCw, CheckCircle2, X, ArrowRight
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
@@ -39,8 +40,15 @@ function fill(template: string, vars: Record<string, string | number>) {
   return Object.entries(vars).reduce((acc, [k, v]) => acc.replace(`{${k}}`, String(v)), template);
 }
 
-const actionChip: Record<string, string> = { parent_call: "chip-red", extra_saturday: "chip-amber", mentor: "chip-blue" };
-const statusChip: Record<string, string> = { Done: "chip-green", Next: "chip-blue", Live: "chip-green", Later: "bg-slate-100 text-slate-600" };
+const ACTION_TONE: Record<string, Tone | "info"> = { parent_call: "danger", extra_saturday: "warning", mentor: "info" };
+const STATUS_TONE: Record<string, Tone | "info"> = { Done: "success", Next: "info", Live: "success", Later: "neutral" };
+const DIFFICULTY_TONE: Record<string, Tone> = { Easy: "success", Medium: "warning", Hard: "danger" };
+// chart colours match globals.css tokens (recharts needs literal values)
+const READY = "#1F9D6B";
+const BELOW = "#2B5CD0";
+const INK = "#0F1F3A";
+const AXIS = "#64748B";
+const GRID = "#E2E8F0";
 
 export default function TrainerDashboardPage() {
   const { t, language } = useLanguage();
@@ -56,15 +64,19 @@ export default function TrainerDashboardPage() {
   const [loadingProblems, setLoadingProblems] = useState(true);
   const [selectedWeek, setSelectedWeek] = useState("All");
 
+  // only the latest request may set state: a slower reply for the old language must not overwrite the new one
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const req = ++latest.current;
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchApi<DashboardData>(`/trainer/dashboard?lang=${language}`));
+      const res = await fetchApi<DashboardData>(`/trainer/dashboard?lang=${language}`);
+      if (req === latest.current) setData(res);
     } catch (err: any) {
-      setError(err?.detail || err?.message || "error");
+      if (req === latest.current) setError(err?.detail || err?.message || "error");
     } finally {
-      setLoading(false);
+      if (req === latest.current) setLoading(false);
     }
   }, [language]);
 
@@ -121,27 +133,30 @@ export default function TrainerDashboardPage() {
   };
 
   const filteredProblems = selectedWeek === "All" ? codingProblems : codingProblems.filter((p) => p.week_info?.includes(`Week ${selectedWeek}`));
-  const card = "bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm space-y-2";
   const quickLabel = (key: string) => t(`trainer_dashboard.${key}`);
+  const quickClass = (variant: string) =>
+    variant === "blue" ? buttonClass("primary", "md", "w-full")
+      : variant === "teal" ? buttonClass("primary", "md", "w-full bg-teal border-teal hover:bg-teal-hover")
+        : buttonClass("secondary", "md", "w-full");
 
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("trainer_dashboard.title")}>
-        <div className="space-y-6 max-w-7xl mx-auto pb-10" data-testid="trainer-dashboard">
+        <div className="space-y-6 max-w-7xl pb-10" data-testid="trainer-dashboard">
           {loading && (
             <div className="space-y-6 animate-pulse" aria-busy="true" aria-label={t("trainer_dashboard.loading")}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 bg-white rounded-xl border border-[#E2E8F0]" />)}</div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="h-64 bg-white rounded-xl border border-[#E2E8F0]" /><div className="h-64 bg-white rounded-xl border border-[#E2E8F0]" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-32 bg-surface rounded-card border border-line" />)}</div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="h-72 bg-surface rounded-card border border-line" /><div className="h-72 bg-surface rounded-card border border-line" /></div>
             </div>
           )}
 
           {!loading && error && (
-            <div className="bg-white rounded-2xl border border-[#FECACA] p-8 text-center space-y-3 max-w-md mx-auto">
-              <AlertCircle className="w-8 h-8 text-[#D93636] mx-auto" />
-              <h2 className="text-base font-bold text-[#0F1F3A]">{t("trainer_dashboard.error_title")}</h2>
-              <p className="text-xs text-[#64748B]">{error}</p>
-              <button onClick={load} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg"><RefreshCw className="w-3.5 h-3.5" /> {t("trainer_dashboard.retry")}</button>
-            </div>
+            <Card className="text-center space-y-3 max-w-md mx-auto border-danger-line">
+              <AlertCircle className="w-8 h-8 text-danger mx-auto" />
+              <h2 className="text-heading font-semibold text-ink">{t("trainer_dashboard.error_title")}</h2>
+              <p className="text-body text-muted">{error}</p>
+              <Button onClick={load}><RefreshCw className="w-4 h-4" /> {t("trainer_dashboard.retry")}</Button>
+            </Card>
           )}
 
           {!loading && !error && data && (
@@ -150,213 +165,200 @@ export default function TrainerDashboardPage() {
 
               {/* Row 1 KPI cards (PDF 8) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="trainer-kpis">
-                <div className={card}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.active_batches")}</div>
-                  <div className="text-3xl font-black text-[#0F1F3A]">{data.kpis.active_batches.value}</div>
-                  <div className="text-[11px] text-[#64748B]">{fill(t(data.kpis.active_batches.colleges === 1 ? "trainer_dashboard.students_colleges" : "trainer_dashboard.students_colleges_plural"), { s: data.kpis.active_batches.students, c: data.kpis.active_batches.colleges })}</div>
-                </div>
-                <div className={card}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.today_attendance")}</div>
-                  {data.kpis.today_attendance.value === null ? (
-                    <div className="text-sm text-[#64748B] py-2">{t("trainer_dashboard.no_attendance")}</div>
-                  ) : (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-[#0F1F3A]">{data.kpis.today_attendance.value}%</span>
+                <StatTile label={t("trainer_dashboard.active_batches")} value={data.kpis.active_batches.value}
+                  hint={fill(t(data.kpis.active_batches.colleges === 1 ? "trainer_dashboard.students_colleges" : "trainer_dashboard.students_colleges_plural"), { s: data.kpis.active_batches.students, c: data.kpis.active_batches.colleges })} />
+                <StatTile label={t("trainer_dashboard.today_attendance")}
+                  value={data.kpis.today_attendance.value === null ? undefined : (
+                    <span className="flex items-baseline gap-2">
+                      {data.kpis.today_attendance.value}%
                       {data.kpis.today_attendance.delta_vs_last_week !== null && (
-                        <span className={`text-xs font-bold ${data.kpis.today_attendance.delta_vs_last_week >= 0 ? "text-[#15803D]" : "text-[#D93636]"}`}>
+                        <span className={`text-label font-medium ${data.kpis.today_attendance.delta_vs_last_week >= 0 ? "text-success" : "text-danger"}`}>
                           {data.kpis.today_attendance.delta_vs_last_week >= 0 ? "▲" : "▼"} {Math.abs(data.kpis.today_attendance.delta_vs_last_week)}% {t("trainer_dashboard.vs_last_week")}
                         </span>
                       )}
-                    </div>
+                    </span>
                   )}
-                  <div className="text-[11px] text-[#64748B]">{fill(t("trainer_dashboard.sessions_today"), { n: data.kpis.today_attendance.sessions })} · {data.kpis.today_attendance.day}</div>
-                </div>
-                <div className={card}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.pending_reviews")}</div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-[#0F1F3A]">{data.kpis.pending_code_reviews.value}</span>
+                  hint={<>
+                    {data.kpis.today_attendance.value === null && <span className="block text-body text-muted mt-2 mb-1">{t("trainer_dashboard.no_attendance")}</span>}
+                    {fill(t("trainer_dashboard.sessions_today"), { n: data.kpis.today_attendance.sessions })} · {data.kpis.today_attendance.day}
+                  </>} />
+                <StatTile label={t("trainer_dashboard.pending_reviews")}
+                  value={<span className="flex items-baseline gap-2">
+                    {data.kpis.pending_code_reviews.value}
                     {data.kpis.pending_code_reviews.older_than_2_days > 0 ? (
-                      <span className="text-xs font-bold text-[#D93636]">{fill(t("trainer_dashboard.older_than"), { n: data.kpis.pending_code_reviews.older_than_2_days })}</span>
+                      <span className="text-label font-medium text-danger">{fill(t("trainer_dashboard.older_than"), { n: data.kpis.pending_code_reviews.older_than_2_days })}</span>
                     ) : (
-                      <span className="text-xs font-bold text-[#15803D]">{t("trainer_dashboard.queue_clear")}</span>
+                      <span className="text-label font-medium text-success">{t("trainer_dashboard.queue_clear")}</span>
                     )}
-                  </div>
-                  <Link href="/trainer/reviews" className="text-[11px] text-[#2B5CD0] font-semibold hover:underline">{t("trainer_dashboard.review_prs")} →</Link>
-                </div>
-                <div className={card}>
-                  <div className="text-xs text-[#64748B] font-medium">{t("trainer_dashboard.at_risk")}</div>
-                  <div className="text-3xl font-black text-[#D93636]">{data.kpis.at_risk_students.value}</div>
-                  <div className="text-[11px] text-[#64748B]">{fill(t("trainer_dashboard.parents_notified"), { n: data.kpis.at_risk_students.parents_notified })}</div>
-                </div>
+                  </span>}
+                  hint={<Link href="/trainer/reviews" className="text-brand font-medium hover:underline underline-offset-2 inline-flex items-center gap-1">{t("trainer_dashboard.review_prs")}<ArrowRight className="w-4 h-4" aria-hidden /></Link>} />
+                <StatTile label={t("trainer_dashboard.at_risk")} value={data.kpis.at_risk_students.value} tone="danger"
+                  hint={fill(t("trainer_dashboard.parents_notified"), { n: data.kpis.at_risk_students.parents_notified })} />
               </div>
 
               {/* Row 2 chart + schedule */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                    <h3 className="font-bold text-xs text-[#0F1F3A]">{t("trainer_dashboard.batch_readiness")}</h3>
-                    <span className="text-[11px] text-[#64748B]">{t("trainer_dashboard.average_semester")}</span>
-                  </div>
-                  <div className="h-56 w-full pt-2" data-testid="batch-readiness-chart">
+                <Card>
+                  <CardHeader title={t("trainer_dashboard.batch_readiness")} subtitle={t("trainer_dashboard.average_semester")} />
+                  <div className="h-56 w-full" data-testid="batch-readiness-chart">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data.batch_readiness}>
-                        <XAxis dataKey="batch" tick={{ fontSize: 11 }} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Bar dataKey="score" radius={[6, 6, 0, 0]} label={{ position: "top", fontSize: 11, fill: "#0F1F3A" }}>
-                          {data.batch_readiness.map((entry) => <Cell key={entry.batch_id} fill={entry.score >= 75 ? "#2BB3A0" : "#2B5CD0"} />)}
+                      <BarChart data={data.batch_readiness} margin={{ top: 20, right: 4, bottom: 0, left: -16 }}>
+                        <XAxis dataKey="batch" tick={{ fontSize: 12, fill: AXIS }} axisLine={{ stroke: GRID }} tickLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: AXIS }} axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{ fill: "#F8FAFC" }} />
+                        <Bar dataKey="score" radius={[4, 4, 0, 0]} maxBarSize={48} label={{ position: "top", fontSize: 12, fill: INK }}>
+                          {data.batch_readiness.map((entry) => <Cell key={entry.batch_id} fill={entry.score >= 75 ? READY : BELOW} />)}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="flex items-center justify-center gap-4 text-[11px] text-[#64748B] pt-1">
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2BB3A0]" /> {t("trainer_dashboard.legend_ready")}</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2B5CD0]" /> {t("trainer_dashboard.legend_below")}</span>
+                  <div className="flex items-center justify-center gap-4 text-caption text-muted pt-3">
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-success-fill" /> {t("trainer_dashboard.legend_ready")}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-brand" /> {t("trainer_dashboard.legend_below")}</span>
                   </div>
-                </div>
+                </Card>
 
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                    <h3 className="font-bold text-xs text-[#0F1F3A]">{data.today_schedule.is_today ? t("trainer_dashboard.today_schedule") : t("trainer_dashboard.next_day_schedule")}</h3>
-                    <span className="text-[11px] text-[#64748B] font-semibold">{data.today_schedule.label}</span>
-                  </div>
+                <Card>
+                  <CardHeader title={data.today_schedule.is_today ? t("trainer_dashboard.today_schedule") : t("trainer_dashboard.next_day_schedule")}
+                    subtitle={data.today_schedule.label} />
                   {data.today_schedule.items.length === 0 ? (
-                    <p className="text-xs text-[#64748B] py-6 text-center">{t("trainer_dashboard.no_schedule")}</p>
+                    <EmptyState title={t("trainer_dashboard.no_schedule")} />
                   ) : (
-                    <div className="space-y-2.5" data-testid="today-schedule">
+                    <ul className="divide-y divide-line-soft -my-2" data-testid="today-schedule">
                       {data.today_schedule.items.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] gap-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="w-16 text-xs font-bold text-[#0F1F3A] flex-shrink-0">{item.time}</span>
+                        <li key={item.id} className="flex items-center justify-between gap-3 py-3">
+                          <div className="flex items-center gap-4 min-w-0">
+                            <span className="w-16 text-label font-medium text-ink-soft tabular flex-shrink-0">{item.time}</span>
                             <div className="min-w-0">
-                              <div className="text-xs font-bold text-[#0F1F3A] truncate">{item.topic}</div>
-                              <div className="text-[10px] text-[#64748B]">{item.batch}</div>
+                              <div className="text-body font-medium text-ink truncate">{item.topic}</div>
+                              <div className="text-label text-muted">{item.batch}</div>
                             </div>
                           </div>
                           {item.can_enter ? (
-                            <Link href={item.room} className="px-3 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white text-xs font-bold rounded-lg shadow-sm flex-shrink-0">{t("trainer_dashboard.enter_room")}</Link>
+                            <Link href={item.room} className={buttonClass("primary", "sm", "flex-shrink-0")}>{t("trainer_dashboard.enter_room")}</Link>
                           ) : (
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${statusChip[item.status] || "bg-slate-100 text-slate-600"}`}>{item.status_label}</span>
+                            <Badge tone={STATUS_TONE[item.status] ?? "neutral"} className="flex-shrink-0">{item.status_label}</Badge>
                           )}
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
-                </div>
+                </Card>
               </div>
 
               {/* Row 3 weekly DSA widget (Screen 24 integration) */}
-              <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-4" data-testid="trainer-dsa-widget">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
-                  <div className="flex items-center gap-2">
-                    <Code2 className="w-5 h-5 text-[#2B5CD0]" />
-                    <h3 className="font-bold text-sm text-[#0F1F3A]">{t("trainer_dashboard.dsa_widget")}</h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-[#64748B] font-medium flex items-center gap-1"><Filter className="w-3.5 h-3.5" /> Week:</span>
-                    <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="bg-[#F8FAFC] border border-[#CBD5E1] text-xs font-semibold text-[#0F1F3A] rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer" aria-label="Week">
-                      <option value="All">All Weeks (1-8)</option>
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => <option key={w} value={String(w)}>Week {w}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
-                      <th className="pb-2.5 font-semibold">Problem</th><th className="pb-2.5 font-semibold">Schedule</th><th className="pb-2.5 font-semibold">Topic</th>
-                      <th className="pb-2.5 font-semibold">Difficulty</th><th className="pb-2.5 font-semibold text-center">Submissions</th><th className="pb-2.5 font-semibold text-center">Solved %</th><th className="pb-2.5 font-semibold text-right"></th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-[#E2E8F0]">
-                      {loadingProblems ? (
-                        <tr><td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">…</td></tr>
-                      ) : filteredProblems.length === 0 ? (
-                        <tr><td colSpan={7} className="py-6 text-center text-xs text-[#64748B]">No problems for this week.</td></tr>
-                      ) : filteredProblems.map((prob) => (
-                        <tr key={prob.id} className="hover:bg-[#F8FAFC]">
-                          <td className="py-2.5 font-bold text-[#0F1F3A]">{prob.title}</td>
-                          <td className="py-2.5 text-[#64748B]">{prob.week_info}</td>
-                          <td className="py-2.5"><span className="chip-blue text-[10px]">{prob.topic}</span></td>
-                          <td className="py-2.5"><span className={prob.difficulty === "Easy" ? "chip-green text-[10px]" : prob.difficulty === "Medium" ? "chip-amber text-[10px]" : "chip-red text-[10px]"}>{prob.difficulty}</span></td>
-                          <td className="py-2.5 text-center font-mono text-[#0F1F3A]">{prob.total_submissions}</td>
-                          <td className="py-2.5 text-center font-bold text-[#15803D] text-[11px]">{prob.solved_percentage}%</td>
-                          <td className="py-2.5 text-right"><Link href={`/student/coding/${prob.id}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-[11px] rounded-lg"><span>Open</span><ExternalLink className="w-2.5 h-2.5" /></Link></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <Card padded={false} data-testid="trainer-dsa-widget">
+                <CardHeader className="px-5 pt-5"
+                  title={<span className="inline-flex items-center gap-2"><Code2 className="w-5 h-5 text-brand" />{t("trainer_dashboard.dsa_widget")}</span>}
+                  actions={<>
+                    <span className="text-label text-muted inline-flex items-center gap-1"><Filter className="w-4 h-4" /> {t("trainer_dashboard.dsa_week")}</span>
+                    <Select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} aria-label={t("trainer_dashboard.dsa_week")}>
+                      <option value="All">{t("trainer_dashboard.dsa_all_weeks")}</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => <option key={w} value={String(w)}>{fill(t("trainer_dashboard.dsa_week_n"), { n: w })}</option>)}
+                    </Select>
+                  </>} />
+                <Table>
+                  <THead>
+                    <tr>
+                      <Th>{t("trainer_dashboard.dsa_problem")}</Th><Th>{t("trainer_dashboard.dsa_schedule")}</Th>
+                      <Th>{t("trainer_dashboard.dsa_topic")}</Th><Th>{t("trainer_dashboard.dsa_difficulty")}</Th>
+                      <Th align="right">{t("trainer_dashboard.dsa_submissions")}</Th><Th align="right">{t("trainer_dashboard.dsa_solved")}</Th>
+                      <Th align="right"><span className="sr-only">{t("trainer_dashboard.dsa_open")}</span></Th>
+                    </tr>
+                  </THead>
+                  <tbody>
+                    {loadingProblems ? (
+                      <Tr><Td colSpan={7} className="text-center text-muted">…</Td></Tr>
+                    ) : filteredProblems.length === 0 ? (
+                      <Tr><Td colSpan={7}><EmptyState title={t("trainer_dashboard.dsa_none")} className="py-4" /></Td></Tr>
+                    ) : filteredProblems.map((prob) => (
+                      <Tr key={prob.id} className="hover:bg-surface-2">
+                        <Td className="font-medium">{prob.title}</Td>
+                        <Td className="text-muted">{prob.week_info}</Td>
+                        <Td><Badge tone="info">{prob.topic}</Badge></Td>
+                        <Td><Badge tone={DIFFICULTY_TONE[prob.difficulty] ?? "neutral"}>
+                          {DIFFICULTY_TONE[prob.difficulty] ? t(`trainer_dashboard.dsa_${prob.difficulty.toLowerCase()}`) : prob.difficulty}
+                        </Badge></Td>
+                        <Td align="right">{prob.total_submissions}</Td>
+                        <Td align="right" className="font-medium text-success">{prob.solved_percentage}%</Td>
+                        <Td align="right">
+                          <Link href={`/trainer/assessments?problem=${prob.id}`} className={buttonClass("secondary", "sm")}><span>{t("trainer_dashboard.dsa_open")}</span><ExternalLink className="w-3.5 h-3.5" /></Link>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </Card>
 
               {/* Row 4 support table + quick actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
-                    <h3 className="font-bold text-xs text-[#0F1F3A]">{t("trainer_dashboard.needing_support")}</h3>
-                    <span className="text-[11px] text-[#D93636] font-semibold">{fill(t("trainer_dashboard.score_below"), { n: data.thresholds.score_below })}</span>
-                  </div>
+                <Card padded={false} className="lg:col-span-2">
+                  <CardHeader className="px-5 pt-5" title={t("trainer_dashboard.needing_support")}
+                    subtitle={<span className="text-danger">{fill(t("trainer_dashboard.score_below"), { n: data.thresholds.score_below })}</span>} />
                   {data.students_needing_support.length === 0 ? (
-                    <p className="text-xs text-[#64748B] py-6 text-center">{t("trainer_dashboard.no_support")}</p>
+                    <EmptyState title={t("trainer_dashboard.no_support")} />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left" data-testid="support-table">
-                        <thead><tr className="border-b border-[#E2E8F0] text-[#64748B] text-[11px]">
-                          <th className="pb-2 font-semibold">{t("trainer_dashboard.student")}</th><th className="pb-2 font-semibold">{t("trainer_dashboard.batch")}</th>
-                          <th className="pb-2 font-semibold">{t("trainer_dashboard.score")}</th><th className="pb-2 font-semibold">{t("trainer_dashboard.issue")}</th>
-                          <th className="pb-2 font-semibold text-right">{t("trainer_dashboard.action")}</th>
-                        </tr></thead>
-                        <tbody className="divide-y divide-[#E2E8F0]">
-                          {data.students_needing_support.map((st) => (
-                            <tr key={st.flag_id} className="hover:bg-[#F8FAFC]">
-                              <td className="py-2.5 font-bold text-[#0F1F3A]">{st.name}{st.parent_notified && <span className="ml-1.5 text-[9px] text-[#15803D] font-semibold" title={t("trainer_dashboard.notified")}>✓</span>}</td>
-                              <td className="py-2.5 text-[#64748B]">{st.batch}</td>
-                              <td className="py-2.5"><span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 font-bold text-[11px]">{st.score}</span></td>
-                              <td className="py-2.5 text-[#64748B]">{st.issue}</td>
-                              <td className="py-2.5 text-right whitespace-nowrap">
-                                <button type="button" disabled={acting === st.flag_id} onClick={() => runAction(st)} className={`${actionChip[st.action] || "chip-blue"} cursor-pointer disabled:opacity-50`} data-testid="support-action">{st.action_label}</button>
-                                <button type="button" onClick={() => { setResolving(st); setResolveNote(""); }} className="ml-1.5 text-[10px] text-[#64748B] hover:text-[#0F1F3A] underline" aria-label={`${t("trainer_dashboard.resolve")} ${st.name}`}>{t("trainer_dashboard.resolve")}</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <Table data-testid="support-table">
+                      <THead>
+                        <tr>
+                          <Th>{t("trainer_dashboard.student")}</Th><Th>{t("trainer_dashboard.batch")}</Th>
+                          <Th align="right">{t("trainer_dashboard.score")}</Th><Th>{t("trainer_dashboard.issue")}</Th>
+                          <Th align="right">{t("trainer_dashboard.action")}</Th>
+                        </tr>
+                      </THead>
+                      <tbody>
+                        {data.students_needing_support.map((st) => (
+                          <Tr key={st.flag_id} className="hover:bg-surface-2">
+                            <Td className="font-medium">{st.name}{st.parent_notified && <span className="ml-1.5 text-success" title={t("trainer_dashboard.notified")}>✓</span>}</Td>
+                            <Td className="text-muted">{st.batch}</Td>
+                            <Td align="right"><Badge tone="danger">{st.score}</Badge></Td>
+                            <Td className="text-muted">{st.issue}</Td>
+                            <Td align="right" className="whitespace-nowrap">
+                              <button type="button" disabled={acting === st.flag_id} onClick={() => runAction(st)} data-testid="support-action"
+                                className="cursor-pointer disabled:opacity-50 rounded-full focus-visible:ring-2 focus-visible:ring-brand">
+                                <Badge tone={ACTION_TONE[st.action] ?? "info"}>{st.action_label}</Badge>
+                              </button>
+                              <button type="button" onClick={() => { setResolving(st); setResolveNote(""); }} className="ml-2 text-label text-muted hover:text-ink underline underline-offset-2" aria-label={`${t("trainer_dashboard.resolve")} ${st.name}`}>{t("trainer_dashboard.resolve")}</button>
+                            </Td>
+                          </Tr>
+                        ))}
+                      </tbody>
+                    </Table>
                   )}
-                </div>
+                </Card>
 
-                <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-[#0F1F3A] border-b border-[#E2E8F0] pb-2">{t("trainer_dashboard.quick_actions")}</h3>
-                  <div className="grid grid-cols-2 gap-2.5 pt-1" data-testid="quick-actions">
+                <Card>
+                  <CardHeader title={t("trainer_dashboard.quick_actions")} />
+                  <div className="grid grid-cols-2 gap-2.5" data-testid="quick-actions">
                     {data.quick_actions.map((qa) => (
-                      <Link key={qa.key} href={qa.href} className={`py-2.5 px-3 text-center font-bold text-xs rounded-xl transition-all ${qa.variant === "blue" ? "bg-[#2B5CD0] hover:bg-[#1E46B0] text-white shadow" : qa.variant === "teal" ? "bg-[#2BB3A0] hover:bg-[#249B8A] text-white shadow" : "border border-[#CBD5E1] hover:bg-[#F8FAFC] text-[#0F1F3A]"}`}>
-                        {quickLabel(qa.key)}
-                      </Link>
+                      <Link key={qa.key} href={qa.href} className={quickClass(qa.variant)}>{quickLabel(qa.key)}</Link>
                     ))}
                   </div>
-                </div>
+                </Card>
               </div>
             </>
           )}
         </div>
 
         {toast && (
-          <div role="status" className="fixed bottom-6 right-6 z-50 bg-[#0F1F3A] text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2" data-testid="toast">
-            <CheckCircle2 className="w-4 h-4 text-[#2BB3A0]" /> {toast}
+          <div role="status" className="fixed bottom-6 right-6 z-50 bg-ink text-white text-body font-medium px-4 py-3 rounded-card shadow-pop flex items-center gap-2" data-testid="toast">
+            <CheckCircle2 className="w-4 h-4 text-teal" /> {toast}
           </div>
         )}
 
         {resolving && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-[#E2E8F0]">
+          <div className="fixed inset-0 bg-ink/50 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true">
+            <div className="bg-surface rounded-card max-w-md w-full p-6 space-y-4 shadow-pop border border-line">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-[#0F1F3A]">{t("trainer_dashboard.resolve")} · {resolving.name}</h3>
-                <button onClick={() => setResolving(null)} className="p-1.5 rounded-lg hover:bg-[#F1F5F9]" aria-label={t("trainer_dashboard.cancel")}><X className="w-4 h-4 text-[#64748B]" /></button>
+                <h3 className="text-heading font-semibold text-ink">{t("trainer_dashboard.resolve")} · {resolving.name}</h3>
+                <button onClick={() => setResolving(null)} className="p-1.5 rounded-tile hover:bg-line-soft" aria-label={t("trainer_dashboard.cancel")}><X className="w-4 h-4 text-muted" /></button>
               </div>
-              <label className="block text-xs font-bold text-[#0F1F3A]">{t("trainer_dashboard.resolve_note")}
-                <textarea value={resolveNote} onChange={(e) => setResolveNote(e.target.value)} rows={3} className="mt-1 w-full px-3 py-2 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-xs font-normal focus:outline-none focus:border-[#2B5CD0]" data-testid="resolve-note" />
-              </label>
+              <Field label={t("trainer_dashboard.resolve_note")}>
+                <textarea value={resolveNote} onChange={(e) => setResolveNote(e.target.value)} rows={3} className={`${inputClass} h-auto py-2`} data-testid="resolve-note" />
+              </Field>
               <div className="flex gap-2">
-                <button onClick={() => setResolving(null)} className="flex-1 py-2 bg-[#F1F5F9] text-[#0F1F3A] font-bold text-xs rounded-xl">{t("trainer_dashboard.cancel")}</button>
-                <button onClick={submitResolve} disabled={!resolveNote.trim()} className="flex-1 py-2 bg-[#2BB3A0] text-white font-bold text-xs rounded-xl disabled:opacity-50">{t("trainer_dashboard.resolve_confirm")}</button>
+                <Button variant="secondary" className="flex-1" onClick={() => setResolving(null)}>{t("trainer_dashboard.cancel")}</Button>
+                <Button className="flex-1" onClick={submitResolve} disabled={!resolveNote.trim()}>{t("trainer_dashboard.resolve_confirm")}</Button>
               </div>
             </div>
           </div>

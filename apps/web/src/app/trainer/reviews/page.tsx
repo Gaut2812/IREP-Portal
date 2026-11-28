@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { fetchApi } from "@/lib/api";
 import {
-  Code2, GitPullRequest, CheckCircle2, XCircle, AlertCircle,
+  GitPullRequest, CheckCircle2, XCircle, AlertCircle,
   Clock, Search, FileCode, Check, RefreshCw, MessageSquare,
   ChevronRight, Sparkles, ShieldCheck, GitBranch, ArrowRight,
   Sliders, User, Users, FolderGit2
@@ -452,46 +453,35 @@ export default function TrainerCodeReviewsPage() {
 
   return (
     <RoleGuard allowedRoles={["trainer", "college"]}>
-      <AppShell pageTitle={t("trainer_reviews.title")}>
-        <div className="max-w-[1600px] mx-auto space-y-6 pb-12">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-black text-[#0F1F3A] tracking-tight flex items-center gap-2.5">
-                <Code2 className="w-6 h-6 text-[#2B5CD0]" />
-                <span>{t("trainer_reviews.title")}</span>
-              </h1>
-              <p className="text-sm text-[#64748B] mt-1 font-medium">
-                {t("trainer_reviews.subtitle")}
-              </p>
-            </div>
-          </div>
+      <AppShell pageTitle={t("trainer_reviews.title")} pageSubtitle={t("trainer_reviews.subtitle")}>
+        <HowItWorks topic="code_review" steps={4} className="mb-4 max-w-6xl" />
+        <div className="max-w-[1600px] space-y-6 pb-12">
 
           {/* Main Two-Panel Workspace */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* LEFT PANEL: PR Queue (4 cols) */}
-            <div className="lg:col-span-4 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex flex-col h-[calc(100vh-170px)] overflow-hidden">
+            <div className="lg:col-span-4 bg-white rounded-card border border-line shadow-card flex flex-col h-[calc(100vh-170px)] overflow-hidden">
               {/* Queue Header & Search */}
-              <div className="p-4 border-b border-[#E2E8F0] space-y-3">
+              <div className="p-4 border-b border-line space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-[#0F1F3A] flex items-center gap-2">
-                    <GitPullRequest className="w-4 h-4 text-[#2B5CD0]" />
+                  <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
+                    <GitPullRequest className="w-4 h-4 text-brand" />
                     <span>{t("trainer_reviews.pr_queue")}</span>
                   </h2>
-                  <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#2B5CD0]">
+                  <span className="text-caption font-semibold px-2 py-0.5 rounded-full bg-brand-soft text-brand">
                     {counts.pending} {language === "ta" ? "நிலுவையில்" : "Pending"}
                   </span>
                 </div>
 
                 {/* Search */}
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t("trainer_reviews.search_placeholder")}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-[#CBD5E1] text-xs focus:outline-none focus:border-[#2B5CD0]"
+                    className="w-full pl-8 pr-3 py-1.5 rounded-card border border-line-strong text-xs focus:outline-none focus:border-brand"
                   />
                 </div>
 
@@ -506,15 +496,15 @@ export default function TrainerCodeReviewsPage() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveFilter(tab.id)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 py-1 rounded-tile text-caption font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
                         activeFilter === tab.id
-                          ? "bg-[#2B5CD0] text-white shadow-xs"
-                          : "bg-[#F1F5F9] text-[#64748B] hover:text-[#0F1F3A]"
+                          ? "bg-brand text-white shadow-card"
+                          : "bg-line-soft text-muted hover:text-ink"
                       }`}
                     >
                       <span>{tab.label}</span>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                        activeFilter === tab.id ? "bg-white/20 text-white" : "bg-white text-[#475569]"
+                      <span className={`text-caption px-1.5 py-0.2 rounded-full ${
+                        activeFilter === tab.id ? "bg-white/20 text-white" : "bg-white text-ink-soft"
                       }`}>
                         {tab.count}
                       </span>
@@ -524,18 +514,18 @@ export default function TrainerCodeReviewsPage() {
               </div>
 
               {/* PR Cards List */}
-              <div className="flex-1 overflow-y-auto divide-y divide-[#F1F5F9] p-2 space-y-1">
+              <div className="flex-1 overflow-y-auto divide-y divide-line-soft p-2 space-y-1">
                 {loadingList ? (
                   <div className="p-4 space-y-3">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-24 bg-[#F8FAFC] rounded-xl animate-pulse" />
+                      <div key={i} className="h-24 bg-surface-2 rounded-card animate-pulse" />
                     ))}
                   </div>
                 ) : filteredPrs.length === 0 ? (
                   <div className="p-8 text-center space-y-2">
-                    <GitPullRequest className="w-8 h-8 text-[#94A3B8] mx-auto" />
-                    <p className="text-xs font-bold text-[#0F1F3A]">{t("trainer_reviews.no_prs")}</p>
-                    <p className="text-[11px] text-[#64748B]">{t("trainer_reviews.no_prs_desc")}</p>
+                    <GitPullRequest className="w-8 h-8 text-subtle mx-auto" />
+                    <p className="text-xs font-semibold text-ink">{t("trainer_reviews.no_prs")}</p>
+                    <p className="text-caption text-muted">{t("trainer_reviews.no_prs_desc")}</p>
                   </div>
                 ) : (
                   filteredPrs.map((item) => {
@@ -544,23 +534,23 @@ export default function TrainerCodeReviewsPage() {
                       <div
                         key={item.id}
                         onClick={() => setSelectedPrId(item.id)}
-                        className={`p-3.5 rounded-xl cursor-pointer transition-all border ${
+                        className={`p-3.5 rounded-card cursor-pointer transition-all border ${
                           isSelected
-                            ? "bg-[#EFF6FF] border-[#2B5CD0] shadow-xs"
-                            : "bg-white hover:bg-[#F8FAFC] border-transparent"
+                            ? "bg-brand-soft border-brand shadow-card"
+                            : "bg-white hover:bg-surface-2 border-transparent"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-black text-[#2B5CD0]">
+                          <span className="text-xs font-semibold text-brand">
                             {item.pr_number}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            className={`text-caption font-semibold px-2 py-0.5 rounded-full ${
                               item.status === "approved"
-                                ? "bg-[#DCFCE7] text-[#15803D]"
+                                ? "bg-success-soft text-success"
                                 : item.status === "changes_requested"
-                                ? "bg-[#FEE2E2] text-[#DC2626]"
-                                : "bg-[#FEF3C7] text-[#B45309]"
+                                ? "bg-danger-soft text-danger"
+                                : "bg-warning-soft text-warning"
                             }`}
                           >
                             {item.status === "approved"
@@ -571,21 +561,21 @@ export default function TrainerCodeReviewsPage() {
                           </span>
                         </div>
 
-                        <h4 className="text-xs font-bold text-[#0F1F3A] mt-1 line-clamp-2">
+                        <h4 className="text-xs font-semibold text-ink mt-1 line-clamp-2">
                           {item.title}
                         </h4>
 
-                        <div className="flex items-center gap-2 mt-2 text-[11px] text-[#64748B]">
-                          <div className="w-5 h-5 rounded-full bg-[#2B5CD0] text-white flex items-center justify-center font-bold text-[9px]">
+                        <div className="flex items-center gap-2 mt-2 text-caption text-muted">
+                          <div className="w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center font-semibold text-caption">
                             {item.author_initials}
                           </div>
-                          <span className="font-semibold text-[#0F1F3A] truncate">{item.author_name}</span>
+                          <span className="font-semibold text-ink truncate">{item.author_name}</span>
                           <span>·</span>
                           <span className="truncate">{item.team_name}</span>
                         </div>
 
-                        <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-[#E2E8F0]/60 text-[10px] text-[#94A3B8]">
-                          <span className="font-semibold text-[#059669]">
+                        <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-line/60 text-caption text-subtle">
+                          <span className="font-semibold text-success">
                             {item.automated_checks_passed ? "✓ Checks Passed" : "⚠ Checks Warning"}
                           </span>
                           <span>{item.story_points} pts</span>
@@ -598,33 +588,33 @@ export default function TrainerCodeReviewsPage() {
             </div>
 
             {/* RIGHT PANEL: Code Diff & Review Evaluation Console (8 cols) */}
-            <div className="lg:col-span-8 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex flex-col h-[calc(100vh-170px)] overflow-hidden">
+            <div className="lg:col-span-8 bg-white rounded-card border border-line shadow-card flex flex-col h-[calc(100vh-170px)] overflow-hidden">
               {loadingDetail || !prDetail ? (
                 <div className="p-8 space-y-6 animate-pulse">
-                  <div className="h-20 bg-[#F1F5F9] rounded-xl" />
-                  <div className="h-32 bg-[#F1F5F9] rounded-xl" />
-                  <div className="h-64 bg-[#F1F5F9] rounded-xl" />
+                  <div className="h-20 bg-line-soft rounded-card" />
+                  <div className="h-32 bg-line-soft rounded-card" />
+                  <div className="h-64 bg-line-soft rounded-card" />
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto divide-y divide-[#E2E8F0]">
+                <div className="flex-1 overflow-y-auto divide-y divide-line">
                   {/* PR Header Bar */}
                   <div className="p-6 space-y-4 bg-white">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-black text-[#2B5CD0] bg-[#EFF6FF] px-2 py-0.5 rounded-md">
+                          <span className="text-sm font-semibold text-brand bg-brand-soft px-2 py-0.5 rounded-tile">
                             {prDetail.pr.pr_number}
                           </span>
-                          <span className="text-xs font-semibold text-[#64748B]">
+                          <span className="text-xs font-semibold text-muted">
                             {prDetail.pr.project_name} · {prDetail.pr.team_name}
                           </span>
                           <span
-                            className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                            className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
                               prDetail.pr.status === "approved"
-                                ? "bg-[#DCFCE7] text-[#15803D]"
+                                ? "bg-success-soft text-success"
                                 : prDetail.pr.status === "changes_requested"
-                                ? "bg-[#FEE2E2] text-[#DC2626]"
-                                : "bg-[#FEF3C7] text-[#B45309]"
+                                ? "bg-danger-soft text-danger"
+                                : "bg-warning-soft text-warning"
                             }`}
                           >
                             {prDetail.pr.status === "approved"
@@ -635,73 +625,73 @@ export default function TrainerCodeReviewsPage() {
                           </span>
                         </div>
 
-                        <h2 className="text-lg font-bold text-[#0F1F3A] mt-1.5">
+                        <h2 className="text-lg font-semibold text-ink mt-1.5">
                           {prDetail.pr.title}
                         </h2>
                       </div>
 
                       <div className="text-right flex-shrink-0">
-                        <div className="text-[11px] text-[#64748B] font-medium">
+                        <div className="text-caption text-muted font-medium">
                           {prDetail.pr.created_at}
                         </div>
-                        <div className="text-xs font-bold text-[#0F1F3A] mt-0.5">
+                        <div className="text-xs font-semibold text-ink mt-0.5">
                           {prDetail.pr.story_points} {t("trainer_reviews.story_points")}
                         </div>
                       </div>
                     </div>
 
                     {/* Branch Merge Target Indicator */}
-                    <div className="flex items-center gap-2 text-xs bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 py-2 rounded-xl text-[#475569]">
-                      <GitBranch className="w-4 h-4 text-[#2B5CD0]" />
-                      <span className="font-semibold text-[#0F1F3A]">{prDetail.pr.author_name}</span>
+                    <div className="flex items-center gap-2 text-xs bg-surface-2 border border-line px-3.5 py-2 rounded-card text-ink-soft">
+                      <GitBranch className="w-4 h-4 text-brand" />
+                      <span className="font-semibold text-ink">{prDetail.pr.author_name}</span>
                       <span>{t("trainer_reviews.branch_merge_target")}</span>
-                      <code className="px-2 py-0.5 rounded bg-[#E2E8F0] font-mono text-[11px] text-[#0F1F3A] font-bold">
+                      <code className="px-2 py-0.5 rounded bg-line font-mono text-caption text-ink font-semibold">
                         {prDetail.pr.target_branch}
                       </code>
                       <span>{t("trainer_reviews.from_branch")}</span>
-                      <code className="px-2 py-0.5 rounded bg-[#E2E8F0] font-mono text-[11px] text-[#0F1F3A] font-bold">
+                      <code className="px-2 py-0.5 rounded bg-line font-mono text-caption text-ink font-semibold">
                         {prDetail.pr.source_branch}
                       </code>
                     </div>
 
                     {/* Automated Checks Summary Card */}
-                    <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl p-4 space-y-2">
+                    <div className="bg-success-faint border border-success-line rounded-card p-4 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-xs font-bold text-[#166534]">
-                          <ShieldCheck className="w-4 h-4 text-[#15803D]" />
+                        <span className="flex items-center gap-2 text-xs font-semibold text-success">
+                          <ShieldCheck className="w-4 h-4 text-success" />
                           <span>{t("trainer_reviews.automated_checks_passed")}</span>
                         </span>
-                        <span className="text-[11px] font-bold text-[#15803D]">
+                        <span className="text-caption font-semibold text-success">
                           Maintainability: {prDetail.automated_checks.maintainability_rating}
                         </span>
                       </div>
 
-                      <p className="text-[11px] text-[#15803D]">
+                      <p className="text-caption text-success">
                         {t("trainer_reviews.automated_checks_desc")}
                       </p>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#DCFCE7] text-[10px]">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-success-soft text-caption">
                         <div>
-                          <span className="text-[#166534] font-semibold">Automated Tests: </span>
-                          <span className="font-bold text-[#15803D]">
+                          <span className="text-success font-semibold">Automated Tests: </span>
+                          <span className="font-semibold text-success">
                             {prDetail.automated_checks.tests_passed}/{prDetail.automated_checks.tests_run} Passed
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#166534] font-semibold">AST Complexity: </span>
-                          <span className="font-bold text-[#15803D]">
+                          <span className="text-success font-semibold">AST Complexity: </span>
+                          <span className="font-semibold text-success">
                             {prDetail.automated_checks.cyclomatic_complexity}
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#166534] font-semibold">Lint Violations: </span>
-                          <span className="font-bold text-[#15803D]">
+                          <span className="text-success font-semibold">Lint Violations: </span>
+                          <span className="font-semibold text-success">
                             {prDetail.automated_checks.lint_errors}
                           </span>
                         </div>
                         <div>
-                          <span className="text-[#166534] font-semibold">Security Alerts: </span>
-                          <span className="font-bold text-[#15803D]">
+                          <span className="text-success font-semibold">Security Alerts: </span>
+                          <span className="font-semibold text-success">
                             {prDetail.automated_checks.security_alerts} Clean
                           </span>
                         </div>
@@ -710,7 +700,7 @@ export default function TrainerCodeReviewsPage() {
                   </div>
 
                   {/* File Selector Tabs */}
-                  <div className="px-6 py-2.5 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between gap-4">
+                  <div className="px-6 py-2.5 bg-surface-2 border-b border-line flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1">
                       {prDetail.files.map((file, idx) => (
                         <button
@@ -719,21 +709,21 @@ export default function TrainerCodeReviewsPage() {
                             setSelectedFileIdx(idx);
                             setActiveCommentLine(null);
                           }}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-tile text-xs font-semibold transition cursor-pointer ${
                             selectedFileIdx === idx
-                              ? "bg-white text-[#2B5CD0] shadow-xs border border-[#CBD5E1]"
-                              : "text-[#64748B] hover:text-[#0F1F3A]"
+                              ? "bg-white text-brand shadow-card border border-line-strong"
+                              : "text-muted hover:text-ink"
                           }`}
                         >
                           <FileCode className="w-3.5 h-3.5" />
                           <span>{file.filename}</span>
-                          <span className="text-[10px] text-[#059669]">+{file.additions}</span>
-                          <span className="text-[10px] text-[#DC2626]">-{file.deletions}</span>
+                          <span className="text-caption text-success">+{file.additions}</span>
+                          <span className="text-caption text-danger">-{file.deletions}</span>
                         </button>
                       ))}
                     </div>
 
-                    <span className="text-xs text-[#94A3B8] font-semibold flex-shrink-0">
+                    <span className="text-xs text-subtle font-semibold flex-shrink-0">
                       {prDetail.files.length} {t("trainer_reviews.files_changed")}
                     </span>
                   </div>
@@ -741,17 +731,17 @@ export default function TrainerCodeReviewsPage() {
                   {/* Code Diff Viewer */}
                   <div className="p-6 bg-white font-mono text-xs">
                     {prDetail.files[selectedFileIdx] && (
-                      <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-xs">
-                        <div className="bg-[#F1F5F9] px-4 py-2 border-b border-[#E2E8F0] flex items-center justify-between font-sans text-xs">
-                          <span className="font-bold text-[#0F1F3A]">
+                      <div className="border border-line rounded-card overflow-hidden shadow-card">
+                        <div className="bg-line-soft px-4 py-2 border-b border-line flex items-center justify-between font-sans text-xs">
+                          <span className="font-semibold text-ink">
                             {prDetail.files[selectedFileIdx].filename}
                           </span>
-                          <span className="text-[11px] text-[#64748B]">
+                          <span className="text-caption text-muted">
                             Unified Diff View
                           </span>
                         </div>
 
-                        <div className="divide-y divide-[#F1F5F9] overflow-x-auto">
+                        <div className="divide-y divide-line-soft overflow-x-auto">
                           {prDetail.files[selectedFileIdx].diff_content.split("\n").map((line, lineIdx) => {
                             const isAdded = line.startsWith("+");
                             const isDeleted = line.startsWith("-");
@@ -768,25 +758,25 @@ export default function TrainerCodeReviewsPage() {
                                 <div
                                   className={`group flex items-start text-xs font-mono transition-colors ${
                                     isAdded
-                                      ? "bg-[#F0FDF4] text-[#166534]"
+                                      ? "bg-success-faint text-success"
                                       : isDeleted
-                                      ? "bg-[#FEF2F2] text-[#991B1B]"
+                                      ? "bg-danger-faint text-danger"
                                       : isHunk
-                                      ? "bg-[#EFF6FF] text-[#2B5CD0] font-bold"
-                                      : "bg-white text-[#334155] hover:bg-[#F8FAFC]"
+                                      ? "bg-brand-soft text-brand font-semibold"
+                                      : "bg-white text-ink-soft hover:bg-surface-2"
                                   }`}
                                 >
                                   {/* Line Number / Comment trigger */}
                                   <div
                                     onClick={() => setActiveCommentLine(activeCommentLine === lineNumber ? null : lineNumber)}
                                     title="Click to comment on this line"
-                                    className="w-12 py-1 px-2 text-right select-none text-[10px] text-[#94A3B8] group-hover:text-[#2B5CD0] cursor-pointer border-r border-[#E2E8F0] flex-shrink-0"
+                                    className="w-12 py-1 px-2 text-right select-none text-caption text-subtle group-hover:text-brand cursor-pointer border-r border-line flex-shrink-0"
                                   >
                                     {lineNumber}
                                   </div>
 
                                   {/* Line prefix */}
-                                  <div className="w-5 py-1 text-center select-none font-bold text-[11px] flex-shrink-0">
+                                  <div className="w-5 py-1 text-center select-none font-semibold text-caption flex-shrink-0">
                                     {isAdded ? "+" : isDeleted ? "-" : " "}
                                   </div>
 
@@ -800,22 +790,22 @@ export default function TrainerCodeReviewsPage() {
                                 {lineComments.map((comment) => (
                                   <div
                                     key={comment.id}
-                                    className="bg-[#EFF6FF] border-l-4 border-[#2B5CD0] p-3 text-xs font-sans space-y-1 mx-4 my-1 rounded-r-lg"
+                                    className="bg-brand-soft border-l-4 border-brand p-3 text-xs font-sans space-y-1 mx-4 my-1 rounded-r-lg"
                                   >
-                                    <div className="flex items-center justify-between text-[11px]">
-                                      <span className="font-bold text-[#0F1F3A]">
+                                    <div className="flex items-center justify-between text-caption">
+                                      <span className="font-semibold text-ink">
                                         {comment.author_name} ({comment.author_role})
                                       </span>
-                                      <span className="text-[#94A3B8]">{comment.created_at}</span>
+                                      <span className="text-subtle">{comment.created_at}</span>
                                     </div>
-                                    <p className="text-[#334155] text-xs">{comment.comment_text}</p>
+                                    <p className="text-ink-soft text-xs">{comment.comment_text}</p>
                                   </div>
                                 ))}
 
                                 {/* Inline comment composer when line clicked */}
                                 {activeCommentLine === lineNumber && (
-                                  <div className="p-3 bg-[#F8FAFC] border-y border-[#CBD5E1] font-sans text-xs space-y-2">
-                                    <div className="font-bold text-[#0F1F3A]">
+                                  <div className="p-3 bg-surface-2 border-y border-line-strong font-sans text-xs space-y-2">
+                                    <div className="font-semibold text-ink">
                                       {t("trainer_reviews.add_inline_comment")} {lineNumber}
                                     </div>
                                     <textarea
@@ -823,19 +813,19 @@ export default function TrainerCodeReviewsPage() {
                                       value={newCommentText}
                                       onChange={(e) => setNewCommentText(e.target.value)}
                                       placeholder="Provide technical guidance on this line..."
-                                      className="w-full p-2 border border-[#CBD5E1] rounded-lg text-xs focus:outline-none focus:border-[#2B5CD0] bg-white"
+                                      className="w-full p-2 border border-line-strong rounded-tile text-xs focus:outline-none focus:border-brand bg-white"
                                     />
                                     <div className="flex items-center justify-end gap-2">
                                       <button
                                         onClick={() => setActiveCommentLine(null)}
-                                        className="px-3 py-1 rounded-lg border border-[#CBD5E1] text-[#64748B] hover:bg-white text-xs font-semibold cursor-pointer"
+                                        className="px-3 py-1 rounded-tile border border-line-strong text-muted hover:bg-white text-xs font-semibold cursor-pointer"
                                       >
                                         Cancel
                                       </button>
                                       <button
                                         onClick={() => handleAddInlineComment(prDetail.files[selectedFileIdx].id, lineNumber)}
                                         disabled={commentLoading || !newCommentText.trim()}
-                                        className="px-3 py-1 rounded-lg bg-[#2B5CD0] hover:bg-[#204497] text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                                        className="px-3 py-1 rounded-tile bg-brand hover:bg-brand-hover text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
                                       >
                                         {commentLoading ? "Posting..." : t("trainer_reviews.submit_comment")}
                                       </button>
@@ -851,23 +841,23 @@ export default function TrainerCodeReviewsPage() {
                   </div>
 
                   {/* Review Evaluation & Action Console */}
-                  <div className="p-6 bg-[#F8FAFC] border-t border-[#E2E8F0] space-y-5">
+                  <div className="p-6 bg-surface-2 border-t border-line space-y-5">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-[#0F1F3A] flex items-center gap-2">
-                        <Sliders className="w-4 h-4 text-[#2B5CD0]" />
+                      <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+                        <Sliders className="w-4 h-4 text-brand" />
                         <span>{t("trainer_reviews.rubrics_heading")}</span>
                       </h3>
-                      <span className="text-[11px] text-[#64748B]">
+                      <span className="text-caption text-muted">
                         Ratings reflect on student portfolio and verified credentials
                       </span>
                     </div>
 
                     {/* Rubric Sliders */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-white p-3 rounded-xl border border-[#E2E8F0] space-y-2">
-                        <div className="flex justify-between text-xs font-bold text-[#0F1F3A]">
+                      <div className="bg-white p-3 rounded-card border border-line space-y-2">
+                        <div className="flex justify-between text-xs font-semibold text-ink">
                           <span>{t("trainer_reviews.rubric_code_quality")}</span>
-                          <span className="text-[#2B5CD0]">{qualityScore} / 5</span>
+                          <span className="text-brand">{qualityScore} / 5</span>
                         </div>
                         <input
                           type="range"
@@ -875,14 +865,14 @@ export default function TrainerCodeReviewsPage() {
                           max="5"
                           value={qualityScore}
                           onChange={(e) => setQualityScore(Number(e.target.value))}
-                          className="w-full accent-[#2B5CD0] cursor-pointer"
+                          className="w-full accent-brand cursor-pointer"
                         />
                       </div>
 
-                      <div className="bg-white p-3 rounded-xl border border-[#E2E8F0] space-y-2">
-                        <div className="flex justify-between text-xs font-bold text-[#0F1F3A]">
+                      <div className="bg-white p-3 rounded-card border border-line space-y-2">
+                        <div className="flex justify-between text-xs font-semibold text-ink">
                           <span>{t("trainer_reviews.rubric_test_coverage")}</span>
-                          <span className="text-[#2B5CD0]">{testScore} / 5</span>
+                          <span className="text-brand">{testScore} / 5</span>
                         </div>
                         <input
                           type="range"
@@ -890,14 +880,14 @@ export default function TrainerCodeReviewsPage() {
                           max="5"
                           value={testScore}
                           onChange={(e) => setTestScore(Number(e.target.value))}
-                          className="w-full accent-[#2B5CD0] cursor-pointer"
+                          className="w-full accent-brand cursor-pointer"
                         />
                       </div>
 
-                      <div className="bg-white p-3 rounded-xl border border-[#E2E8F0] space-y-2">
-                        <div className="flex justify-between text-xs font-bold text-[#0F1F3A]">
+                      <div className="bg-white p-3 rounded-card border border-line space-y-2">
+                        <div className="flex justify-between text-xs font-semibold text-ink">
                           <span>{t("trainer_reviews.rubric_modularity")}</span>
-                          <span className="text-[#2B5CD0]">{modularityScore} / 5</span>
+                          <span className="text-brand">{modularityScore} / 5</span>
                         </div>
                         <input
                           type="range"
@@ -905,14 +895,14 @@ export default function TrainerCodeReviewsPage() {
                           max="5"
                           value={modularityScore}
                           onChange={(e) => setModularityScore(Number(e.target.value))}
-                          className="w-full accent-[#2B5CD0] cursor-pointer"
+                          className="w-full accent-brand cursor-pointer"
                         />
                       </div>
                     </div>
 
                     {/* Review Feedback Textarea */}
                     <div>
-                      <label className="block text-xs font-bold text-[#0F1F3A] mb-1.5">
+                      <label className="block text-xs font-semibold text-ink mb-1.5">
                         {t("trainer_reviews.review_feedback_label")}
                       </label>
                       <textarea
@@ -920,17 +910,17 @@ export default function TrainerCodeReviewsPage() {
                         value={feedbackText}
                         onChange={(e) => setFeedbackText(e.target.value)}
                         placeholder={t("trainer_reviews.review_feedback_placeholder")}
-                        className="w-full p-3 rounded-xl border border-[#CBD5E1] text-xs focus:outline-none focus:border-[#2B5CD0] bg-white"
+                        className="w-full p-3 rounded-card border border-line-strong text-xs focus:outline-none focus:border-brand bg-white"
                       />
                     </div>
 
                     {/* Feedback Toast */}
                     {actionMessage && (
                       <div
-                        className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                        className={`p-3 rounded-card text-xs font-semibold flex items-center gap-2 ${
                           actionMessage.type === "success"
-                            ? "bg-[#DCFCE7] text-[#15803D] border border-[#86EFAC]"
-                            : "bg-[#FEE2E2] text-[#DC2626] border border-[#FCA5A5]"
+                            ? "bg-success-soft text-success border border-success-line"
+                            : "bg-danger-soft text-danger border border-danger-line"
                         }`}
                       >
                         <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
@@ -943,7 +933,7 @@ export default function TrainerCodeReviewsPage() {
                       <button
                         onClick={() => handleReviewAction("request_changes")}
                         disabled={actionLoading}
-                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-[#F59E0B] text-[#D97706] hover:bg-[#FEF3C7] text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-card border border-warning-fill text-warning hover:bg-warning-soft text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         <AlertCircle className="w-4 h-4" />
                         <span>{t("trainer_reviews.action_request_changes")}</span>
@@ -952,7 +942,7 @@ export default function TrainerCodeReviewsPage() {
                       <button
                         onClick={() => handleReviewAction("approve")}
                         disabled={actionLoading}
-                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#2BB3A0] hover:bg-[#239988] text-white text-xs font-bold shadow-md transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full sm:w-auto px-6 py-2.5 rounded-card bg-teal hover:bg-teal-hover text-white text-xs font-semibold shadow-pop transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         <Check className="w-4 h-4" />
                         <span>{t("trainer_reviews.action_approve")}</span>

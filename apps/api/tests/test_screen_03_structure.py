@@ -18,9 +18,10 @@ from sqlalchemy import delete, select
 from core.database import SessionLocal
 from core.security import PLATFORM_TENANT, create_access_token
 from main import app
-from models.schema import (AuditLog, Batch, BatchTrainer, Branch, College, ConsentRecord, MouTerm, OutboxEvent, ParentStudent,
+from models.schema import (Invitation, AuditLog, Batch, BatchTrainer, Branch, College, ConsentRecord, MouTerm, OutboxEvent, ParentStudent,
                            Student, Trainer, User)
 
+from tests.invite_helpers import set_password
 client = TestClient(app)
 STAFF = {"Authorization": "Bearer " + create_access_token({"sub": "usr_irep_staff_01", "role": "irep_admin", "college_id": PLATFORM_TENANT})}
 KAVITHA = {"Authorization": "Bearer " + create_access_token({"sub": "usr_kavitha_01", "role": "college_admin", "college_id": "col_demo_001"})}
@@ -33,7 +34,7 @@ def college():
     cid = client.post("/api/v1/admin/colleges", json={"name": "Structure Test College", "code": code, "city": "Trichy",
                                                       "state": "Tamil Nadu"}, headers=STAFF).json()["id"]
     email = f"admin.{code.lower()}@college.example"
-    temp = client.post(f"/api/v1/admin/colleges/{cid}/admins", json={"name": "Dr. Admin", "email": email}, headers=STAFF).json()["temporary_password"]
+    temp = set_password(client.post(f"/api/v1/admin/colleges/{cid}/admins", json={"name": "Dr. Admin", "email": email}, headers=STAFF).json())
     tok = client.post("/api/v1/auth/login", json={"role": "college", "identifier": email, "password": temp}).json()["access_token"]
     db = SessionLocal()
     try:
@@ -61,6 +62,7 @@ def college():
         db.execute(delete(Batch).where(Batch.college_id == cid))
         db.execute(delete(Branch).where(Branch.college_id == cid))
         db.execute(delete(Trainer).where(Trainer.college_id == cid))
+        db.execute(delete(Invitation).where(Invitation.college_id == cid))
         db.execute(delete(User).where(User.college_id == cid))
         db.execute(delete(OutboxEvent).where(OutboxEvent.college_id == cid))
         db.execute(delete(MouTerm).where(MouTerm.college_id == cid))

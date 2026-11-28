@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { useAuth, Role } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
 import { NotificationBell } from "@/components/NotificationBell";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { cn } from "@/lib/cn";
 import { KeyRound,
   LifeBuoy,
   LayoutDashboard, BookOpen, Code2, FileCheck2, Cpu,
@@ -14,18 +16,38 @@ import { KeyRound,
   Search, ChevronDown, Languages, LogOut, Menu, X, Mail, ShieldCheck, Building2,
 } from "lucide-react";
 
+const COLLAPSE_KEY = "irep_sidebar_collapsed";
+import { BrandMark } from "@/components/ui/BrandMark";
+
 interface AppShellProps {
   children: React.ReactNode;
+  /** The screen's h1, shown at the top of the page body. */
   pageTitle?: string;
+  /** One line under the title. */
+  pageSubtitle?: React.ReactNode;
+  /** Buttons on the right of the title. */
+  pageActions?: React.ReactNode;
+  /** false when the page draws its own h1 (legacy hero headers). */
+  header?: boolean;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashboard" }) => {
+export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashboard", pageSubtitle, pageActions, header = true }) => {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const [profileOpen, setProfileOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // desktop sidebar: full (labels) or a narrow icon rail; remembered in this browser
+  const [collapsed, setCollapsed] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1"); }, []);
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1");
+      return !c;
+    });
+  };
 
   const role: Role = user?.role || "student";
 
@@ -52,7 +74,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
   const studentNav = [
     { label: t("nav.dashboard"), href: "/student", icon: LayoutDashboard },
     { label: t("nav.my_courses"), href: "/student/courses", icon: BookOpen },
-    { label: t("nav.coding_lab"), href: "/student/coding/prob_connected_components", icon: Code2 },
+    { label: t("nav.coding_lab"), href: "/student/coding", icon: Code2 },
     { label: t("nav.practice_tests"), href: "/student/tests", icon: FileCheck2 },
     { label: t("nav.virtual_labs"), href: "/student/labs", icon: Cpu },
     { label: t("nav.sprint_board"), href: "/student/projects/board", icon: KanbanSquare },
@@ -62,7 +84,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.certificates"), href: "/student/certificates", icon: Award },
     { label: t("nav.portfolio"), href: "/student/portfolio", icon: Briefcase },
     { label: t("nav.live_sessions"), href: "/student/live", icon: Radio },
-    { label: t("nav.checkin"), href: "/student/checkin", icon: ClipboardCheck },
     { label: t("nav.discussions"), href: "/student/discussions", icon: MessageSquare },
   ];
 
@@ -74,12 +95,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
     { label: t("nav.approvals"), href: "/trainer/approvals", icon: ShieldCheck },
     { label: t("nav.assessments"), href: "/trainer/assessments", icon: FileCheck2 },
     { label: t("nav.mock_interviews"), href: "/trainer/interviews", icon: Video },
+    { label: t("nav.trainer_projects"), href: "/trainer/projects", icon: KanbanSquare },
     { label: t("nav.code_reviews"), href: "/trainer/reviews", icon: Code2 },
     { label: t("nav.at_risk_students"), href: "/trainer/at-risk", icon: Users },
     { label: t("nav.lab_board"), href: "/trainer/labs", icon: Cpu },
     { label: t("nav.reports"), href: "/trainer/reports", icon: BookOpen },
     { label: t("nav.messages"), href: "/trainer/messages", icon: MessageSquare },
-    { label: t("nav.live_classroom"), href: "/live/sess_thu_rag", icon: Radio },
+    { label: t("nav.live_classroom"), href: "/trainer/live", icon: Radio },
   ];
 
   const collegeNav = [
@@ -124,75 +146,93 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
   const currentNav = role === "admin" ? adminNav : role === "trainer" ? trainerNav : role === "college" ? collegeNav : role === "parent" ? parentNav : studentNav;
   const homes = ["/student", "/trainer", "/college", "/parent", "/admin/colleges"];
 
-  const sidebar = (
+  /** compact = the desktop icon rail; drawer = the phone menu (always full, its logo does not toggle). */
+  const sidebar = (compact: boolean, drawer = false) => (
     <>
-      <div>
-        <div className="p-4 border-b border-[#1E3A6E] flex items-start justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#2BB3A0] to-[#2B5CD0] flex items-center justify-center font-bold text-white text-sm shadow">IR</div>
-              <span className="font-bold text-base tracking-wide text-white">IREP Portal</span>
-            </div>
-            <div className="mt-2 text-[10px] font-semibold tracking-wider text-[#94A3B8] uppercase truncate max-w-[170px]">
-              {roleLabel[role]} · {user?.name || ""}
-            </div>
+      <div className={cn("flex items-center gap-2 h-16 flex-shrink-0", compact ? "justify-center px-3" : "justify-between px-4")}>
+        {drawer ? (
+          <div className="flex items-center gap-2.5 min-w-0 px-1">
+            <BrandMark className="w-8 h-8" />
+            <span className="font-semibold text-heading text-white truncate">IREP Portal</span>
           </div>
-          <button onClick={() => setNavOpen(false)} className="lg:hidden p-1 rounded hover:bg-[#1E3A6E]" aria-label={t("shell.close_menu")}>
-            <X className="w-4 h-4" />
+        ) : (
+          // desktop: the logo is the toggle between the full sidebar and the icon rail
+          <button onClick={toggleCollapsed} data-testid="sidebar-toggle" aria-pressed={compact}
+            aria-label={compact ? t("shell.expand_menu") : t("shell.collapse_menu")} title={compact ? t("shell.expand_menu") : t("shell.collapse_menu")}
+            className={cn("group flex items-center gap-2.5 min-w-0 rounded-card p-1 -m-1 transition-colors hover:bg-white/10 focus-visible:bg-white/10",
+              compact ? "" : "flex-1")}>
+            <BrandMark className="w-8 h-8 transition-transform duration-200 group-hover:scale-105 group-active:scale-95" />
+            {!compact && <span className="font-semibold text-heading text-white truncate">IREP Portal</span>}
           </button>
-        </div>
-        <nav className="p-2 space-y-1 overflow-y-auto max-h-[calc(100vh-170px)] scrollbar-none" aria-label={t("shell.main_menu")}>
-          {currentNav.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href || (!homes.includes(item.href) && pathname.startsWith(item.href));
-            return (
-              <Link key={item.href} href={item.href} aria-current={isActive ? "page" : undefined}
-                className={`flex items-center gap-2.5 px-3 py-2.5 lg:py-2 rounded-lg text-sm lg:text-xs font-medium transition-all ${isActive ? "bg-[#2B5CD0] text-white shadow-sm font-semibold" : "text-[#CBD5E1] hover:bg-[#1E3A6E] hover:text-white"}`}>
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        )}
+        <button onClick={() => setNavOpen(false)} className="lg:hidden p-1.5 rounded-tile text-white/70 hover:bg-white/10 hover:text-white" aria-label={t("shell.close_menu")}>
+          <X className="w-4 h-4" />
+        </button>
       </div>
-      <div className="p-3 border-t border-[#1E3A6E] text-[10px] text-[#94A3B8] leading-tight text-center">
-        Industry-Ready Engineer Program<br />B.Tech Semesters 2 to 7
+      <nav className={cn("flex-1 min-h-0 py-2 space-y-0.5 overflow-y-auto scrollbar-none", compact ? "px-2" : "px-3")} aria-label={t("shell.main_menu")}>
+        {currentNav.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || (!homes.includes(item.href) && pathname.startsWith(item.href));
+          return (
+            <Link key={item.href} href={item.href} aria-current={isActive ? "page" : undefined}
+              title={compact ? item.label : undefined} aria-label={compact ? item.label : undefined}
+              className={cn("flex items-center min-h-9 py-2 rounded-tile text-body leading-5 font-medium transition-colors",
+                compact ? "justify-center px-0" : "gap-3 px-3",
+                isActive ? "bg-white/20 text-white shadow-card ring-1 ring-white/25" : "text-white/90 hover:bg-white/15 hover:text-white")}>
+              <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-white" : "text-white/85")} />
+              {!compact && <span className="min-w-0 break-words">{item.label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className={cn("flex items-center gap-3 py-4 border-t border-white/15 flex-shrink-0", compact ? "justify-center px-2" : "px-5")}
+        data-testid="sidebar-user" title={compact ? `${user?.name || ""} · ${roleLabel[role]}` : undefined}>
+        <span className="w-9 h-9 rounded-full bg-white/15 ring-1 ring-white/20 text-white flex items-center justify-center font-semibold text-label flex-shrink-0">{user?.avatar || "?"}</span>
+        {!compact && (
+          <div className="min-w-0">
+            <div className="text-label font-semibold text-white truncate">{user?.name || ""}</div>
+            <div className="text-caption text-white/80 truncate">{roleLabel[role]} · {t("shell.college_name")}</div>
+          </div>
+        )}
       </div>
     </>
   );
 
   return (
-    <div className="flex h-screen bg-[#F1F5F9] overflow-hidden">
+    <div className="flex h-screen bg-canvas overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-[200px] flex-shrink-0 bg-[#14284B] text-white flex-col justify-between z-20">{sidebar}</aside>
+      <aside data-testid="desktop-sidebar" data-collapsed={collapsed ? "true" : "false"}
+        className={cn("hidden lg:flex flex-shrink-0 side-gradient text-white flex-col z-20 transition-[width] duration-300 ease-out", collapsed ? "w-[72px]" : "w-[240px]")}>
+        {sidebar(collapsed)}
+      </aside>
 
       {/* Mobile / tablet drawer */}
       {navOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label={t("shell.main_menu")}>
-          <div className="absolute inset-0 bg-black/50" onClick={() => setNavOpen(false)} />
-          <aside className="relative w-[260px] max-w-[80vw] bg-[#14284B] text-white flex flex-col justify-between shadow-2xl" data-testid="mobile-nav">{sidebar}</aside>
+          <div className="absolute inset-0 bg-ink/50" onClick={() => setNavOpen(false)} />
+          <aside className="relative w-[260px] max-w-[80vw] side-gradient text-white flex flex-col shadow-pop" data-testid="mobile-nav">{sidebar(false, true)}</aside>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-14 bg-white border-b border-[#E2E8F0] px-3 sm:px-6 flex items-center justify-between gap-2 flex-shrink-0 z-10">
-          <div className="flex items-center gap-2 min-w-0">
-            <button onClick={() => setNavOpen(true)} className="lg:hidden p-2 -ml-1 rounded-lg hover:bg-[#F1F5F9]" aria-label={t("shell.open_menu")} data-testid="open-nav">
-              <Menu className="w-5 h-5 text-[#0F1F3A]" />
+      {/* the whole right side scrolls, so the page passes under the frosted top bar */}
+      <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden" data-testid="app-scroll">
+        <header className="sticky top-0 z-30 px-3 pt-2 sm:px-4 lg:px-6">
+        <div className="glass-bar h-14 rounded-card px-3 sm:px-4 flex items-center justify-between gap-3" data-testid="top-bar">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <button onClick={() => setNavOpen(true)} className="lg:hidden p-2 -ml-1 rounded-tile hover:bg-white/70" aria-label={t("shell.open_menu")} data-testid="open-nav">
+              <Menu className="w-5 h-5 text-ink" />
             </button>
-            <h1 className="text-sm sm:text-base font-bold text-[#0F1F3A] truncate">{pageTitle}</h1>
+            <div className="relative hidden lg:block w-full max-w-sm">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
+              <input type="text" placeholder={t("shell.search")} aria-label={t("shell.search")}
+                className="w-full h-9 pl-9 pr-3 bg-white/60 border border-white/80 rounded-tile text-body text-ink placeholder:text-subtle focus:outline-none focus:border-brand focus:bg-surface focus:ring-2 focus:ring-brand/15" />
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-            <div className="relative hidden md:block w-56 xl:w-64">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-              <input type="text" placeholder={t("shell.search")} aria-label={t("shell.search")}
-                className="w-full pl-9 pr-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs text-[#0F1F3A] placeholder-[#94A3B8] focus:outline-none focus:border-[#2B5CD0] focus:bg-white" />
-            </div>
-
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button onClick={toggleLanguage} title="Tamil / English" data-testid="lang-toggle"
-              className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0F1F3A] text-xs font-semibold rounded-lg transition-colors border border-[#E2E8F0]">
-              <Languages className="w-3.5 h-3.5 text-[#2B5CD0]" />
+              className="flex items-center gap-1.5 h-9 px-3 bg-white/60 hover:bg-white/90 text-ink text-label font-medium rounded-tile transition-colors border border-white/80">
+              <Languages className="w-4 h-4 text-brand" />
               <span>{language === "en" ? "தமிழ்" : "English"}</span>
             </button>
 
@@ -201,32 +241,32 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
             {/* Profile menu (sign out lives here) */}
             <div className="relative" ref={profileRef}>
               <button onClick={() => setProfileOpen(!profileOpen)} aria-haspopup="menu" aria-expanded={profileOpen} data-testid="profile-button"
-                className="flex items-center gap-1.5 p-0.5 sm:pr-2 rounded-full hover:bg-[#F1F5F9] transition-colors" aria-label={t("shell.profile")}>
-                <span className="w-8 h-8 rounded-full bg-[#2BB3A0] text-white flex items-center justify-center font-bold text-xs shadow-sm">{user?.avatar || "?"}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-[#64748B] hidden sm:block" />
+                className="flex items-center gap-1.5 p-0.5 sm:pr-2 rounded-full hover:bg-white/70 transition-colors" aria-label={t("shell.profile")}>
+                <span className="w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center font-semibold text-caption">{user?.avatar || "?"}</span>
+                <ChevronDown className="w-4 h-4 text-muted hidden sm:block" />
               </button>
               {profileOpen && (
-                <div role="menu" data-testid="profile-menu" className="absolute right-0 mt-1.5 w-64 max-w-[calc(100vw-24px)] bg-white rounded-xl shadow-xl border border-[#E2E8F0] z-50 text-xs overflow-hidden">
-                  <div className="p-4 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center gap-3">
-                    <span className="w-11 h-11 rounded-full bg-[#2BB3A0] text-white flex items-center justify-center font-bold text-sm flex-shrink-0">{user?.avatar || "?"}</span>
+                <div role="menu" data-testid="profile-menu" className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-24px)] bg-surface rounded-card shadow-pop border border-line z-50 overflow-hidden">
+                  <div className="p-4 border-b border-line flex items-center gap-3">
+                    <span className="w-10 h-10 rounded-full bg-teal text-white flex items-center justify-center font-semibold text-label flex-shrink-0">{user?.avatar || "?"}</span>
                     <div className="min-w-0">
-                      <div className="font-bold text-sm text-[#0F1F3A] truncate" data-testid="profile-name">{user?.name}</div>
-                      <div className="text-[11px] font-semibold text-[#2B5CD0]">{roleLabel[role]}</div>
+                      <div className="font-semibold text-body text-ink truncate" data-testid="profile-name">{user?.name}</div>
+                      <div className="text-caption text-muted">{roleLabel[role]}</div>
                     </div>
                   </div>
-                  <div className="p-3 space-y-2 text-[#334155]">
-                    {user?.email && <div className="flex items-center gap-2 min-w-0"><Mail className="w-3.5 h-3.5 text-[#94A3B8] flex-shrink-0" /><span className="truncate">{user.email}</span></div>}
-                    <div className="flex items-center gap-2"><Building2 className="w-3.5 h-3.5 text-[#94A3B8]" /><span>{t("shell.college_name")}</span></div>
-                    <div className="flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5 text-[#94A3B8]" /><span>{t("shell.language")}: {language === "ta" ? "தமிழ்" : "English"}</span></div>
+                  <div className="p-4 space-y-2.5 text-label text-ink-soft">
+                    {user?.email && <div className="flex items-center gap-2.5 min-w-0"><Mail className="w-4 h-4 text-subtle flex-shrink-0" /><span className="truncate">{user.email}</span></div>}
+                    <div className="flex items-center gap-2.5"><Building2 className="w-4 h-4 text-subtle" /><span>{t("shell.college_name")}</span></div>
+                    <div className="flex items-center gap-2.5"><ShieldCheck className="w-4 h-4 text-subtle" /><span>{t("shell.language")}: {language === "ta" ? "தமிழ்" : "English"}</span></div>
                   </div>
-                  <div className="border-t border-[#E2E8F0] p-1">
+                  <div className="border-t border-line p-1.5">
                     {/* L39: report a problem from any screen (screen 49) */}
                     <Link role="menuitem" href={`/support?from=${encodeURIComponent(pathname || "/")}`} data-testid="report-problem"
-                      className="w-full text-left px-3 py-2.5 text-[#334155] hover:bg-[#F1F5F9] rounded-lg flex items-center gap-2 font-semibold">
+                      className="w-full text-left px-3 h-9 text-label text-ink-soft hover:bg-line-soft rounded-tile flex items-center gap-2.5 font-medium">
                       <LifeBuoy className="w-4 h-4" /><span>{t("shell.report_problem")}</span>
                     </Link>
                     <button role="menuitem" onClick={logout} data-testid="sign-out"
-                      className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 font-semibold">
+                      className="w-full text-left px-3 h-9 text-label text-danger hover:bg-danger-soft rounded-tile flex items-center gap-2.5 font-medium">
                       <LogOut className="w-4 h-4" /><span>{t("shell.sign_out")}</span>
                     </button>
                   </div>
@@ -234,9 +274,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, pageTitle = "Dashb
               )}
             </div>
           </div>
+        </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6">{children}</main>
+        <main className="px-4 pt-5 pb-6 sm:px-6 lg:px-8 lg:pt-6 lg:pb-8">
+          {header && <PageHeader title={pageTitle} subtitle={pageSubtitle} actions={pageActions} />}
+          {children}
+        </main>
       </div>
     </div>
   );

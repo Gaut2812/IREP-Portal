@@ -1,0 +1,28 @@
+# LiveKit on its own media VM (not the database host). Template: replace every CHANGE_ME.
+# Needs a person's review before first use (docs/deploy/LIVEKIT.md).
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true          # advertise the VM's public IP to browsers
+redis:
+  address: CHANGE_ME:6379        # optional for one node; required to add a second media node
+keys:
+  CHANGE_ME_KEY: CHANGE_ME_SECRET_AT_LEAST_32_CHARS
+webhook:
+  api_key: CHANGE_ME_KEY
+  urls:
+    - https://CHANGE_ME_PORTAL_DOMAIN/api/v1/webhooks/livekit
+turn:
+  enabled: true                  # campus networks often block UDP: TURN over TLS on 443 gets through
+  domain: turn.CHANGE_ME_DOMAIN
+  tls_port: 5349                 # Caddy (or a layer-4 proxy) forwards 443 for the turn.* name here
+  udp_port: 3478
+  external_tls: true
+room:
+  empty_timeout: 300
+  departure_timeout: 20
+  max_participants: 300
+logging:
+  level: info

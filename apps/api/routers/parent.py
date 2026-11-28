@@ -16,8 +16,9 @@ router = APIRouter(prefix="/parent", tags=["Parent Screens"])
 
 class RSVPRequest(BaseModel):
     event_id: str
-    status: str # attending, declined, none
-    guest_count: int = 1
+    status: str  # attending or declined (yes / no / maybe also accepted)
+    guest_count: int = 1  # 0..10
+    child_id: Optional[str] = None  # parents of two children say which one; default: the first linked child
 
 # --- SCREEN 15: Parent View (PDF 10) ---
 from services.parent_overview import build_parent_overview
@@ -75,13 +76,21 @@ def submit_rsvp_legacy(
     current_user: TokenPayload = Depends(require_role(["parent"])),
     db: Session = Depends(get_db),
 ):
-    """Legacy Screen 15 RSVP (ProjectDemoEvent). Kept for the first-generation page."""
-    event = db.execute(select(ProjectDemoEvent).filter_by(id=req.event_id, college_id=current_user.college_id)).scalar_one_or_none()
-    if event:
-        event.rsvp_status = req.status
-        event.guest_count = req.guest_count
-        db.commit()
+    """Legacy Screen 15 RSVP. Stored per parent like every RSVP (it used to overwrite one shared row)."""
+    _save_card_rsvp(db, current_user, req)
+    db.commit()
     return {"success": True, "message": f"RSVP saved for {req.event_id}. Thank you!"}
+
+
+CARD_STATUS = {"attending": "yes", "declined": "no", "yes": "yes", "no": "no", "maybe": "maybe"}
+
+
+def _save_card_rsvp(db: Session, current_user: TokenPayload, req: "RSVPRequest"):
+    from routers.events import save_parent_rsvp
+    status = CARD_STATUS.get((req.status or "").strip().lower())
+    if status is None:
+        raise HTTPException(status_code=422, detail="status must be attending or declined")
+    return save_parent_rsvp(db, current_user, req.event_id, status, req.guest_count, req.child_id)
 
 # --- SCREEN 33: Parent Projects & Portfolio ---
 @router.get("/portfolio")
@@ -126,17 +135,9 @@ def get_parent_portfolio(
             "is_featured": p.is_featured
         })
 
-    # Query Demo Day event
-    event = db.execute(select(ProjectDemoEvent).filter_by(college_id=college_id)).scalar_one_or_none()
-    demo_day_info = {
-        "id": event.id if event else "event_demo_day_nov",
-        "title": event.title if event else "Project Demo Day – Capstone Showcase",
-        "event_date": event.event_date if event else "Sat, Nov 8 · 10:00 AM – 1:00 PM",
-        "venue": event.venue if event else "Auditorium A & Live Stream",
-        "description": event.description if event else "Annual Industry-Ready Engineer Program Capstone Presentation.",
-        "rsvp_status": event.rsvp_status if event else "none",
-        "guest_count": event.guest_count if event else 1
-    }
+    # The next real event that takes RSVPs (a demo day first), with this parent's own answer; None when there is none
+    from routers.events import next_demo_day_for_parent
+    demo_day_info = next_demo_day_for_parent(db, current_user, student, lang)
 
     return {
         "ward": {
@@ -191,21 +192,14 @@ def submit_portfolio_rsvp(
     current_user: TokenPayload = Depends(require_role(["parent"])),
     db: Session = Depends(get_db)
 ):
-    college_id = current_user.college_id
-    event = db.execute(select(ProjectDemoEvent).filter_by(id=req.event_id, college_id=college_id)).scalar_one_or_none()
-
-    if not event:
-        raise HTTPException(status_code=404, detail="Demo day event not found")
-
-    event.rsvp_status = req.status
-    event.guest_count = req.guest_count
+    rsvp = _save_card_rsvp(db, current_user, req)
     db.commit()
-
+    card = {"yes": "attending", "no": "declined", "maybe": "maybe"}[rsvp.status]
     return {
         "success": True,
-        "message": f"RSVP recorded as '{req.status}' for {event.title}",
-        "rsvp_status": event.rsvp_status,
-        "guest_count": event.guest_count
+        "message": f"RSVP recorded as '{card}'",
+        "rsvp_status": card,
+        "guest_count": rsvp.guests
     }
 
 

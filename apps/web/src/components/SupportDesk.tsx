@@ -74,42 +74,42 @@ export function SupportDesk({ staffView }: { staffView: boolean }) {
     await Promise.all([show(open.id), load()]);
   });
 
-  const cls = "w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs";
-  const chip: Record<string, string> = { open: "bg-[#DBEAFE] text-[#1D4ED8]", answered: "bg-[#DCFCE7] text-[#166534]", closed: "bg-[#F1F5F9] text-[#475569]" };
+  const cls = "w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs";
+  const chip: Record<string, string> = { open: "bg-info-soft text-info", answered: "bg-success-soft text-success", closed: "bg-line-soft text-ink-soft" };
 
   return (
     <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-5 gap-4 max-w-6xl">
       <div className="lg:col-span-2 space-y-3">
         {!staffView && (
-          <form onSubmit={submit} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-2" data-testid="ticket-form">
-            <h2 className="text-sm font-black flex items-center gap-2"><LifeBuoy className="w-4 h-4 text-[#2B5CD0]" />{t("support.report")}</h2>
-            {form.page_path && <p className="text-[11px] text-[#64748B]" data-testid="ticket-from">{t("support.from_page")}: <code>{form.page_path}</code></p>}
+          <form onSubmit={submit} noValidate className="bg-white rounded-card border border-line p-4 space-y-2" data-testid="ticket-form">
+            <h2 className="text-sm font-semibold flex items-center gap-2"><LifeBuoy className="w-4 h-4 text-brand" />{t("support.report")}</h2>
+            {form.page_path && <p className="text-caption text-muted" data-testid="ticket-from">{t("support.from_page")}: <code>{form.page_path}</code></p>}
             <select className={cls} value={form.category} aria-label={t("support.category")} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="ticket-category">
               {["bug", "question", "access", "data"].map((c) => <option key={c} value={c}>{t(`support.cat_${c}`)}</option>)}
             </select>
             <input className={cls} placeholder={t("support.subject")} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} data-testid="ticket-subject" />
             <textarea className={cls} rows={4} placeholder={t("support.body")} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} data-testid="ticket-body" />
-            <button type="submit" disabled={busy} className="w-full px-3 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50" data-testid="ticket-submit">{t("support.send")}</button>
+            <button type="submit" disabled={busy} className="w-full px-3 py-2 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="ticket-submit">{t("support.send")}</button>
           </form>
         )}
         <div className="flex gap-2" role="tablist">
           {["", "open", "answered", "closed"].map((f) => (
             <button key={f || "all"} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${filter === f ? "bg-[#0F1F3A] text-white" : "border border-[#CBD5E1]"}`}>{t(`support.filter_${f || "all"}`)}</button>
+              className={`px-2.5 py-1 rounded-tile text-caption font-semibold ${filter === f ? "bg-ink text-white" : "border border-line-strong"}`}>{t(`support.filter_${f || "all"}`)}</button>
           ))}
         </div>
         {error && <p className="text-xs text-red-600" role="alert" data-testid="support-error">{error}</p>}
-        <ul className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9]" data-testid="ticket-list">
-          {tickets.length === 0 && <li className="p-4 text-xs text-[#64748B] text-center">{t("support.none")}</li>}
+        <ul className="bg-white rounded-card border border-line divide-y divide-line-soft" data-testid="ticket-list">
+          {tickets.length === 0 && <li className="p-4 text-xs text-muted text-center">{t("support.none")}</li>}
           {tickets.map((tk) => (
             <li key={tk.id}>
               <button type="button" onClick={() => show(tk.id)} aria-pressed={open?.id === tk.id} data-testid="ticket-row"
-                className={`w-full text-left px-3 py-2 ${open?.id === tk.id ? "bg-[#EFF6FF]" : "hover:bg-[#F8FAFC]"}`}>
+                className={`w-full text-left px-3 py-2 ${open?.id === tk.id ? "bg-brand-soft" : "hover:bg-surface-2"}`}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-[#0F1F3A] truncate">{tk.subject}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chip[tk.status]}`}>{t(`support.status_${tk.status}`)}</span>
+                  <span className="text-xs font-semibold text-ink truncate">{tk.subject}</span>
+                  <span className={`text-caption font-semibold px-2 py-0.5 rounded-full ${chip[tk.status]}`}>{t(`support.status_${tk.status}`)}</span>
                 </div>
-                <div className="text-[11px] text-[#64748B] truncate">{staffView ? `${tk.requester_name} · ${tk.requester_role} · ${tk.college}` : t(`support.cat_${tk.category}`)}{tk.page_path ? ` · ${tk.page_path}` : ""}</div>
+                <div className="text-caption text-muted truncate">{staffView ? `${tk.requester_name} · ${tk.requester_role} · ${tk.college}` : t(`support.cat_${tk.category}`)}{tk.page_path ? ` · ${tk.page_path}` : ""}</div>
               </button>
             </li>
           ))}
@@ -117,19 +117,19 @@ export function SupportDesk({ staffView }: { staffView: boolean }) {
       </div>
 
       {open && (
-        <section className="lg:col-span-3 bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3 h-fit" data-testid="ticket-detail">
+        <section className="lg:col-span-3 bg-white rounded-card border border-line p-4 space-y-3 h-fit" data-testid="ticket-detail">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h2 className="text-sm font-black text-[#0F1F3A]" data-testid="ticket-subject-heading">{open.subject}</h2>
-              <p className="text-[11px] text-[#64748B]">{open.requester_name} · {t(`support.cat_${open.category}`)}{open.page_path ? ` · ${open.page_path}` : ""}</p>
+              <h2 className="text-sm font-semibold text-ink" data-testid="ticket-subject-heading">{open.subject}</h2>
+              <p className="text-caption text-muted">{open.requester_name} · {t(`support.cat_${open.category}`)}{open.page_path ? ` · ${open.page_path}` : ""}</p>
             </div>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chip[open.status]}`} data-testid="ticket-status">{t(`support.status_${open.status}`)}</span>
+            <span className={`text-caption font-semibold px-2 py-0.5 rounded-full ${chip[open.status]}`} data-testid="ticket-status">{t(`support.status_${open.status}`)}</span>
           </div>
           <ol className="space-y-2" data-testid="ticket-thread">
             {open.thread.map((m) => (
-              <li key={m.id} className={`rounded-lg p-2.5 text-xs ${m.is_staff ? "bg-[#ECFDF5] border border-[#A7F3D0]" : "bg-[#F8FAFC] border border-[#E2E8F0]"}`} data-testid={m.is_staff ? "staff-message" : "user-message"}>
-                <div className="font-bold text-[11px] text-[#334155]">{m.author}</div>
-                <div className="whitespace-pre-wrap text-[#0F1F3A]">{m.body}</div>
+              <li key={m.id} className={`rounded-tile p-2.5 text-xs ${m.is_staff ? "bg-success-faint border border-success-line" : "bg-surface-2 border border-line"}`} data-testid={m.is_staff ? "staff-message" : "user-message"}>
+                <div className="font-semibold text-caption text-ink-soft">{m.author}</div>
+                <div className="whitespace-pre-wrap text-ink">{m.body}</div>
               </li>
             ))}
           </ol>
@@ -137,13 +137,13 @@ export function SupportDesk({ staffView }: { staffView: boolean }) {
             <div className="space-y-2">
               <textarea rows={3} className={cls} value={reply} onChange={(e) => setReply(e.target.value)} placeholder={t("support.reply_ph")} data-testid="ticket-reply" />
               <div className="flex gap-2">
-                <button type="button" disabled={busy || !reply.trim()} onClick={send} className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1 disabled:opacity-50" data-testid="ticket-send">
+                <button type="button" disabled={busy || !reply.trim()} onClick={send} className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile inline-flex items-center gap-1 disabled:opacity-50" data-testid="ticket-send">
                   <Send className="w-3.5 h-3.5" />{t("support.reply")}
                 </button>
-                <button type="button" disabled={busy} onClick={close} className="px-3 py-1.5 border border-[#CBD5E1] text-xs font-bold rounded-lg disabled:opacity-50" data-testid="ticket-close">{t("support.close")}</button>
+                <button type="button" disabled={busy} onClick={close} className="px-3 py-1.5 border border-line-strong text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="ticket-close">{t("support.close")}</button>
               </div>
             </div>
-          ) : <p className="text-[11px] text-[#64748B]">{t("support.closed_note")}</p>}
+          ) : <p className="text-caption text-muted">{t("support.closed_note")}</p>}
         </section>
       )}
     </div>

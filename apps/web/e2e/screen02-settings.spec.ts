@@ -13,18 +13,59 @@ test.describe("Screen 02: College settings (/college/settings)", () => {
     await page.getByTestId("user-email").fill(email);
     await page.getByTestId("user-role").selectOption("placement_officer");
     await page.getByTestId("user-save").click();
-    const password = await page.getByTestId("user-temp-password-value").innerText();
+    // Phase 5: a one-time set-password link instead of a temporary password
+    const link = await page.getByTestId("invite-link-value").inputValue();
     await expect(page.getByTestId("user-row").filter({ hasText: email })).toContainText("Placement officer");
+    const row = page.getByTestId("invitation-row").filter({ hasText: email });
+    await expect(row.getByTestId("invitation-status")).toHaveText("Waiting");
 
     const ctx = await browser.newContext();
     const p2 = await ctx.newPage();
-    await p2.goto("/login");
-    await p2.getByTestId("role-college").click();
-    await p2.getByTestId("login-identifier").fill(email);
-    await p2.getByTestId("login-password").fill(password);
-    await p2.getByTestId("login-submit").click();
+    const u = new URL(link);
+    await p2.goto(u.pathname + u.hash);
+    await expect(p2.getByTestId("set-password-who")).toContainText("Meena Placement");
+    await expect(p2).toHaveURL(/\/auth\/set-password$/);                      // the token left the address bar
+    await p2.getByTestId("set-password-new").fill("short1");
+    await p2.getByTestId("set-password-again").fill("short1");
+    await p2.getByTestId("set-password-submit").click();
+    await expect(p2.getByTestId("set-password-error")).toBeVisible();
+    await p2.getByTestId("set-password-new").fill("Placement2026-ok");
+    await p2.getByTestId("set-password-again").fill("Placement2026-ok");
+    await p2.getByTestId("set-password-submit").click();
     await p2.waitForURL("**/college");
+
+    // the same link cannot be used twice
+    await p2.goto(u.pathname + u.hash);
+    await expect(p2.getByTestId("set-password-invalid")).toBeVisible();
     await ctx.close();
+
+    await page.reload();
+    await expect(page.getByTestId("invitation-row").filter({ hasText: email }).getByTestId("invitation-status")).toHaveText("Accepted");
+  });
+
+  test("an invitation can be revoked and sent again", async ({ page }) => {
+    await loginAs(page, "college");
+    await page.goto("/college/settings");
+    const email = `revoke.${Date.now().toString(36)}@demo.edu`;
+    await page.getByTestId("user-name").fill("Revoke Test");
+    await page.getByTestId("user-email").fill(email);
+    await page.getByTestId("user-role").selectOption("placement_officer");
+    await page.getByTestId("user-save").click();
+    const row = page.getByTestId("invitation-row").filter({ hasText: email });
+    await row.getByTestId("invitation-revoke").click();
+    await expect(row.getByTestId("revoke-confirm")).toBeVisible();                // asks first
+    await row.getByTestId("revoke-confirm-ok").click();
+    await expect(row.getByTestId("invitation-status")).toHaveText("Revoked");
+    await row.getByTestId("invitation-resend").click();
+    await expect(row.getByTestId("invitation-status")).toHaveText("Waiting");
+    await expect(page.getByTestId("invite-resent-box").getByTestId("invite-link-value")).toHaveValue(/#token=/);
+  });
+
+  test("set-password page supports Tamil and explains a bad link", async ({ page }) => {
+    await page.goto("/auth/set-password#token=not-a-real-token-123");
+    await expect(page.getByTestId("set-password-invalid")).toContainText("This link is not valid");
+    await page.getByTestId("set-password-lang").click();
+    await expect(page.getByTestId("set-password-invalid")).toContainText("இந்த இணைப்பு செல்லாது");
   });
 
   test("a data request raised here is completed on 48 and downloaded here", { tag: "@L27" }, async ({ page, browser }) => {

@@ -7,6 +7,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { downloadWithAuth } from "@/components/admin/AuditTabs";
 import { useLanguage } from "@/lib/LanguageContext";
 import { API_BASE, ApiError, authHeaders, fetchApi } from "@/lib/api";
+import { InviteLinkBox, InvitationsPanel, type InviteResult } from "@/components/invitations/Invitations";
 import { Copy, FileDown, Palette, Users } from "lucide-react";
 
 interface CollegeUser { id: string; name: string; email: string; phone: string | null; role: "college_admin" | "placement_officer"; is_active: boolean; is_me: boolean }
@@ -21,7 +22,8 @@ export default function CollegeSettingsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [userForm, setUserForm] = useState({ name: "", email: "", phone: "", role: "placement_officer" });
-  const [temp, setTemp] = useState<{ email: string; password: string } | null>(null);
+  const [invited, setInvited] = useState<InviteResult | null>(null);
+  const [inviteRefresh, setInviteRefresh] = useState(0);
   const [brand, setBrand] = useState({ logo_url: "", chat_retention_days: "365" });
   const [brandSaved, setBrandSaved] = useState(false);
   const [search, setSearch] = useState("");
@@ -63,10 +65,11 @@ export default function CollegeSettingsPage() {
     e.preventDefault();
     if (userForm.name.trim().length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(userForm.email.trim())) return setError(t("college_settings.err_user"));
     run(async () => {
-      const r = await fetchApi<{ email: string; temporary_password?: string }>("/college/users", {
+      const r = await fetchApi<InviteResult>("/college/users", {
         method: "POST", body: JSON.stringify({ ...userForm, name: userForm.name.trim(), email: userForm.email.trim(), phone: userForm.phone.trim() || null }),
       });
-      setTemp(r.temporary_password ? { email: r.email, password: r.temporary_password } : null);
+      setInvited(r);
+      setInviteRefresh((n) => n + 1);
       setUserForm({ name: "", email: "", phone: "", role: userForm.role });
     });
   };
@@ -107,43 +110,36 @@ export default function CollegeSettingsPage() {
   const download = (r: Req) => downloadWithAuth(`${API_BASE}/college/data-requests/${r.id}/export`, authHeaders(), `irep-export-${r.student_id}.json`)
     .catch(() => setError(t("college_settings.download_failed")));
 
-  const inputCls = "w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs";
+  const inputCls = "w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs";
 
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("college_settings.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-6 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="settings-error">{error}</p>}
           {s && (
-            <p className="text-xs text-[#64748B]">{s.college.name} · {s.college.code} · {[s.college.city, s.college.state].filter(Boolean).join(", ")} — {t("college_settings.profile_note")}</p>
+            <p className="text-xs text-muted">{s.college.name} · {s.college.code} · {[s.college.city, s.college.state].filter(Boolean).join(", ")} — {t("college_settings.profile_note")}</p>
           )}
 
           {/* Users and roles */}
-          <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3" data-testid="users-section">
-            <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><Users className="w-4 h-4 text-[#2B5CD0]" />{t("college_settings.users")}</h2>
-            <ul className="divide-y divide-[#F1F5F9] text-xs">
+          <section className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="users-section">
+            <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><Users className="w-4 h-4 text-brand" />{t("college_settings.users")}</h2>
+            <ul className="divide-y divide-line-soft text-xs">
               {s?.users.map((u) => (
                 <li key={u.id} className="py-2 flex items-center justify-between gap-2" data-testid="user-row">
                   <div>
-                    <span className="font-bold">{u.name}</span> · {u.email}
-                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[10px] font-bold">{t(`college_settings.role_${u.role}`)}</span>
-                    {!u.is_active && <span className="ml-1 px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#64748B] text-[10px] font-bold">{t("college_settings.inactive")}</span>}
+                    <span className="font-semibold">{u.name}</span> · {u.email}
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-brand-soft text-info text-caption font-semibold">{t(`college_settings.role_${u.role}`)}</span>
+                    {!u.is_active && <span className="ml-1 px-2 py-0.5 rounded-full bg-line-soft text-muted text-caption font-semibold">{t("college_settings.inactive")}</span>}
                   </div>
                   <button type="button" disabled={busy || u.is_me} onClick={() => toggleUser(u)} data-testid="user-toggle"
-                    className="px-2.5 py-1 border border-[#CBD5E1] rounded font-bold disabled:opacity-40">
+                    className="px-2.5 py-1 border border-line-strong rounded font-semibold disabled:opacity-40">
                     {u.is_active ? t("college_settings.deactivate") : t("college_settings.reactivate")}
                   </button>
                 </li>
               ))}
             </ul>
-            {temp && (
-              <div className="p-3 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] text-xs space-y-1" data-testid="user-temp-password">
-                <p className="font-bold text-[#92400E]">{t("admin_colleges.temp_password_title")}</p>
-                <p>{temp.email} · <code className="font-mono font-bold" data-testid="user-temp-password-value">{temp.password}</code>
-                  <button type="button" className="ml-2 inline-flex items-center gap-1 text-[#2B5CD0] font-bold" onClick={() => navigator.clipboard?.writeText(temp.password)}><Copy className="w-3 h-3" />{t("admin_colleges.copy")}</button></p>
-                <p className="text-[#92400E]">{t("admin_colleges.temp_password_note")}</p>
-              </div>
-            )}
+            <InviteLinkBox result={invited} testId="user-invite" />
             <form onSubmit={addUser} noValidate className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end" data-testid="user-form">
               <input className={inputCls} placeholder={t("admin_colleges.admin_name")} value={userForm.name} data-testid="user-name" onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} />
               <input className={inputCls} placeholder={t("admin_colleges.admin_email")} value={userForm.email} data-testid="user-email" onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
@@ -152,40 +148,41 @@ export default function CollegeSettingsPage() {
                 <option value="placement_officer">{t("college_settings.role_placement_officer")}</option>
                 <option value="college_admin">{t("college_settings.role_college_admin")}</option>
               </select>
-              <button type="submit" disabled={busy} data-testid="user-save" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("college_settings.add_user")}</button>
+              <button type="submit" disabled={busy} data-testid="user-save" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("college_settings.add_user")}</button>
             </form>
           </section>
+          <InvitationsPanel basePath="/college/invitations" refreshKey={inviteRefresh} />
 
           {/* Branding and policy */}
-          <form onSubmit={saveBrand} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3" data-testid="branding-form">
-            <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><Palette className="w-4 h-4 text-[#2B5CD0]" />{t("college_settings.branding")}</h2>
+          <form onSubmit={saveBrand} noValidate className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="branding-form">
+            <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><Palette className="w-4 h-4 text-brand" />{t("college_settings.branding")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
-              <label className="text-[11px] font-bold md:col-span-2">{t("college_settings.logo_url")}
+              <label className="text-caption font-semibold md:col-span-2">{t("college_settings.logo_url")}
                 <input className={`${inputCls} mt-1 font-normal`} value={brand.logo_url} data-testid="brand-logo" onChange={(e) => setBrand({ ...brand, logo_url: e.target.value })} placeholder="https://… or /logo.png" />
               </label>
-              <label className="text-[11px] font-bold">{t("college_settings.retention")}
+              <label className="text-caption font-semibold">{t("college_settings.retention")}
                 <input type="number" className={`${inputCls} mt-1 font-normal`} value={brand.chat_retention_days} data-testid="brand-retention" onChange={(e) => setBrand({ ...brand, chat_retention_days: e.target.value })} />
               </label>
             </div>
-            <p className="text-[11px] text-[#64748B]">{t("college_settings.retention_help")}</p>
+            <p className="text-caption text-muted">{t("college_settings.retention_help")}</p>
             <div className="flex items-center gap-2">
-              <button type="submit" disabled={busy} data-testid="brand-save" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("college_settings.save")}</button>
-              {brandSaved && <span className="text-xs text-[#166534] font-bold" data-testid="brand-saved">{t("college_settings.saved")}</span>}
+              <button type="submit" disabled={busy} data-testid="brand-save" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("college_settings.save")}</button>
+              {brandSaved && <span className="text-xs text-success font-semibold" data-testid="brand-saved">{t("college_settings.saved")}</span>}
             </div>
           </form>
 
           {/* Data requests (L27 -> screen 48) */}
-          <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3" data-testid="requests-section">
-            <h2 className="text-sm font-black text-[#0F1F3A] flex items-center gap-2"><FileDown className="w-4 h-4 text-[#2B5CD0]" />{t("college_settings.data_requests")}</h2>
-            <p className="text-[11px] text-[#64748B]">{t("college_settings.requests_help")}</p>
+          <section className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="requests-section">
+            <h2 className="text-sm font-semibold text-ink flex items-center gap-2"><FileDown className="w-4 h-4 text-brand" />{t("college_settings.data_requests")}</h2>
+            <p className="text-caption text-muted">{t("college_settings.requests_help")}</p>
             <form onSubmit={raise} noValidate className="space-y-2" data-testid="request-form">
               <div className="relative">
                 <input className={inputCls} placeholder={t("college_settings.find_student")} value={picked ? `${picked.name} · ${picked.register_no}` : search}
                   data-testid="request-student" onChange={(e) => { setPicked(null); setSearch(e.target.value); }} />
                 {hits.length > 0 && (
-                  <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#E2E8F0] rounded-lg shadow text-xs max-h-48 overflow-auto">
+                  <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-line rounded-tile shadow-card text-xs max-h-48 overflow-auto">
                     {hits.map((h) => (
-                      <li key={h.id}><button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#F8FAFC]" data-testid="student-hit" onClick={() => { setPicked(h); setHits([]); }}>
+                      <li key={h.id}><button type="button" className="w-full text-left px-3 py-1.5 hover:bg-surface-2" data-testid="student-hit" onClick={() => { setPicked(h); setHits([]); }}>
                         {h.name} · {h.register_no} · {h.batch}</button></li>
                     ))}
                   </ul>
@@ -197,21 +194,21 @@ export default function CollegeSettingsPage() {
                   <option value="deletion">{t("admin_audit.kind_deletion")}</option>
                 </select>
                 <input className={`${inputCls} md:col-span-2`} placeholder={t("college_settings.reason")} value={reqForm.reason} data-testid="request-reason" onChange={(e) => setReqForm({ ...reqForm, reason: e.target.value })} />
-                <button type="submit" disabled={busy} data-testid="request-save" className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("college_settings.raise")}</button>
+                <button type="submit" disabled={busy} data-testid="request-save" className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("college_settings.raise")}</button>
               </div>
             </form>
-            <ul className="divide-y divide-[#F1F5F9] text-xs">
-              {requests.length === 0 && <li className="py-2 text-[#64748B]">{t("admin_audit.no_requests")}</li>}
+            <ul className="divide-y divide-line-soft text-xs">
+              {requests.length === 0 && <li className="py-2 text-muted">{t("admin_audit.no_requests")}</li>}
               {requests.map((r) => (
                 <li key={r.id} className="py-2 flex flex-wrap items-center justify-between gap-2" data-testid="college-request">
                   <div>
-                    <span className="font-bold">{t(`admin_audit.kind_${r.kind}`)}</span> · {r.student_name || r.student_id}
-                    <span className="ml-2 text-[#64748B]">{t(`admin_audit.status_${r.status}`)}</span>
-                    {r.days_left !== null && <span className={`ml-2 ${r.overdue ? "text-[#DC2626] font-bold" : "text-[#64748B]"}`}>{r.overdue ? t("admin_audit.overdue") : `${t("admin_audit.due_in")} ${r.days_left} ${t("admin_audit.days")}`}</span>}
-                    {r.decision_note && <div className="text-[11px] text-[#64748B]">{t("admin_audit.decision")}: {r.decision_note}</div>}
+                    <span className="font-semibold">{t(`admin_audit.kind_${r.kind}`)}</span> · {r.student_name || r.student_id}
+                    <span className="ml-2 text-muted">{t(`admin_audit.status_${r.status}`)}</span>
+                    {r.days_left !== null && <span className={`ml-2 ${r.overdue ? "text-danger font-semibold" : "text-muted"}`}>{r.overdue ? t("admin_audit.overdue") : `${t("admin_audit.due_in")} ${r.days_left} ${t("admin_audit.days")}`}</span>}
+                    {r.decision_note && <div className="text-caption text-muted">{t("admin_audit.decision")}: {r.decision_note}</div>}
                   </div>
                   {r.has_export && (
-                    <button type="button" onClick={() => download(r)} data-testid="college-request-download" className="px-2.5 py-1 border border-[#CBD5E1] rounded font-bold">{t("admin_audit.download")}</button>
+                    <button type="button" onClick={() => download(r)} data-testid="college-request-download" className="px-2.5 py-1 border border-line-strong rounded font-semibold">{t("admin_audit.download")}</button>
                   )}
                 </li>
               ))}

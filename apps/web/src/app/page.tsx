@@ -18,12 +18,12 @@ export default function RootPage() {
   }, [user, isLoaded, router]);
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-[#F1F5F9]">
+    <div className="h-screen w-screen flex items-center justify-center bg-line-soft">
       <div className="text-center space-y-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#2BB3A0] to-[#2B5CD0] flex items-center justify-center font-bold text-white text-base shadow mx-auto animate-pulse">
+        <div className="w-10 h-10 rounded-card bg-gradient-to-tr from-teal to-brand flex items-center justify-center font-semibold text-white text-base shadow-card mx-auto animate-pulse">
           IR
         </div>
-        <p className="text-xs text-[#64748B] font-medium">Loading IREP Portal...</p>
+        <p className="text-xs text-muted font-medium">Loading IREP Portal...</p>
       </div>
     </div>
   );

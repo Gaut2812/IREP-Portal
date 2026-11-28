@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import { Inter, Noto_Sans_Tamil } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/LanguageContext";
 import { AuthProvider } from "@/lib/AuthContext";
+
+// self-hosted at build time; no request to Google from the browser
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const tamil = Noto_Sans_Tamil({ subsets: ["tamil"], variable: "--font-tamil", display: "swap" });
 
 export const metadata: Metadata = {
   title: "IREP Training Portal",
@@ -23,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${tamil.variable}`}>
       <body className="antialiased font-sans">
         <LanguageProvider>
           <AuthProvider>

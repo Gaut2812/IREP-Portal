@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, Date, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, Date, ForeignKey, JSON, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import TenantModel
 
@@ -156,6 +156,9 @@ class CodingProblem(TenantModel):
     # Screen 22 (L13): published to batches (None = every batch); the platform tenant holds the IREP bank (L37)
     status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)  # draft, published
     batch_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # function: a LeetCode-style method; the judge adds a driver (services/code_harness.py), tests run in Python.
+    # stdio: a program that reads stdin and prints the answer, in any language.
+    io_mode: Mapped[str] = mapped_column(String(16), default="stdio", server_default="stdio")
     due_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     source_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # bank item it was imported from
@@ -293,6 +296,10 @@ class TestAttempt(TenantModel):
     total_questions: Mapped[int] = mapped_column(Integer, default=30)
     accuracy_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     time_taken_sec: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # A lost connection pauses the clock: the server credits the gap since the last heartbeat (capped), see
+    # routers/student.py _credit_pause. paused_seconds is the total credited so far.
+    last_seen_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    paused_seconds: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 class AttemptAnswer(TenantModel):
     __tablename__ = "attempt_answers"
@@ -378,6 +385,7 @@ class SprintTask(TenantModel):
     sprint_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
     assignee_student_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_by_student_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # None: the trainer or the seed
 
 # Screen 36: Mock Interviews
 class MockInterview(TenantModel):
@@ -432,6 +440,10 @@ class GroupMessage(TenantModel):
     timestamp_str: Mapped[str] = mapped_column(String(32), default="10:32 AM")
     sender_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     is_removed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # the sender may edit (within EDIT_WINDOW_MIN) or delete their own message; moderators still see the original
+    edited_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    original_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     removed_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 class TrainerDirectThread(TenantModel):
@@ -463,6 +475,10 @@ class DirectMessage(TenantModel):
     sender_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     original_lang: Mapped[str] = mapped_column(String(8), default="en")
     read_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    # the sender may edit (within DM_EDIT_WINDOW_MIN) or delete for everyone; first_text is kept for audit
+    edited_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    first_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 # Screen 35: translation cache + broadcasts
@@ -712,6 +728,27 @@ class Internship(TenantModel):
     secured_on: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
 
 
+class Invitation(TenantModel):
+    """Phase 5: one invitation per invited account. Local mode keeps only the SHA-256 of a one-time set-password token
+    (48 h); Keycloak mode has no token (Keycloak emails its own link)."""
+    __tablename__ = "invitations"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", name="fk_invitations_user_id_users"), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider: Mapped[str] = mapped_column(String(16), default="local", server_default="local")   # local | keycloak
+    token_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    expires_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    send_seq: Mapped[int] = mapped_column(Integer, default=1, server_default="1")       # bumped by each resend
+    emailed_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")    # the last send the mailer finished
+    last_sent_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    accepted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    revoked_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    invited_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    invited_by_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
+
 class AuditLog(TenantModel):
     """Append-only audit trail for sensitive actions (P04)."""
     __tablename__ = "audit_log"
@@ -738,6 +775,10 @@ class Course(TenantModel):
     skill_key: Mapped[str] = mapped_column(String(32), nullable=False)              # dashboard skill bar it feeds (L33)
     status: Mapped[str] = mapped_column(String(16), default="draft", index=True)    # draft, published
     published_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    thumbnail_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)     # services/storage keys, served signed
+    intro_video_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
 
 class Lesson(TenantModel):
@@ -751,6 +792,7 @@ class Lesson(TenantModel):
     body_en: Mapped[str] = mapped_column(Text, default="")
     body_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     duration_min: Mapped[int] = mapped_column(Integer, default=20)
+    video_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
 
 class LessonProgress(TenantModel):
@@ -1016,6 +1058,7 @@ class Event(TenantModel):
     description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description_ta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rsvp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    rsvp_deadline: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)   # replies close (else at the start)
     created_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     # Screen 42: draft -> published -> cancelled; rows from before S7 are published
     status: Mapped[str] = mapped_column(String(16), default="published", server_default="published", index=True)
@@ -1051,6 +1094,8 @@ class AtRiskFlag(TenantModel):
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)        # open, in_progress, resolved
     parent_notified: Mapped[bool] = mapped_column(Boolean, default=False)
     parent_notified_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    mentor_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)   # a trainer of the college
+    mentor_assigned_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     resolved_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     resolved_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
@@ -1125,6 +1170,7 @@ class Rsvp(TenantModel):
     student_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="yes")   # yes, no, maybe
     guests: Mapped[int] = mapped_column(Integer, default=1)
+    reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)   # optional, when not attending
 
 
 # ---------------------------------------------------------------------------
@@ -1141,6 +1187,20 @@ class StudyBuddyMessage(TenantModel):
     topic: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)       # e.g. a coding problem id
     lang: Mapped[str] = mapped_column(String(8), default="en")
     provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)    # fake, anthropic
+    conversation_id: Mapped[Optional[str]] = mapped_column(
+        String(64), ForeignKey("buddy_conversations.id", name="fk_buddy_msg_conversation"), nullable=True, index=True)  # None: before conversations
+    feedback: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)     # up, down (assistant answers only)
+
+
+class BuddyConversation(TenantModel):
+    """A saved Study Buddy chat: its title, the course it is about (optional) and its mode."""
+    __tablename__ = "buddy_conversations"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), ForeignKey("students.id", name="fk_buddy_conv_student"), index=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    course_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # a library course (platform tenant)
+    mode: Mapped[str] = mapped_column(String(16), default="tutor", server_default="tutor")   # tutor, practice
 
 
 # ---------------------------------------------------------------------------
@@ -1226,7 +1286,7 @@ class LiveMeeting(TenantModel):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id"), unique=True, index=True)
-    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb, teams
+    provider: Mapped[str] = mapped_column(String(16), default="fake")            # fake, bbb, teams, livekit
     external_meeting_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     started_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
@@ -1238,6 +1298,7 @@ class LiveMeeting(TenantModel):
     flow_title: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     flow_steps: Mapped[list] = mapped_column(JSON, default=list)
     finalized: Mapped[bool] = mapped_column(Boolean, default=False)
+    spotlight_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)   # the trainer puts one person on the main stage
     # Microsoft Teams (LIVE_CLASS_ADAPTER=teams): Graph calendar event with a Teams meeting
     join_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     organizer_upn: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -1245,6 +1306,8 @@ class LiveMeeting(TenantModel):
     graph_online_meeting_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     attendance_pulled_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     unmatched_attendees: Mapped[list] = mapped_column(JSON, default=list)   # Teams names the trainer must confirm
+    # LiveKit: users.id of students the trainer allowed to share their screen in this class
+    share_grants: Mapped[list] = mapped_column(JSON, default=list)
 
 
 class JoinEvent(TenantModel):
@@ -1255,7 +1318,10 @@ class JoinEvent(TenantModel):
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
     event: Mapped[str] = mapped_column(String(16), nullable=False)               # joined, left
     at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, index=True)
-    source: Mapped[str] = mapped_column(String(16), default="portal")            # portal, webhook
+    source: Mapped[str] = mapped_column(String(16), default="portal")            # portal, webhook, click, teams, livekit
+    external_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # provider webhook id (LiveKit retries)
+
+    __table_args__ = (UniqueConstraint("external_id", name="uq_join_events_external_id"),)
 
 
 class LivePoll(TenantModel):
@@ -1394,6 +1460,8 @@ class Team(TenantModel):
     client_name: Mapped[str] = mapped_column(String(128), default="Trainer")
     repo_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # owner/repo linked through the GitHub App
     trainer_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("trainers.id"), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)   # what the team builds (shown on the board)
+    goals: Mapped[Optional[str]] = mapped_column(Text, nullable=True)         # one goal per line
 
 
 class TeamMember(TenantModel):
@@ -1700,3 +1768,41 @@ class BillingCredit(TenantModel):
     used_paise: Mapped[int] = mapped_column(Integer, default=0)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     created_by: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Live classroom controls (Phase 3, C3.9)
+# ---------------------------------------------------------------------------
+
+class LiveChatMessage(TenantModel):
+    """In-class chat; the trainer can pin a message to the top."""
+    __tablename__ = "live_chat_messages"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id", name="fk_live_chat_session"), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    author_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    author_role: Mapped[str] = mapped_column(String(16), nullable=False)     # trainer, student
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+
+
+class LiveHand(TenantModel):
+    """A raised hand, in the order raised; lowered by the student or the trainer (the row is removed)."""
+    __tablename__ = "live_hands"
+    __table_args__ = (UniqueConstraint("session_id", "user_id", name="uq_live_hand"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id", name="fk_live_hand_session"), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    raised_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+
+
+class LiveReaction(TenantModel):
+    """A short-lived emoji reaction (shown for a few seconds)."""
+    __tablename__ = "live_reactions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("sessions.id", name="fk_live_reaction_session"), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    emoji: Mapped[str] = mapped_column(String(8), nullable=False)

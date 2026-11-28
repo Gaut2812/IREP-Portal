@@ -45,9 +45,32 @@ test.describe("Screen 07: Live Classroom (/live/:sessionId)", () => {
     await student.page.getByTestId("qa-input").press("Enter");
     await expect(student.page.getByTestId("live-qa")).toContainText("Can we cache embeddings between labs?");
 
+    // Phase 3 controls: chat (the trainer pins), a raised hand the trainer lowers, a reaction, a spotlight
+    await student.page.getByTestId("chat-input").fill("Is the notebook link in the chat?");
+    await student.page.getByTestId("chat-send").click();
+    await expect(trainer.page.getByTestId("live-chat")).toContainText("Is the notebook link in the chat?", { timeout: 10000 });
+    await trainer.page.getByTestId("live-chat").getByTestId("chat-msg").last().hover();
+    await trainer.page.getByTestId("live-chat").locator("[data-testid^='pin-']").last().click();
+    await expect(student.page.getByTestId("chat-pinned")).toContainText("Is the notebook link in the chat?", { timeout: 10000 });
+
+    await student.page.getByTestId("hand-toggle").click();
+    await expect(student.page.getByTestId("hand-toggle")).toHaveAttribute("aria-pressed", "true");
+    await expect(trainer.page.getByTestId("hands-queue")).toContainText("Priya R", { timeout: 10000 });
+    await trainer.page.getByTestId("hands-queue").locator("[data-testid^='lower-']").first().click();
+    await expect(student.page.getByTestId("hand-toggle")).toHaveAttribute("aria-pressed", "false", { timeout: 10000 });
+
+    await student.page.getByTestId("react-open").click();
+    await student.page.getByTestId("react-👏").click();
+    await expect(trainer.page.getByTestId("reaction-bubbles")).toContainText("👏", { timeout: 10000 });
+
+    await trainer.page.getByTestId("people").locator("[data-testid^='spotlight-']").first().click();
+    await expect(student.page.getByTestId("spotlight-banner")).toBeVisible({ timeout: 10000 });
+    await expect(trainer.page.getByTestId("open-lab")).toHaveAttribute("target", "_blank");     // the lab opens beside the class
+
     // Trainer sees the question, ends the class
     await expect(trainer.page.getByTestId("live-qa")).toContainText("Can we cache embeddings between labs?", { timeout: 10000 });
     await trainer.page.getByTestId("end-class").click();
+    await trainer.page.getByTestId("end-confirm-ok").click();          // "End for everyone" asks first
     await expect(trainer.page.getByTestId("live-lobby")).toContainText("This class has ended");
 
     // Student's room follows (push or 5 s polling)

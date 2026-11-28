@@ -165,10 +165,19 @@ def _parent_thread(db: Session, trainer_user_id: str, parent: User, student_id: 
     return t
 
 
+RENOTIFY_AFTER = datetime.timedelta(days=3)
+
+
+def recently_notified(flag: AtRiskFlag, now: Optional[datetime.datetime] = None) -> bool:
+    """A parent is told at most once every RENOTIFY_AFTER per flag (it used to be once per flag, ever)."""
+    now = now or datetime.datetime.utcnow()
+    return bool(flag.parent_notified and flag.parent_notified_at and now - flag.parent_notified_at < RENOTIFY_AFTER)
+
+
 def _deliver_parent_call(db: Session, flag: AtRiskFlag, trainer_user_id: Optional[str],
                          now: Optional[datetime.datetime] = None) -> int:
-    """L31: alert each linked parent (in-app and SMS) and open the call in the trainer thread (18). Once per flag."""
-    if flag.parent_notified:
+    """L31: alert each linked parent (in-app and SMS) and open the call in the trainer thread (18)."""
+    if recently_notified(flag):
         return 0
     student = db.execute(select(Student).where(Student.id == flag.student_id)).scalar_one()
     student_name = db.execute(select(User.name).where(User.id == student.user_id)).scalar_one_or_none() or "your child"
@@ -206,8 +215,9 @@ def _deliver_parent_call(db: Session, flag: AtRiskFlag, trainer_user_id: Optiona
 
 def request_parent_call(db: Session, flag: AtRiskFlag, trainer_user_id: Optional[str],
                         now: Optional[datetime.datetime] = None) -> str:
-    """L31. Returns sent, held (quiet hours: queued in the outbox until they end), already or no_parent."""
-    if flag.parent_notified:
+    """L31. Returns sent, held (quiet hours: queued in the outbox until they end), already (told in the last
+    RENOTIFY_AFTER) or no_parent."""
+    if recently_notified(flag):
         return "already"
     if not db.execute(select(ParentStudent.id).filter_by(student_id=flag.student_id, college_id=flag.college_id)).first():
         return "no_parent"
@@ -216,7 +226,8 @@ def request_parent_call(db: Session, flag: AtRiskFlag, trainer_user_id: Optional
         pending = db.execute(select(OutboxEvent.id).where(OutboxEvent.event_type == "at_risk.parent_call",
                                                           OutboxEvent.entity_id == flag.id, OutboxEvent.status == "pending")).first()
         if not pending:
-            emit(db, "at_risk.parent_call", {"flag_id": flag.id, "trainer_user_id": trainer_user_id}, college_id=flag.college_id,
+            emit(db, "at_risk.parent_call", {"flag_id": flag.id, "trainer_user_id": trainer_user_id,
+                                             "requested_at": datetime.datetime.utcnow().isoformat()}, college_id=flag.college_id,
                  entity_type="at_risk_flag", entity_id=flag.id, delay_seconds=wait)
             db.flush()                                           # a second call in this transaction sees it
         return "held"
@@ -227,8 +238,13 @@ def request_parent_call(db: Session, flag: AtRiskFlag, trainer_user_id: Optional
 def _held_parent_call(db: Session, ev: OutboxEvent) -> None:
     """Deliver a call held over quiet hours. Idempotent: parent_notified guards a re-run."""
     flag = db.get(AtRiskFlag, (ev.payload or {}).get("flag_id"))
-    if flag is not None and flag.status != "resolved":
-        _deliver_parent_call(db, flag, (ev.payload or {}).get("trainer_user_id"))
+    if flag is None or flag.status == "resolved":
+        return
+    # idempotent: a notice that went out after this request was made covers it (recently_notified guards too)
+    requested = (ev.payload or {}).get("requested_at")
+    if requested and flag.parent_notified_at and flag.parent_notified_at >= datetime.datetime.fromisoformat(requested):
+        return
+    _deliver_parent_call(db, flag, (ev.payload or {}).get("trainer_user_id"))
 
 
 def notify_batch_trainers(db: Session, flags: List[AtRiskFlag]) -> int:

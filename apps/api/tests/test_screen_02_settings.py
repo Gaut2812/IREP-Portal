@@ -14,10 +14,11 @@ from sqlalchemy import delete, select
 from core.database import SessionLocal
 from core.security import PLATFORM_TENANT, create_access_token
 from main import app
-from models.schema import (AuditLog, Batch, BatchTrainer, Branch, College, ConsentRecord, DataRequest, MouTerm, Notification, OutboxEvent,
+from models.schema import (Invitation, AuditLog, Batch, BatchTrainer, Branch, College, ConsentRecord, DataRequest, MouTerm, Notification, OutboxEvent,
                            ParentStudent, Student, User)
 from services import outbox
 
+from tests.invite_helpers import set_password
 client = TestClient(app)
 STAFF = {"Authorization": "Bearer " + create_access_token({"sub": "usr_irep_staff_01", "role": "irep_admin", "college_id": PLATFORM_TENANT})}
 KAVITHA = {"Authorization": "Bearer " + create_access_token({"sub": "usr_kavitha_01", "role": "college_admin", "college_id": "col_demo_001"})}
@@ -34,7 +35,7 @@ def college():
                                                       "state": "Tamil Nadu"}, headers=STAFF).json()["id"]
     email = f"admin.{code.lower()}@college.example"
     r = client.post(f"/api/v1/admin/colleges/{cid}/admins", json={"name": "Dr. Admin", "email": email}, headers=STAFF).json()
-    tok = _login(email, r["temporary_password"]).json()["access_token"]
+    tok = _login(email, set_password(r)).json()["access_token"]
     yield {"id": cid, "code": code, "admin_id": r["id"], "h": {"Authorization": f"Bearer {tok}"}}
     db = SessionLocal()
     try:
@@ -50,6 +51,7 @@ def college():
         db.execute(delete(Batch).where(Batch.college_id == cid))
         db.execute(delete(Branch).where(Branch.college_id == cid))
         db.execute(delete(Notification).where(Notification.college_id == cid))
+        db.execute(delete(Invitation).where(Invitation.college_id == cid))
         db.execute(delete(User).where(User.college_id == cid))
         db.execute(delete(MouTerm).where(MouTerm.college_id == cid))
         db.execute(delete(College).where(College.id == cid))
@@ -63,7 +65,7 @@ def test_add_a_placement_officer_who_signs_in_to_the_college_ui(college):
     r = client.post("/api/v1/college/users", json={"name": "Suresh P", "email": f"placement.{tag}@college.example",
                                                    "role": "placement_officer"}, headers=college["h"])
     assert r.status_code == 201
-    login = _login(f"placement.{tag}@college.example", r.json()["temporary_password"])
+    login = _login(f"placement.{tag}@college.example", set_password(r.json()))
     assert login.status_code == 200 and login.json()["user"]["role"] == "placement_officer"
     tok = {"Authorization": "Bearer " + login.json()["access_token"]}
     assert client.get("/api/v1/college/overview", headers=tok).status_code == 200       # college UI, own college
@@ -83,12 +85,13 @@ def test_deactivation_rules_and_sign_in(college):
     assert client.post(f"/api/v1/college/users/{me}/deactivate", headers=college["h"]).status_code == 409   # not yourself
     second = client.post("/api/v1/college/users", json={"name": "Second Admin", "email": f"second.{tag}@college.example",
                                                         "role": "college_admin"}, headers=college["h"]).json()
+    set_password(second)                                        # they accepted the invitation first
     assert client.post(f"/api/v1/college/users/{second['id']}/deactivate", headers=college["h"]).json()["is_active"] is False
-    off = _login(f"second.{tag}@college.example", second["temporary_password"])
+    off = _login(f"second.{tag}@college.example", set_password(second))
     assert off.status_code == 401 and "deactivated" in off.json()["detail"]
     # with the second admin inactive, the first is the last active admin: it can't be deactivated by the second either
     assert client.post(f"/api/v1/college/users/{second['id']}/reactivate", headers=college["h"]).json()["is_active"] is True
-    assert _login(f"second.{tag}@college.example", second["temporary_password"]).status_code == 200
+    assert _login(f"second.{tag}@college.example", set_password(second)).status_code == 200
     # other colleges' users are not found
     assert client.post("/api/v1/college/users/usr_kavitha_01/deactivate", headers=college["h"]).status_code == 404
     db = SessionLocal()
@@ -103,7 +106,7 @@ def test_last_admin_cannot_be_deactivated(college):
     tag = college["code"].lower()
     other = client.post("/api/v1/college/users", json={"name": "Other Admin", "email": f"other.{tag}@college.example",
                                                        "role": "college_admin"}, headers=college["h"]).json()
-    other_h = {"Authorization": "Bearer " + _login(f"other.{tag}@college.example", other["temporary_password"]).json()["access_token"]}
+    other_h = {"Authorization": "Bearer " + _login(f"other.{tag}@college.example", set_password(other)).json()["access_token"]}
     assert client.post(f"/api/v1/college/users/{college['admin_id']}/deactivate", headers=other_h).status_code == 200
     # now 'other' is the only active admin; the first admin (inactive) can't be used, and other can't remove themselves
     assert client.post(f"/api/v1/college/users/{other['id']}/deactivate", headers=other_h).status_code == 409

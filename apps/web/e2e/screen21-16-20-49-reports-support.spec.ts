@@ -10,11 +10,12 @@ test.describe("Screens 21 and 16: monthly cards (/trainer/reports, /parent/repor
     await expect(page.getByTestId("report-msg")).toContainText("Drafts created");
     await page.getByTestId("card-row").filter({ hasText: "Priya R" }).click();
     await page.getByTestId("field-trainer_remark_en").fill("A focused month with a clear project demo.");
-    await page.getByTestId("card-approve").click();                                        // Tamil missing: refused
-    await expect(page.getByTestId("report-error")).toContainText("Tamil");
-    await page.getByTestId("field-trainer_remark_ta").fill("தெளிவான புராஜெக்ட் விளக்கத்துடன் கவனமான மாதம்.");
+    // English only: no Tamil boxes, the API translates for parents
+    await expect(page.getByTestId("field-trainer_remark_ta")).toHaveCount(0);
+    await expect(page.getByTestId("tamil-auto-note")).toBeVisible();
+    await page.getByTestId("card-approve").click();                                        // help text missing: refused
+    await expect(page.getByTestId("report-error")).toContainText("help text");
     await page.getByTestId("field-how_to_help_en").fill("Ask Priya to show you her project this weekend.");
-    await page.getByTestId("field-how_to_help_ta").fill("இந்த வார இறுதியில் தன் புராஜெக்ட்டைக் காட்டச் சொல்லுங்கள்.");
     await page.getByTestId("card-approve").click();
     await expect(page.getByTestId("card-released")).toBeVisible();
 

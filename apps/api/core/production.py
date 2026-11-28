@@ -49,11 +49,16 @@ def problems(settings) -> List[str]:
 
     # live classes
     live = settings.LIVE_CLASS_ADAPTER.lower()
-    if live not in ("teams", "bbb") and "live_classes" not in demo:
-        out.append("LIVE_CLASS_ADAPTER must be teams (or bbb). Until Teams is set up, add live_classes to "
+    if live not in ("teams", "bbb", "livekit") and "live_classes" not in demo:
+        out.append("LIVE_CLASS_ADAPTER must be teams, livekit (or bbb). Until one is set up, add live_classes to "
                    "ALLOW_DEMO_ADAPTERS to keep the in-portal classroom without video.")
     if live == "bbb" and settings.BBB_SECRET in ("", "bbb_demo_secret_2026"):
         out.append("LIVE_CLASS_ADAPTER=bbb needs the real BBB_URL and BBB_SECRET.")
+    if live == "livekit":
+        if settings.LIVEKIT_API_KEY in ("", "devkey") or len(settings.LIVEKIT_API_SECRET) < 32 or "not_for_production" in settings.LIVEKIT_API_SECRET:
+            out.append("LIVE_CLASS_ADAPTER=livekit needs a real LIVEKIT_API_KEY and a LIVEKIT_API_SECRET of 32+ characters (docs/deploy/LIVEKIT.md).")
+        if not settings.LIVEKIT_WS_URL.startswith("wss://"):
+            out.append("LIVEKIT_WS_URL must be a wss:// address in production (browsers block camera and mic otherwise).")
     if live == "teams" and not (settings.GRAPH_TENANT_ID and settings.GRAPH_CLIENT_ID and settings.GRAPH_CLIENT_SECRET):
         out.append("LIVE_CLASS_ADAPTER=teams needs GRAPH_TENANT_ID, GRAPH_CLIENT_ID and GRAPH_CLIENT_SECRET (docs/deploy/TEAMS_SETUP.md).")
 

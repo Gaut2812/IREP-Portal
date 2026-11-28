@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 from core.security import TokenPayload
 from models.schema import (
     Student, SkillScore, ReadinessSnapshot, SessionItem, SprintTask, StudentProject,
-    Event, Badge, StudentBadge, Certificate, SessionAttendance, PullRequest,
+    Event, Badge, StudentBadge, Certificate, SessionAttendance, PullRequest, Team, TeamMember,
 )
 from services.readiness import latest_snapshot, get_config, COMPONENT_LABELS
+from services.dashboard_details import best_streak, solved_recently
 
 DAY_TA = {"Mon": "திங்", "Tue": "செவ்", "Wed": "புத", "Thu": "வியா", "Fri": "வெள்", "Sat": "சனி", "Sun": "ஞாயி"}
 
@@ -70,6 +71,9 @@ def build_student_dashboard(db: Session, student: Student, current_user: TokenPa
     ).scalars().all()
 
     sessions, monday = _week_sessions(db, student)
+    from services.live_sessions import session_status
+    attendance_by_session = {a.session_id: a for a in db.execute(select(SessionAttendance).where(
+        SessionAttendance.student_id == student.id, SessionAttendance.session_id.in_([s.id for s in sessions] or ["_"]))).scalars()}
     week_no = sessions[0].week_no if sessions and sessions[0].week_no else None
 
     # Current project: the in-progress project + sprint board progress
@@ -77,10 +81,21 @@ def build_student_dashboard(db: Session, student: Student, current_user: TokenPa
         select(StudentProject).filter_by(student_id=student.id, college_id=college_id, status="in_progress")
         .order_by(StudentProject.is_featured.desc())
     ).scalars().first()
-    tasks = db.execute(select(SprintTask).filter_by(college_id=college_id)).scalars().all()
-    total_pts = sum(t.story_points for t in tasks) or 1
+    # Progress and "my open tasks" come from my team's active sprint, the same numbers the board shows
+    # (before, every task in the college was counted and "mine" was matched by initials).
+    from services.sprint_board import active_sprint
+    team = db.execute(
+        select(Team).join(TeamMember, TeamMember.team_id == Team.id)
+        .where(TeamMember.student_id == student.id, Team.college_id == college_id)
+    ).scalars().first()
+    sprint = active_sprint(db, team) if team else None
+    tasks = db.execute(
+        select(SprintTask).where(SprintTask.college_id == college_id, SprintTask.team_id == team.id,
+                                 SprintTask.sprint_id == (sprint.id if sprint else None))
+    ).scalars().all() if team else []
+    total_pts = sum(t.story_points for t in tasks)
     done_pts = sum(t.story_points for t in tasks if t.column_name == "done")
-    open_mine = len([t for t in tasks if t.column_name != "done" and t.assignee_initials == (current_user.avatar or student.id[:2].upper())])
+    open_mine = len([t for t in tasks if t.column_name != "done" and t.assignee_student_id == student.id])
     pending_prs = db.execute(
         select(func.count(PullRequest.id)).where(PullRequest.college_id == college_id, PullRequest.author_id == student.id, PullRequest.status == "pending")
     ).scalar_one()
@@ -134,13 +149,13 @@ def build_student_dashboard(db: Session, student: Student, current_user: TokenPa
             "has_snapshot": snap is not None,
             "snapshot_date": snap.snapshot_date.isoformat() if snap else None,
             "problems_solved": student.problems_solved,
-            "problems_delta": max(0, student.problems_solved - 252) if student.id == "std_priya_01" else max(0, int(student.problems_solved * 0.12)),
+            "problems_delta": solved_recently(db, student),          # distinct problems accepted in the last 30 days
             "attendance_pct": student.attendance_pct,
             "attendance_target": 85,
             "sessions_attended": attended,
             "sessions_total": total_sessions,
             "streak_days": student.streak_days,
-            "streak_best": max(student.streak_days, 27 if student.id == "std_priya_01" else student.streak_days),
+            "streak_best": best_streak(db, student),
         },
         "skill_progress": [
             {"key": s.skill_key, "skill": (s.label_ta if lang == "ta" and s.label_ta else s.label_en), "percentage": s.percentage, "color": s.color}
@@ -153,7 +168,7 @@ def build_student_dashboard(db: Session, student: Student, current_user: TokenPa
                 "topic": s.title,
                 "duration": _duration_label(s.duration_min, lang),
                 "type": s.session_type,
-                "status": s.status,
+                "status": session_status(s, attendance_by_session.get(s.id), datetime.datetime.now()),   # from the clock, not the stored value
                 "is_lab": s.duration_min >= 120 or s.session_type != "Live",
             }
             for s in sessions
@@ -162,7 +177,7 @@ def build_student_dashboard(db: Session, student: Student, current_user: TokenPa
             "id": project.id if project else None,
             "title": project.title if project else None,
             "subtitle": (f"{project.category.replace('_', ' ').title()} · Team of {project.team_size} · {project.team_name}" if project else None),
-            "progress_pct": int(round(done_pts * 100 / total_pts)),
+            "progress_pct": int(round(done_pts * 100 / total_pts)) if total_pts else 0,
             "open_tasks": open_mine,
             "pending_prs": pending_prs,
         } if project else None,

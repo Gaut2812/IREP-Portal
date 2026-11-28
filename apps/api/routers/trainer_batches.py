@@ -68,7 +68,13 @@ def my_batches(current_user: TokenPayload = Depends(TRAINER), db: Session = Depe
         select(Student.batch_id, func.count(Student.id), func.avg(Student.readiness_score), func.avg(Student.attendance_pct))
         .where(Student.batch_id.in_(batch_ids), Student.college_id == current_user.college_id).group_by(Student.batch_id)).all()}
     batches = db.execute(select(Batch).where(Batch.id.in_(batch_ids)).order_by(Batch.semester, Batch.short_name)).scalars().all()
-    return {"batches": [{
+    from models.schema import Branch, College
+    college = db.get(College, current_user.college_id)
+    branches = {br.id: br for br in db.execute(select(Branch).where(Branch.id.in_([b.branch_id for b in batches] or ["_"]))).scalars()}
+    return {"college": {"id": college.id, "name": college.name, "code": college.code} if college else None, "batches": [{
+        "branch": branches[b.branch_id].name if b.branch_id in branches else None,
+        "branch_code": branches[b.branch_id].code if b.branch_id in branches else None,
+        "college": college.name if college else None,
         "id": b.id, "short_name": b.short_name, "name": b.name, "semester": b.semester, "academic_year": b.academic_year,
         "track": b.track, "role": roles.get(b.id, "primary"), "students": stats.get(b.id, (0, None, None))[0],
         "avg_readiness": round(stats[b.id][1]) if b.id in stats and stats[b.id][1] is not None else None,
@@ -89,7 +95,10 @@ def roster(batch_id: str, current_user: TokenPayload = Depends(TRAINER), db: Ses
                                  .group_by(AtRiskFlag.student_id)).all())
     pending = set(db.execute(select(RosterChangeRequest.student_id).where(RosterChangeRequest.from_batch_id == batch_id,
                                                                           RosterChangeRequest.status == "open")).scalars())
-    return {"batch": {"id": b.id, "short_name": b.short_name, "name": b.name, "semester": b.semester},
+    from models.schema import Branch, College
+    br, college = db.get(Branch, b.branch_id), db.get(College, b.college_id)
+    return {"batch": {"id": b.id, "short_name": b.short_name, "name": b.name, "semester": b.semester, "academic_year": b.academic_year,
+                      "branch": br.name if br else None, "college": college.name if college else None},
             "students": [{"id": s.id, "name": name, "register_no": s.register_no, "readiness_score": s.readiness_score,
                           "readiness_band": s.readiness_band, "attendance_pct": s.attendance_pct, "open_flags": open_flags.get(s.id, 0),
                           "pending_roster_request": s.id in pending} for s, name in rows]}

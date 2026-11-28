@@ -158,10 +158,10 @@ def build_trainer_dashboard(db: Session, trainer: Trainer, current_user: TokenPa
         "thresholds": {"score_below": rules.score_below, "attendance_below": rules.attendance_below},
         "quick_actions": [
             {"key": "mark_attendance", "href": "/trainer/attendance", "variant": "blue"},
-            {"key": "create_test", "href": "/trainer/assessments", "variant": "outline"},
+            {"key": "create_test", "href": "/trainer/assessments?tab=tests&new=1", "variant": "outline"},
             {"key": "review_prs", "href": "/trainer/reviews", "variant": "outline"},
             {"key": "send_parent_update", "href": "/trainer/messages", "variant": "outline"},
-            {"key": "schedule_mock", "href": "/trainer/messages", "variant": "outline"},
+            {"key": "schedule_mock", "href": "/trainer/interviews", "variant": "outline"},
             {"key": "monthly_report", "href": "/trainer/reports", "variant": "teal"},
         ],
     }

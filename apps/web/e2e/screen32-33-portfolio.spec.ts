@@ -99,6 +99,27 @@ test.describe("Screen 33: Parent Projects & Portfolio (/parent/portfolio)", () =
     await expect(page.getByText("RSVP Confirmed! We look forward to seeing you.")).toBeVisible();
   });
 
+  test("a failed RSVP is reported, not shown as confirmed", async ({ page }) => {
+    const API = process.env.PLAYWRIGHT_API_URL || "http://localhost:8000/api/v1";
+    const auth = { Authorization: `Bearer ${parentToken}` };
+    const portfolio = await (await page.request.get(`${API}/parent/portfolio`, { headers: auth })).json();
+    await page.request.post(`${API}/parent/portfolio/rsvp`, {
+      headers: auth, data: { event_id: portfolio.demo_day_invitation.id, status: "declined", guest_count: 1 },
+    });
+    await page.goto("/parent/portfolio");
+    await page.route("**/api/v1/parent/portfolio/rsvp", (r) => r.fulfill({ status: 500, body: "boom" }));
+    await page.getByRole("button", { name: "Yes, I will attend" }).click();
+    await expect(page.getByTestId("rsvp-error")).toBeVisible();
+    await expect(page.getByText("Attending Confirmed")).toHaveCount(0);
+  });
+
+  test("a portfolio that fails to load shows an error, not another child's portfolio", async ({ page }) => {
+    await page.route("**/api/v1/parent/portfolio?*", (r) => r.fulfill({ status: 500, body: "boom" }));
+    await page.goto("/parent/portfolio");
+    await expect(page.getByRole("button", { name: /Try Again/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Priya R" })).toHaveCount(0);
+  });
+
   test("should render bilingual Tamil translation on parent portfolio", async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem("irep_lang", "ta");

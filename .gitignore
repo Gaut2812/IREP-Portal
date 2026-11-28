@@ -45,3 +45,11 @@ apps/web/playwright-report/
 apps/api/static/reports/
 apps/api/static/cards/
 apps/api/var/
+
+# Judge0 config holds passwords and the API token (CLAUDE.md: never commit Judge0 config)
+infra/judge0/judge0.conf
+
+# local leftovers
+*.db.before-*
+apps/api/links.json
+apps/web/debug.log

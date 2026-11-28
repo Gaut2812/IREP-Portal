@@ -42,12 +42,12 @@ export function BankPanel() {
     }
   };
 
-  const cls = "w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs";
+  const cls = "w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs";
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <form onSubmit={add} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-3 space-y-2" data-testid="bank-form">
-        <h2 className="text-sm font-black flex items-center gap-2"><Library className="w-4 h-4 text-[#2B5CD0]" />{t("content.bank_add_problem")}</h2>
-        <p className="text-[11px] text-[#64748B]">{t("content.bank_help")}</p>
+      <form onSubmit={add} noValidate className="bg-white rounded-card border border-line p-3 space-y-2" data-testid="bank-form">
+        <h2 className="text-sm font-semibold flex items-center gap-2"><Library className="w-4 h-4 text-brand" />{t("content.bank_add_problem")}</h2>
+        <p className="text-caption text-muted">{t("content.bank_help")}</p>
         {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
         <input className={cls} placeholder={t("assess.p_title")} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="bank-title" />
         <textarea className={cls} rows={3} placeholder={t("assess.p_statement")} value={form.statement} onChange={(e) => setForm({ ...form, statement: e.target.value })} data-testid="bank-statement" />
@@ -61,13 +61,13 @@ export function BankPanel() {
           <textarea className={cls} rows={2} placeholder={t("assess.hidden_in")} value={form.hidden_in} onChange={(e) => setForm({ ...form, hidden_in: e.target.value })} />
           <textarea className={cls} rows={2} placeholder={t("assess.hidden_out")} value={form.hidden_out} onChange={(e) => setForm({ ...form, hidden_out: e.target.value })} />
         </div>
-        <button type="submit" disabled={busy} className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50" data-testid="bank-save">{t("content.bank_publish")}</button>
+        <button type="submit" disabled={busy} className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="bank-save">{t("content.bank_publish")}</button>
       </form>
-      <ul className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] h-fit" data-testid="bank-list">
+      <ul className="bg-white rounded-card border border-line divide-y divide-line-soft h-fit" data-testid="bank-list">
         {bank && [...bank.problems, ...bank.tests].map((it) => (
           <li key={it.id} className="px-3 py-2 text-xs" data-testid="bank-item">
-            <div className="font-bold">{it.title}</div>
-            <div className="text-[11px] text-[#64748B]">{t(`assess.kind_${it.kind}`)}{it.difficulty ? ` · ${it.difficulty}` : ""}{it.questions ? ` · ${it.questions} ${t("assess.questions")}` : ""} · {t("content.bank_imports")} {it.imports}</div>
+            <div className="font-semibold">{it.title}</div>
+            <div className="text-caption text-muted">{t(`assess.kind_${it.kind}`)}{it.difficulty ? ` · ${it.difficulty}` : ""}{it.questions ? ` · ${it.questions} ${t("assess.questions")}` : ""} · {t("content.bank_imports")} {it.imports}</div>
           </li>
         ))}
       </ul>

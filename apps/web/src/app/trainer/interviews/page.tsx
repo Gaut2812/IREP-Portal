@@ -5,15 +5,17 @@
  *  mock drive (38) carry the drive's name (L17). Spec: docs/screens/37-38-39-interviews-drives-readiness.md */
 import React, { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
+import { ConfirmDelete, DeleteButton } from "@/components/ui";
 
 interface Slot { id: string; starts_at: string; duration_min: number; round_type: string; round_label: string; batch_id: string | null;
   booked_by: string | null; drive: string | null; can_cancel: boolean }
 interface Iv { id: string; student: string; round_number: number; round_type: string; round_label: string; scheduled_at: string;
   duration_min: number; overall: number | null; has_recording: boolean; drive: string | null }
-interface View { rubric: { max: number; criteria: { key: string; label: string }[] }; batches: { id: string; name: string }[];
+interface View { rubric: { max: number; scale?: string; service_ready_min?: number; product_ready_min?: number; criteria: { key: string; label: string; help?: string }[] }; batches: { id: string; name: string }[];
   slots: Slot[]; to_score: Iv[]; upcoming: Iv[]; submitted: Iv[] }
 interface Note { at: string; text: string }
 
@@ -31,6 +33,7 @@ export default function TrainerInterviewsPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [delRec, setDelRec] = useState<Iv | null>(null);
   const [slot, setSlot] = useState({ starts_at: "", round_type: "technical", duration_min: "40", batch_id: "" });
   const [scoring, setScoring] = useState<Iv | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
@@ -83,23 +86,24 @@ export default function TrainerInterviewsPage() {
     run(() => fetchApi(`/trainer/interviews/${iv.id}/recording`, { method: "POST", body: form }), t("trainer_interviews.recording_added"));
   };
 
-  const card = "bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3";
-  const field = "px-2.5 py-1.5 border border-[#CBD5E1] rounded-lg text-xs";
-  const badge = (text: string) => <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EEF2FF] text-[#3730A3]" data-testid="drive-badge">{text}</span>;
+  const card = "bg-white rounded-card border border-line p-4 space-y-3";
+  const field = "px-2.5 py-1.5 border border-line-strong rounded-tile text-xs";
+  const badge = (text: string) => <span className="px-2 py-0.5 rounded-full text-caption font-semibold bg-violet-soft text-violet" data-testid="drive-badge">{text}</span>;
 
   const ivRow = (iv: Iv, action?: React.ReactNode) => (
-    <li key={iv.id} className="border border-[#F1F5F9] rounded-lg p-2.5 text-xs flex flex-wrap items-center justify-between gap-2" data-testid={`iv-${iv.id}`}>
+    <li key={iv.id} className="border border-line-soft rounded-tile p-2.5 text-xs flex flex-wrap items-center justify-between gap-2" data-testid={`iv-${iv.id}`}>
       <div className="space-y-0.5">
-        <div className="font-bold text-[#0F1F3A]">{iv.student} · #{iv.round_number} {iv.round_label} {iv.drive && badge(iv.drive)}</div>
-        <div className="text-[#64748B]">{when(iv.scheduled_at, language)} · {iv.duration_min} {t("trainer_interviews.min")}
+        <div className="font-semibold text-ink">{iv.student} · #{iv.round_number} {iv.round_label} {iv.drive && badge(iv.drive)}</div>
+        <div className="text-muted">{when(iv.scheduled_at, language)} · {iv.duration_min} {t("trainer_interviews.min")}
           {iv.overall !== null && <> · {t("trainer_interviews.overall")} <b data-testid="iv-overall">{iv.overall.toFixed(1)}</b> / {v?.rubric.max}</>}</div>
       </div>
       <div className="flex items-center gap-2">
-        <label className="px-2.5 py-1 border border-[#CBD5E1] rounded-lg font-bold cursor-pointer">
+        <label className="px-2.5 py-1 border border-line-strong rounded-tile font-semibold cursor-pointer">
           {iv.has_recording ? t("trainer_interviews.replace_recording") : t("trainer_interviews.add_recording")}
           <input type="file" accept="video/mp4,video/webm,audio/mpeg,audio/mp4" className="hidden" data-testid="iv-recording"
             onChange={(e) => upload(iv, e.target.files?.[0])} />
         </label>
+        {iv.has_recording && <DeleteButton onClick={() => setDelRec(iv)} label={t("trainer_interviews.delete_recording")} testId={`iv-recording-delete-${iv.id}`} />}
         {action}
       </div>
     </li>
@@ -107,19 +111,25 @@ export default function TrainerInterviewsPage() {
 
   return (
     <RoleGuard allowedRoles={["trainer"]}>
-      <AppShell pageTitle={t("trainer_interviews.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-5xl">
-          <p className="text-xs text-[#64748B]">{t("trainer_interviews.help")}</p>
+      <AppShell pageTitle={t("trainer_interviews.title")} pageSubtitle={t("trainer_interviews.help")}>
+        <HowItWorks topic="interview_scoring" steps={5} className="mb-4 max-w-6xl" />
+        <div className="space-y-6 max-w-5xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="ti-error">{error}</p>}
-          {msg && <p className="text-xs text-[#166534]" role="status" data-testid="ti-msg">{msg}</p>}
+          {msg && <p className="text-xs text-success" role="status" data-testid="ti-msg">{msg}</p>}
 
           {scoring && v && (
-            <form onSubmit={submit} noValidate className={`${card} border-[#2B5CD0]`} data-testid="score-form">
-              <h2 className="text-sm font-black text-[#0F1F3A]">{t("trainer_interviews.score_title")} · {scoring.student} · #{scoring.round_number} {scoring.round_label}</h2>
+            <form onSubmit={submit} noValidate className={`${card} border-brand`} data-testid="score-form">
+              <h2 className="text-sm font-semibold text-ink">{t("trainer_interviews.score_title")} · {scoring.student} · #{scoring.round_number} {scoring.round_label}</h2>
+              {v.rubric.scale && (
+                <p className="text-caption text-muted" data-testid="rubric-scale">
+                  {v.rubric.scale}
+                  {v.rubric.service_ready_min != null && ` · ${t("trainer_interviews.ready_bars").replace("{s}", String(v.rubric.service_ready_min)).replace("{p}", String(v.rubric.product_ready_min))}`}
+                </p>
+              )}
               <div className="grid sm:grid-cols-2 gap-2">
                 {v.rubric.criteria.map((c) => (
-                  <label key={c.key} className="text-xs flex items-center justify-between gap-2 border border-[#F1F5F9] rounded-lg px-2.5 py-1.5">
-                    <span>{c.label}</span>
+                  <label key={c.key} className="text-xs flex items-center justify-between gap-2 border border-line-soft rounded-tile px-2.5 py-1.5">
+                    <span className="min-w-0"><span className="block">{c.label}</span>{c.help && <span className="block text-caption text-muted" data-testid={`help-${c.key}`}>{c.help}</span>}</span>
                     <select value={scores[c.key] || ""} onChange={(e) => setScores({ ...scores, [c.key]: Number(e.target.value) })}
                       className={field} data-testid={`score-${c.key}`} aria-label={c.label}>
                       <option value="">–</option>
@@ -133,7 +143,7 @@ export default function TrainerInterviewsPage() {
               <textarea value={fb.ta} onChange={(e) => setFb({ ...fb, ta: e.target.value })} rows={2} placeholder={t("trainer_interviews.feedback_ta")}
                 aria-label={t("trainer_interviews.feedback_ta")} data-testid="feedback-ta" className={`${field} w-full`} />
               <div className="space-y-1.5">
-                <div className="text-xs font-bold text-[#0F1F3A]">{t("trainer_interviews.notes")}</div>
+                <div className="text-xs font-semibold text-ink">{t("trainer_interviews.notes")}</div>
                 {notes.map((n, i) => (
                   <div key={i} className="flex gap-2">
                     <input value={n.at} onChange={(e) => setNotes(notes.map((x, j) => j === i ? { ...x, at: e.target.value } : x))} placeholder="12:30"
@@ -142,27 +152,27 @@ export default function TrainerInterviewsPage() {
                       aria-label={t("trainer_interviews.note_text")} data-testid={`note-text-${i}`} className={`${field} flex-1`} />
                   </div>
                 ))}
-                <button type="button" onClick={() => setNotes([...notes, { at: "", text: "" }])} className="text-xs text-[#2B5CD0] font-bold" data-testid="note-add">
+                <button type="button" onClick={() => setNotes([...notes, { at: "", text: "" }])} className="text-xs text-brand font-semibold" data-testid="note-add">
                   + {t("trainer_interviews.add_note")}
                 </button>
               </div>
               <div className="flex gap-2 justify-end">
-                <button type="button" onClick={() => setScoring(null)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs font-bold">{t("trainer_interviews.cancel")}</button>
-                <button type="submit" disabled={busy} data-testid="score-submit" className="px-3.5 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("trainer_interviews.submit")}</button>
+                <button type="button" onClick={() => setScoring(null)} className="px-3 py-1.5 border border-line-strong rounded-tile text-xs font-semibold">{t("trainer_interviews.cancel")}</button>
+                <button type="submit" disabled={busy} data-testid="score-submit" className="px-3.5 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("trainer_interviews.submit")}</button>
               </div>
-              <p className="text-[11px] text-[#64748B]">{t("trainer_interviews.submit_note")}</p>
+              <p className="text-caption text-muted">{t("trainer_interviews.submit_note")}</p>
             </form>
           )}
 
           <section className={card} data-testid="to-score">
-            <h2 className="text-sm font-black text-[#0F1F3A]">{t("trainer_interviews.to_score")}</h2>
-            {v && v.to_score.length === 0 && <p className="text-xs text-[#64748B]">{t("trainer_interviews.none_to_score")}</p>}
+            <h2 className="text-sm font-semibold text-ink">{t("trainer_interviews.to_score")}</h2>
+            {v && v.to_score.length === 0 && <p className="text-xs text-muted">{t("trainer_interviews.none_to_score")}</p>}
             <ul className="space-y-2">{v?.to_score.map((iv) => ivRow(iv,
-              <button type="button" onClick={() => openScoring(iv)} data-testid="iv-score" className="px-2.5 py-1 bg-[#2B5CD0] text-white rounded-lg font-bold">{t("trainer_interviews.score")}</button>))}</ul>
+              <button type="button" onClick={() => openScoring(iv)} data-testid="iv-score" className="px-2.5 py-1 bg-brand text-white rounded-tile font-semibold">{t("trainer_interviews.score")}</button>))}</ul>
           </section>
 
           <section className={card} data-testid="slots">
-            <h2 className="text-sm font-black text-[#0F1F3A]">{t("trainer_interviews.slots")}</h2>
+            <h2 className="text-sm font-semibold text-ink">{t("trainer_interviews.slots")}</h2>
             <form onSubmit={addSlot} noValidate className="flex flex-wrap gap-2 items-end" data-testid="slot-form">
               <input type="datetime-local" value={slot.starts_at} onChange={(e) => setSlot({ ...slot, starts_at: e.target.value })}
                 aria-label={t("trainer_interviews.starts_at")} data-testid="slot-start" className={field} />
@@ -176,16 +186,16 @@ export default function TrainerInterviewsPage() {
                 <option value="">{t("trainer_interviews.all_batches")}</option>
                 {v?.batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
-              <button type="submit" disabled={busy} data-testid="slot-add" className="px-3.5 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">{t("trainer_interviews.add_slot")}</button>
+              <button type="submit" disabled={busy} data-testid="slot-add" className="px-3.5 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">{t("trainer_interviews.add_slot")}</button>
             </form>
             <ul className="space-y-2">
               {v?.slots.map((s) => (
-                <li key={s.id} className="border border-[#F1F5F9] rounded-lg p-2.5 text-xs flex flex-wrap items-center justify-between gap-2" data-testid={`slot-${s.id}`}>
+                <li key={s.id} className="border border-line-soft rounded-tile p-2.5 text-xs flex flex-wrap items-center justify-between gap-2" data-testid={`slot-${s.id}`}>
                   <div>
-                    <div className="font-bold text-[#0F1F3A]">{when(s.starts_at, language)} · {s.round_label} · {s.duration_min} {t("trainer_interviews.min")} {s.drive && badge(s.drive)}</div>
-                    <div className="text-[#64748B]" data-testid="slot-booked">{s.booked_by ? `${t("trainer_interviews.booked_by")} ${s.booked_by}` : t("trainer_interviews.open")}</div>
+                    <div className="font-semibold text-ink">{when(s.starts_at, language)} · {s.round_label} · {s.duration_min} {t("trainer_interviews.min")} {s.drive && badge(s.drive)}</div>
+                    <div className="text-muted" data-testid="slot-booked">{s.booked_by ? `${t("trainer_interviews.booked_by")} ${s.booked_by}` : t("trainer_interviews.open")}</div>
                   </div>
-                  {s.can_cancel && <button type="button" disabled={busy} data-testid="slot-cancel" className="px-2.5 py-1 border border-[#CBD5E1] rounded-lg font-bold"
+                  {s.can_cancel && <button type="button" disabled={busy} data-testid="slot-cancel" className="px-2.5 py-1 border border-line-strong rounded-tile font-semibold"
                     onClick={() => { if (window.confirm(s.booked_by ? t("trainer_interviews.confirm_cancel_booked") : t("trainer_interviews.confirm_cancel"))) run(() => fetchApi(`/trainer/interview-slots/${s.id}`, { method: "DELETE" }), t("trainer_interviews.slot_cancelled")); }}>
                     {t("trainer_interviews.cancel_slot")}</button>}
                 </li>
@@ -195,17 +205,26 @@ export default function TrainerInterviewsPage() {
 
           {v && v.upcoming.length > 0 && (
             <section className={card} data-testid="upcoming">
-              <h2 className="text-sm font-black text-[#0F1F3A]">{t("trainer_interviews.upcoming")}</h2>
+              <h2 className="text-sm font-semibold text-ink">{t("trainer_interviews.upcoming")}</h2>
               <ul className="space-y-2">{v.upcoming.map((iv) => ivRow(iv))}</ul>
             </section>
           )}
 
           <section className={card} data-testid="submitted">
-            <h2 className="text-sm font-black text-[#0F1F3A]">{t("trainer_interviews.submitted_title")}</h2>
-            {v && v.submitted.length === 0 && <p className="text-xs text-[#64748B]">{t("trainer_interviews.none_submitted")}</p>}
+            <h2 className="text-sm font-semibold text-ink">{t("trainer_interviews.submitted_title")}</h2>
+            {v && v.submitted.length === 0 && <p className="text-xs text-muted">{t("trainer_interviews.none_submitted")}</p>}
             <ul className="space-y-2">{v?.submitted.map((iv) => ivRow(iv))}</ul>
           </section>
         </div>
+        {delRec && (
+          <ConfirmDelete itemName={`${t("trainer_interviews.recording_of")} ${delRec.student} · #${delRec.round_number}`} note={t("trainer_interviews.delete_recording_note")}
+            onConfirm={async () => {
+              await fetchApi(`/trainer/interviews/${delRec.id}/recording`, { method: "DELETE" });
+              setMsg(t("trainer_interviews.recording_deleted"));
+              await load();
+            }}
+            onClose={() => setDelRec(null)} />
+        )}
       </AppShell>
     </RoleGuard>
   );

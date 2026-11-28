@@ -70,4 +70,25 @@ test.describe("App shell: profile menu, per-user notifications, mobile navigatio
     await page.goto("/college/alumni");                // not a module yet
     await expect(page.getByTestId("coming-soon")).toContainText("Coming soon");
   });
+
+  test("sidebar toggle switches to an icon rail and back, and is remembered", async ({ page }) => {
+    await loginAs(page, "student");
+    await page.goto("/student");
+    const side = page.getByTestId("desktop-sidebar");
+    const toggle = page.getByTestId("sidebar-toggle");
+    await expect(side).toHaveAttribute("data-collapsed", "false");
+    await expect(side.getByText("My Courses")).toBeVisible();
+
+    await toggle.click();
+    await expect(side).toHaveAttribute("data-collapsed", "true");
+    await expect(side.getByText("My Courses")).toHaveCount(0);           // labels hidden...
+    await side.getByRole("link", { name: "My Courses" }).click();         // ...but each icon is still a named link
+    await page.waitForURL("**/student/courses");
+
+    await page.reload();                                                  // remembered in this browser
+    await expect(page.getByTestId("desktop-sidebar")).toHaveAttribute("data-collapsed", "true");
+    await page.getByTestId("sidebar-toggle").click();
+    await expect(page.getByTestId("desktop-sidebar")).toHaveAttribute("data-collapsed", "false");
+    await expect(page.getByTestId("desktop-sidebar").getByText("My Courses")).toBeVisible();
+  });
 });

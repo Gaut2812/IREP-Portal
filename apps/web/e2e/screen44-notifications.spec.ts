@@ -37,6 +37,14 @@ test.describe("Screen 44: Notification centre (/notifications)", () => {
     await loginAs(page, "trainer", { lang: "ta" });
     await page.goto("/notifications");
     await expect(page.getByTestId("prefs-save")).toHaveText("விருப்பங்களைச் சேமி");
+    // the type under each notification is translated, not the raw kind ("info", "approval", ...)
+    const kinds = await page.getByTestId("notif-kind").allInnerTexts();
+    expect(kinds.length).toBeGreaterThan(0);
+    for (const k of kinds) expect(k).not.toMatch(/^[a-z_]+$/);
+    // saving channels or quiet hours keeps the page in Tamil (the form used to load the stored "English")
+    await page.getByTestId("prefs-save").click();
+    await expect(page.getByTestId("prefs-saved")).toBeVisible();
+    await expect(page.getByTestId("prefs-save")).toHaveText("விருப்பங்களைச் சேமி");
   });
 
   test("signed-out visitors are sent to sign in", async ({ page }) => {

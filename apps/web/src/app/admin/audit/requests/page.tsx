@@ -16,8 +16,8 @@ interface Req {
   name_hidden?: boolean;
 }
 const STATUS: Record<string, string> = {
-  received: "bg-[#FEF3C7] text-[#92400E]", in_progress: "bg-[#DBEAFE] text-[#1E40AF]",
-  completed: "bg-[#DCFCE7] text-[#166534]", rejected: "bg-[#F1F5F9] text-[#475569]",
+  received: "bg-warning-soft text-warning", in_progress: "bg-info-soft text-info",
+  completed: "bg-success-soft text-success", rejected: "bg-line-soft text-ink-soft",
 };
 
 export default function DataRequestsPage() {
@@ -66,50 +66,50 @@ export default function DataRequestsPage() {
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("admin_audit.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-6 max-w-6xl">
           <AuditTabs />
-          <p className="text-[11px] text-[#64748B]">{t("admin_audit.requests_note")}</p>
+          <p className="text-caption text-muted">{t("admin_audit.requests_note")}</p>
           {error && <p className="text-xs text-red-600" role="alert" data-testid="requests-error">{error}</p>}
           {items && items.length === 0 && (
-            <div className="bg-white rounded-xl border border-dashed border-[#CBD5E1] p-8 text-center text-xs text-[#64748B]">{t("admin_audit.no_requests")}</div>
+            <div className="bg-white rounded-card border border-dashed border-line-strong p-8 text-center text-xs text-muted">{t("admin_audit.no_requests")}</div>
           )}
           <ul className="space-y-2">
             {items?.map((r) => {
               const open = r.status === "received" || r.status === "in_progress";
               return (
-                <li key={r.id} className="bg-white rounded-xl border border-[#E2E8F0] p-3 text-xs space-y-2" data-testid={`request-${r.id}`}>
+                <li key={r.id} className="bg-white rounded-card border border-line p-3 text-xs space-y-2" data-testid={`request-${r.id}`}>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div>
-                      <span className="font-bold text-[#0F1F3A]">{t(`admin_audit.kind_${r.kind}`)}</span> · {r.name_hidden ? <span data-testid="request-name-hidden">{t("admin_audit.name_hidden")} ({r.student_id})</span> : (r.student_name || r.student_id)}
-                      <span className="text-[#64748B]"> · {r.college_id}</span>
+                      <span className="font-semibold text-ink">{t(`admin_audit.kind_${r.kind}`)}</span> · {r.name_hidden ? <span data-testid="request-name-hidden">{t("admin_audit.name_hidden")} ({r.student_id})</span> : (r.student_name || r.student_id)}
+                      <span className="text-muted"> · {r.college_id}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {open && r.days_left !== null && (
-                        <span className={r.overdue ? "text-[#DC2626] font-bold" : "text-[#64748B]"} data-testid="request-due">
+                        <span className={r.overdue ? "text-danger font-semibold" : "text-muted"} data-testid="request-due">
                           {r.overdue ? t("admin_audit.overdue") : `${t("admin_audit.due_in")} ${r.days_left} ${t("admin_audit.days")}`}
                         </span>
                       )}
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS[r.status]}`} data-testid="request-status">{t(`admin_audit.status_${r.status}`)}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-caption font-semibold ${STATUS[r.status]}`} data-testid="request-status">{t(`admin_audit.status_${r.status}`)}</span>
                     </div>
                   </div>
-                  <p className="text-[#475569]">{r.reason}</p>
-                  {r.decision_note && <p className="text-[#64748B]">{t("admin_audit.decision")}: {r.decision_note}</p>}
+                  <p className="text-ink-soft">{r.reason}</p>
+                  {r.decision_note && <p className="text-muted">{t("admin_audit.decision")}: {r.decision_note}</p>}
                   <div className="flex gap-2 flex-wrap">
                     {open && !r.can_decide && (
-                      <span className="text-[11px] text-[#64748B]" data-testid="request-super-only">{t("admin_audit.super_only_deletion")}</span>
+                      <span className="text-caption text-muted" data-testid="request-super-only">{t("admin_audit.super_only_deletion")}</span>
                     )}
                     {r.status === "received" && r.can_decide && (
                       <button type="button" disabled={busy} onClick={() => complete(r)} data-testid="request-complete"
-                        className="px-3 py-1.5 bg-[#2B5CD0] text-white font-bold rounded-lg disabled:opacity-50">
+                        className="px-3 py-1.5 bg-brand text-white font-semibold rounded-tile disabled:opacity-50">
                         {r.kind === "export" ? t("admin_audit.build_export") : t("admin_audit.anonymise")}
                       </button>
                     )}
                     {open && r.can_decide && rejecting !== r.id && (
                       <button type="button" disabled={busy} onClick={() => { setRejecting(r.id); setReason(""); }} data-testid="request-reject"
-                        className="px-3 py-1.5 border border-[#CBD5E1] font-bold rounded-lg">{t("admin_audit.reject")}</button>
+                        className="px-3 py-1.5 border border-line-strong font-semibold rounded-tile">{t("admin_audit.reject")}</button>
                     )}
                     {r.has_export && (
-                      <button type="button" onClick={() => download(r)} data-testid="request-download" className="px-3 py-1.5 border border-[#CBD5E1] font-bold rounded-lg">
+                      <button type="button" onClick={() => download(r)} data-testid="request-download" className="px-3 py-1.5 border border-line-strong font-semibold rounded-tile">
                         {t("admin_audit.download")}
                       </button>
                     )}
@@ -117,9 +117,9 @@ export default function DataRequestsPage() {
                   {rejecting === r.id && (
                     <div className="flex gap-2 items-center">
                       <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("admin_audit.reject_reason")}
-                        data-testid="reject-reason" className="flex-1 px-2.5 py-1.5 border border-[#E2E8F0] rounded-lg" />
+                        data-testid="reject-reason" className="flex-1 px-2.5 py-1.5 border border-line rounded-tile" />
                       <button type="button" disabled={busy} onClick={() => reject(r)} data-testid="reject-confirm"
-                        className="px-3 py-1.5 bg-[#DC2626] text-white font-bold rounded-lg disabled:opacity-50">{t("admin_audit.reject")}</button>
+                        className="px-3 py-1.5 bg-danger text-white font-semibold rounded-tile disabled:opacity-50">{t("admin_audit.reject")}</button>
                     </div>
                   )}
                 </li>

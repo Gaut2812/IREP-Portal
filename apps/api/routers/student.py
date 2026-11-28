@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 import datetime
 import uuid
 
@@ -16,9 +16,10 @@ from models.schema import (
     PracticeQuestion, VirtualLabItem, SprintTask, MockInterview,
     SessionItem, DiscussionGroup, GroupMessage,
     TestAttempt, AttemptAnswer, ProctorEvent, TopicScore,
-    StudentProject, StudentSkill, ProjectDemoEvent
+    StudentProject, StudentSkill, ProjectDemoEvent, UsageLedger
 )
 from services.judge0_service import get_execution_engine
+from services.code_harness import STDIO_TEMPLATES, wrap_python
 from services.ai_reviewer_service import get_ai_reviewer_engine
 from schemas.coding import (
     CodeRunRequest, CodeSubmitRequest, HintRequest, CodeReviewRequest,
@@ -46,6 +47,13 @@ def get_student_dashboard(
     return build_student_dashboard(db, student, current_user, lang)
 
 
+@router.get("/dashboard/details")
+def get_dashboard_details(lang: str = "en", current_user: TokenPayload = Depends(require_role(["student"])), db: Session = Depends(get_db)):
+    """What is behind each dashboard tile: problems by topic, the practice heat map and streaks, all badges, skill tips."""
+    from services.dashboard_details import build_details
+    return build_details(db, get_student_for_user(current_user, db), lang)
+
+
 @router.get("/dashboard/why-score")
 def get_why_score(
     lang: str = "en",
@@ -68,105 +76,10 @@ class CodeSubmitRequest(BaseModel):
 class HintRequest(BaseModel):
     current_count: int = 1
 
-STARTER_CODES = {
-    "python": """class Solution:
-    def countComponents(self, n: int, edges: list[list[int]]) -> int:
-        parent = list(range(n))
-        
-        def find(x):
-            if parent[x] != x:
-                parent[x] = find(parent[x]) # Path compression
-            return parent[x]
-            
-        def union(x, y):
-            rx, ry = find(x), find(y)
-            if rx != ry:
-                parent[rx] = ry
-                return 1
-            return 0
-            
-        return n - sum(union(u, v) for u, v in edges)""",
-    "java": """class Solution {
-    public int countComponents(int n, int[][] edges) {
-        int[] parent = new int[n];
-        for (int i = 0; i < n; i++) parent[i] = i;
-        
-        int components = n;
-        for (int[] edge : edges) {
-            int root1 = find(parent, edge[0]);
-            int root2 = find(parent, edge[1]);
-            if (root1 != root2) {
-                parent[root1] = root2;
-                components--;
-            }
-        }
-        return components;
-    }
-    
-    private int find(int[] parent, int i) {
-        if (parent[i] == i) return i;
-        return parent[i] = find(parent, parent[i]);
-    }
-}""",
-    "cpp": """#include <vector>
-#include <numeric>
+# Starter code: the problem's own (a stub for function problems), else STDIO_TEMPLATES per language.
 
-class Solution {
-public:
-    int countComponents(int n, std::vector<std::vector<int>>& edges) {
-        std::vector<int> parent(n);
-        std::iota(parent.begin(), parent.end(), 0);
-        
-        auto find = [&](auto& self, int i) -> int {
-            if (parent[i] == i) return i;
-            return parent[i] = self(self, parent[i]);
-        };
-        
-        int count = n;
-        for (const auto& edge : edges) {
-            int r1 = find(find, edge[0]);
-            int r2 = find(find, edge[1]);
-            if (r1 != r2) {
-                parent[r1] = r2;
-                count--;
-            }
-        }
-        return count;
-    }
-};""",
-    "javascript": """/**
- * @param {number} n
- * @param {number[][]} edges
- * @return {number}
- */
-var countComponents = function(n, edges) {
-    const parent = Array.from({ length: n }, (_, i) => i);
-    
-    function find(x) {
-        if (parent[x] !== x) {
-            parent[x] = find(parent[x]);
-        }
-        return parent[x];
-    }
-    
-    let count = n;
-    for (const [u, v] of edges) {
-        const rootU = find(u);
-        const rootV = find(v);
-        if (rootU !== rootV) {
-            parent[rootU] = rootV;
-            count--;
-        }
-    }
-    return count;
-};"""
-}
-
-PROBLEM_HINTS = [
-    "Think of this as a connectivity problem. Each edge connects two nodes. Can you maintain the count of disjoint components starting from n?",
-    "Remember that if an edge connects two already connected nodes (same root), the component count does not decrease.",
-    "Notice how path compression in find() flattens the tree. For best worst-case complexity, combine with union-by-rank."
-]
+from services.coding_hints import hints_for
+SUBMIT_GRACE_SECONDS = 60   # a practice-test submit may arrive this late (network) and still save its final answers
 
 CURRICULUM_ORDER = [
     "prob_two_sum",
@@ -193,7 +106,7 @@ CURRICULUM_ORDER = [
 
 def _get_ordered_problems(db: Session, college_id: str):
     all_probs = db.execute(
-        select(CodingProblem).filter_by(college_id=college_id)
+        select(CodingProblem).where(CodingProblem.college_id == college_id, CodingProblem.status != "deleted")
     ).scalars().all()
     order_map = {pid: i for i, pid in enumerate(CURRICULUM_ORDER)}
     return sorted(all_probs, key=lambda p: order_map.get(p.id, 999))
@@ -245,6 +158,33 @@ def list_coding_problems(
         ]
     }
 
+@router.get("/coding/resume")
+def resume_coding_problem(
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    """Where "Resume practice" goes: the last problem the student worked on if it is not solved yet,
+    else the first unsolved problem in curriculum order, else the first problem. None if nothing is published."""
+    me = caller_student(db, current_user)
+    if me is None:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+    problems = [p for p in _get_ordered_problems(db, current_user.college_id) if visible_to(p, me)]
+    if not problems:
+        return {"problem_id": None}
+    ids = {p.id for p in problems}
+    subs = db.execute(
+        select(CodingSubmission.problem_id, CodingSubmission.status)
+        .filter_by(student_id=me.id, college_id=current_user.college_id)
+        .order_by(CodingSubmission.created_at.desc())
+    ).all()
+    solved = {pid for pid, st in subs if st == "Accepted"}
+    last = next((pid for pid, _ in subs if pid in ids), None)
+    if last and last not in solved:
+        return {"problem_id": last}
+    first_open = next((p.id for p in problems if p.id not in solved), None)
+    return {"problem_id": first_open or problems[0].id}
+
+
 @router.get("/coding/{problem_id}")
 def get_coding_problem(
     problem_id: str,
@@ -279,7 +219,7 @@ def get_coding_problem(
     revealed_hints = [r.hint_text for r in hint_records]
     if not revealed_hints:
         # Default with the first hint
-        revealed_hints = [PROBLEM_HINTS[0]]
+        revealed_hints = [hints_for(prob.topic)[0]]
 
     # Check if student has previous submissions
     last_submission = db.execute(
@@ -301,10 +241,11 @@ def get_coding_problem(
         "example_input": prob.example_input,
         "example_output": prob.example_output,
         "constraints": prob.constraints,
-        "starter_codes": prob.starter_codes if (prob.starter_codes and isinstance(prob.starter_codes, dict) and len(prob.starter_codes) > 1) else (
-            {**STARTER_CODES, "python": prob.starter_code} if prob.starter_code else STARTER_CODES
-        ),
-        "starter_code": prob.starter_code or STARTER_CODES["python"],
+        "starter_codes": _starter_codes(prob),
+        "starter_code": prob.starter_code or STDIO_TEMPLATES["python"],
+        # function problems are judged in Python (the driver); any language runs in the terminal on your own input
+        "io_mode": prob.io_mode,
+        "judged_languages": ["python"] if prob.io_mode == "function" else list(STDIO_TEMPLATES),
         "trainer_notes": prob.trainer_notes,
         "trainer_author": prob.trainer_author,
         "prev_problem": {"id": prev_prob.id, "title": prev_prob.title, "week_info": prev_prob.week_info} if prev_prob else None,
@@ -320,7 +261,7 @@ def get_coding_problem(
             ],
             "revealed_hints": revealed_hints,
             "hints_used": len(revealed_hints),
-            "max_hints": len(PROBLEM_HINTS),
+            "max_hints": len(hints_for(prob.topic)),
             "rules_note": f"Hints only, no full solutions. AI help used in this problem: {len(revealed_hints)} hint"
         },
         "last_submission": {
@@ -332,6 +273,78 @@ def get_coding_problem(
             "submitted_at": last_submission.created_at.isoformat()
         } if last_submission else None
     }
+
+def _starter_codes(prob: CodingProblem) -> dict:
+    own = prob.starter_codes if isinstance(prob.starter_codes, dict) else {}
+    out = {lang: own.get(lang) or tpl for lang, tpl in STDIO_TEMPLATES.items()}
+    if prob.starter_code:
+        out["python"] = own.get("python") or prob.starter_code
+    return out
+
+
+def _program_for_tests(engine, prob: CodingProblem, code: str, language: str) -> str:
+    """A real engine runs function problems through the Python driver; other languages can't be judged for them yet."""
+    if not engine.runs_real_code or prob.io_mode != "function":
+        return code
+    if language != "python":
+        raise HTTPException(status_code=422, detail="This problem's tests run in Python. Use the Terminal tab to run "
+                                                    "Java, C++ or Node.js code on your own input.")
+    return wrap_python(code)
+
+
+TERMINAL_MIN_GAP_SEC = 2
+TERMINAL_RUNS_PER_HOUR = 60
+
+
+def _terminal_budget(db: Session, student) -> None:
+    """Judge0 is shared: one terminal run at a time per student (2 s apart) and at most 60 an hour. Counted from the
+    usage ledger, so it holds across API workers; trainers' previews are not limited."""
+    now = datetime.datetime.utcnow()
+    recent = db.execute(select(UsageLedger.created_at).where(UsageLedger.student_id == student.id, UsageLedger.kind == "code_runs",
+                                                             UsageLedger.created_at >= now - datetime.timedelta(hours=1))
+                        .order_by(UsageLedger.created_at.desc())).scalars().all()
+    if recent and (now - recent[0]).total_seconds() < TERMINAL_MIN_GAP_SEC:
+        raise HTTPException(status_code=429, detail="One run at a time: wait a moment before running again.",
+                            headers={"Retry-After": str(TERMINAL_MIN_GAP_SEC)})
+    if len(recent) >= TERMINAL_RUNS_PER_HOUR:
+        raise HTTPException(status_code=429, detail=f"You have used {TERMINAL_RUNS_PER_HOUR} terminal runs this hour. Try again later.",
+                            headers={"Retry-After": "600"})
+
+
+class ProgramRunRequest(BaseModel):
+    language: str = Field(default="python", pattern="^(python|java|cpp|javascript)$")
+    code: str = Field(..., min_length=1, max_length=65536)
+    stdin: str = Field(default="", max_length=65536)
+
+
+@router.post("/coding/{problem_id}/execute")
+def execute_program(
+    problem_id: str,
+    req: ProgramRunRequest,
+    current_user: TokenPayload = Depends(require_role(["student", "trainer"])),
+    db: Session = Depends(get_db),
+):
+    """The terminal: run the code as a program on the student's own input (any of the four languages) and show
+    stdout, stderr and compiler output, like VS Code's Run. Nothing is graded or saved."""
+    prob = get_for_caller(db, CodingProblem, problem_id, current_user)
+    me = caller_student(db, current_user)
+    if me is not None:
+        _terminal_budget(db, me)
+    engine = get_execution_engine()
+    # a function problem's class has no main: with input given, the driver calls it (unless the code reads stdin itself)
+    reads_stdin = "input(" in req.code or "sys.stdin" in req.code
+    code = wrap_python(req.code) if (engine.runs_real_code and prob.io_mode == "function" and req.language == "python"
+                                     and req.stdin.strip() and "class " in req.code and not reads_stdin) else req.code
+    out = engine.run_program(code, req.language, req.stdin, time_limit_ms=max(prob.time_limit_ms or 2000, 5000),
+                             memory_limit_mb=prob.memory_limit_mb or 256)
+    if me is not None and out.status != "Unavailable":
+        db.add(UsageLedger(id=f"ul_{uuid.uuid4().hex[:18]}", college_id=me.college_id, student_id=me.id, kind="code_runs", amount=1,
+                           period=datetime.datetime.utcnow().strftime("%Y-%m"), ref_type="terminal", ref_id=prob.id))
+        db.commit()
+    return {"status": out.status, "stdout": out.stdout, "stderr": out.stderr, "compile_output": out.compile_output,
+            "runtime_ms": out.runtime_ms, "memory_mb": out.memory_mb, "message": out.message,
+            "driver": code is not req.code}
+
 
 @router.post("/coding/{problem_id}/run")
 def run_code_sample(
@@ -381,7 +394,7 @@ def run_code_sample(
 
     engine = get_execution_engine()
     execution = engine.execute_suite(
-        code=req.code,
+        code=_program_for_tests(engine, prob, req.code, req.language),
         language=req.language,
         test_cases=sample_cases,
         time_limit_ms=prob.time_limit_ms,
@@ -506,7 +519,7 @@ def submit_code(
 
     engine = get_execution_engine()
     execution = engine.execute_suite(
-        code=req.code,
+        code=_program_for_tests(engine, prob, req.code, req.language),
         language=req.language,
         test_cases=eval_cases,
         time_limit_ms=prob.time_limit_ms,
@@ -633,17 +646,17 @@ def request_coding_hint(
     # the first request unlocks hint 2, never hint 1 again.
     shown = max(len(hint_records), 1)
     next_hint_idx = shown
-    if next_hint_idx >= len(PROBLEM_HINTS):
+    if next_hint_idx >= len(hints_for(prob.topic)):
         # All hints exhausted
         return {
             "success": False,
             "message": "All available hints for this problem have been unlocked.",
-            "hint": PROBLEM_HINTS[-1],
-            "hints_used": len(PROBLEM_HINTS),
-            "max_hints": len(PROBLEM_HINTS)
+            "hint": hints_for(prob.topic)[-1],
+            "hints_used": len(hints_for(prob.topic)),
+            "max_hints": len(hints_for(prob.topic))
         }
 
-    hint_text = PROBLEM_HINTS[next_hint_idx]
+    hint_text = hints_for(prob.topic)[next_hint_idx]
     if student_id is not None:
         # trainers preview hints without consuming a student's hint quota
         to_record = [] if hint_records else [0]          # record the free hint 1 once
@@ -655,7 +668,7 @@ def request_coding_hint(
                 problem_id=prob.id,
                 student_id=student_id,
                 hint_number=idx + 1,
-                hint_text=PROBLEM_HINTS[idx],
+                hint_text=hints_for(prob.topic)[idx],
             ))
         db.commit()
 
@@ -664,7 +677,7 @@ def request_coding_hint(
         "hint": hint_text,
         "hint_number": next_hint_idx + 1,
         "hints_used": next_hint_idx + 1,
-        "max_hints": len(PROBLEM_HINTS)
+        "max_hints": len(hints_for(prob.topic))
     }
 
 
@@ -789,6 +802,43 @@ def get_practice_test(
         ]
     }
 
+HEARTBEAT_SEC = 15          # the test page checks in this often while it is online
+PAUSE_SLACK_SEC = 2 * HEARTBEAT_SEC   # gaps shorter than two missed heartbeats are normal jitter, not a pause
+MAX_PAUSE_SEC = 600         # a lost connection can add at most 10 minutes per attempt (stops abuse of "going offline")
+MAX_TAB_SWITCHES = 3        # warnings before the test is submitted for the student
+
+
+def _credit_pause(db: Session, attempt: TestAttempt, now: datetime.datetime) -> int:
+    """Give back the time a lost connection cost. The gap is measured by the server from the last heartbeat it
+    received (never from what the browser says), only time before the old end counts, and the total is capped.
+    Each credit is logged as a proctor event the trainer sees. Returns the seconds credited now."""
+    seen = attempt.last_seen_at
+    attempt.last_seen_at = now
+    if seen is None or seen >= attempt.ends_at:
+        return 0
+    gap = int((min(now, attempt.ends_at) - seen).total_seconds()) - PAUSE_SLACK_SEC
+    credit = min(max(0, gap), MAX_PAUSE_SEC - (attempt.paused_seconds or 0))
+    if credit <= 0:
+        return 0
+    attempt.ends_at += datetime.timedelta(seconds=credit)
+    attempt.paused_seconds = (attempt.paused_seconds or 0) + credit
+    db.add(ProctorEvent(id=f"proc_{uuid.uuid4().hex[:12]}", college_id=attempt.college_id, attempt_id=attempt.id,
+                        student_id=attempt.student_id, event_type="connection_paused",
+                        details=f"Connection lost: {credit}s added back ({attempt.paused_seconds}s of {MAX_PAUSE_SEC}s used)",
+                        timestamp=now))
+    return credit
+
+
+def _tab_switches(db: Session, attempt_id: str) -> int:
+    return db.execute(select(func.count(ProctorEvent.id)).where(ProctorEvent.attempt_id == attempt_id,
+                                                                ProctorEvent.event_type == "tab_switch")).scalar_one()
+
+
+def _attempt_rules(db: Session, attempt: TestAttempt) -> dict:
+    return {"heartbeat_sec": HEARTBEAT_SEC, "max_pause_sec": MAX_PAUSE_SEC, "paused_seconds": attempt.paused_seconds or 0,
+            "max_tab_switches": MAX_TAB_SWITCHES, "tab_switches": _tab_switches(db, attempt.id)}
+
+
 @router.post("/tests/{test_id}/attempts")
 def start_or_resume_attempt(
     test_id: str,
@@ -806,6 +856,9 @@ def start_or_resume_attempt(
         .order_by(TestAttempt.started_at.desc())
     ).scalars().first()
 
+    if active_attempt:
+        _credit_pause(db, active_attempt, now)          # time lost to a dropped connection comes back (capped)
+        db.commit()
     if active_attempt and active_attempt.ends_at > now:
         answers = db.execute(select(AttemptAnswer).filter_by(attempt_id=active_attempt.id)).scalars().all()
         answers_dict = {a.question_number: a.selected_option for a in answers if a.selected_option}
@@ -820,7 +873,8 @@ def start_or_resume_attempt(
             "ends_at": active_attempt.ends_at.isoformat(),
             "time_remaining_sec": time_rem,
             "saved_answers": answers_dict,
-            "marked_for_review": marked_list
+            "marked_for_review": marked_list,
+            **_attempt_rules(db, active_attempt),
         }
 
     attempt_id = f"att_{uuid.uuid4().hex[:12]}"
@@ -834,7 +888,9 @@ def start_or_resume_attempt(
         status="in_progress",
         started_at=now,
         ends_at=ends_at,
-        total_questions=test.total_questions
+        total_questions=test.total_questions,
+        last_seen_at=now,
+        paused_seconds=0,
     )
     db.add(new_attempt)
     db.commit()
@@ -847,8 +903,33 @@ def start_or_resume_attempt(
         "ends_at": new_attempt.ends_at.isoformat(),
         "time_remaining_sec": test.duration_min * 60,
         "saved_answers": {},
-        "marked_for_review": []
+        "marked_for_review": [],
+        "heartbeat_sec": HEARTBEAT_SEC, "max_pause_sec": MAX_PAUSE_SEC, "paused_seconds": 0,
+        "max_tab_switches": MAX_TAB_SWITCHES, "tab_switches": 0,
     }
+
+@router.post("/tests/attempts/{attempt_id}/heartbeat")
+def attempt_heartbeat(
+    attempt_id: str,
+    current_user: TokenPayload = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    """The test page checks in every HEARTBEAT_SEC while online, and at once when the connection comes back.
+    A check-in after a gap is the resume: the lost time is added back (capped) and the new clock returned."""
+    student = _get_student_for_user(current_user, db)
+    attempt = db.execute(
+        select(TestAttempt).filter_by(id=attempt_id, student_id=student.id, college_id=current_user.college_id)
+    ).scalar_one_or_none()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Test attempt not found")
+    if attempt.status != "in_progress":
+        raise HTTPException(status_code=409, detail="This test is already submitted")
+    now = datetime.datetime.utcnow()
+    credited = _credit_pause(db, attempt, now)
+    db.commit()
+    return {"time_remaining_sec": max(0, int((attempt.ends_at - now).total_seconds())), "credited_sec": credited,
+            **_attempt_rules(db, attempt)}
+
 
 @router.put("/tests/attempts/{attempt_id}/answers")
 def batch_save_answers(
@@ -868,6 +949,7 @@ def batch_save_answers(
         raise HTTPException(status_code=400, detail="Cannot save answers: test is already submitted or expired")
 
     now = datetime.datetime.utcnow()
+    _credit_pause(db, attempt, now)
     if now > attempt.ends_at:
         attempt.status = "expired"
         db.commit()
@@ -884,7 +966,10 @@ def batch_save_answers(
     marked_set = set(req.marked_for_review or [])
 
     for q_num_raw, val in req.answers.items():
-        q_num = int(q_num_raw)
+        try:
+            q_num = int(q_num_raw)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail=f"Answer keys must be question numbers, got '{str(q_num_raw)[:20]}'")
         q = q_by_num.get(q_num)
         if not q:
             continue
@@ -947,7 +1032,7 @@ def log_proctor_event(
     db.add(event)
     db.commit()
 
-    return {"success": True, "event_id": event.id}
+    return {"success": True, "event_id": event.id, "tab_switches": _tab_switches(db, attempt.id), "max_tab_switches": MAX_TAB_SWITCHES}
 
 @router.post("/tests/attempts/{attempt_id}/submit")
 def submit_practice_test(
@@ -963,6 +1048,9 @@ def submit_practice_test(
 
     if not attempt:
         raise HTTPException(status_code=404, detail="Test attempt not found")
+    if attempt.status == "submitted":
+        # submitting twice returns the graded result; it never takes new answers or re-grades
+        return get_attempt_result(attempt_id, current_user, db)
 
     questions = db.execute(
         select(PracticeQuestion)
@@ -971,9 +1059,11 @@ def submit_practice_test(
     ).scalars().all()
 
     now = datetime.datetime.utcnow()
+    # after the time limit (plus a short grace for the network) only answers saved in time count
+    late = attempt.ends_at is not None and now > attempt.ends_at + datetime.timedelta(seconds=SUBMIT_GRACE_SECONDS)
 
     # Save any final answers if provided
-    if req and req.answers:
+    if req and req.answers and not late:
         marked_set = set(req.marked_for_review or [])
         existing_answers = {
             a.question_number: a
@@ -1048,7 +1138,8 @@ def submit_practice_test(
 
     total_q = len(questions) or 1
     accuracy_pct = round((total_score / total_q) * 100, 1)
-    time_taken_sec = int((now - attempt.started_at).total_seconds())
+    finished = min(now, attempt.ends_at) if attempt.ends_at else now
+    time_taken_sec = max(0, int((finished - attempt.started_at).total_seconds()))
     time_taken_mins = max(1, time_taken_sec // 60)
 
     attempt.status = "submitted"

@@ -46,7 +46,31 @@ def active_sprint(db: Session, team: Team) -> Optional[Sprint]:
     return db.execute(select(Sprint).filter_by(team_id=team.id, status="active").order_by(Sprint.number.desc())).scalars().first()
 
 
-def build_board(db: Session, team: Team, now: Optional[datetime.datetime] = None) -> dict:
+def team_members(db: Session, team: Team) -> list:
+    """Members with names and initials, leads first (the board's assignee list)."""
+    rows = db.execute(select(TeamMember, Student, User.name).join(Student, Student.id == TeamMember.student_id)
+                      .join(User, User.id == Student.user_id).where(TeamMember.team_id == team.id)).all()
+    out = [{"student_id": st.id, "name": name, "initials": initials(name), "role": tm.role, "batch": st.batch_name}
+           for tm, st, name in rows]
+    return sorted(out, key=lambda m: (m["role"] != "lead", m["name"]))
+
+
+def initials(name: str) -> str:
+    parts = [p for p in (name or "").replace(".", " ").split() if p]
+    return ("".join(p[0] for p in parts[:2]) or "?").upper()
+
+
+def can_delete_task(task: SprintTask, has_pr: bool, viewer_student_id: Optional[str], is_trainer: bool) -> bool:
+    """Trainers delete any task without a pull request; students delete their own (created or assigned) open ones."""
+    if has_pr:
+        return False
+    if is_trainer:
+        return True
+    return bool(viewer_student_id) and task.column_name != "done" and viewer_student_id in (task.created_by_student_id, task.assignee_student_id)
+
+
+def build_board(db: Session, team: Team, now: Optional[datetime.datetime] = None,
+                viewer_student_id: Optional[str] = None, is_trainer: bool = False) -> dict:
     now = now or datetime.datetime.now()
     sprint = active_sprint(db, team)
     tasks = db.execute(
@@ -61,6 +85,8 @@ def build_board(db: Session, team: Team, now: Optional[datetime.datetime] = None
             "id": t.id, "title": t.title, "tag": t.tag, "tag_type": t.tag_type,
             "assignee_initials": t.assignee_initials, "assignee_name": t.assignee_name, "story_points": t.story_points,
             "pr_number": t.pr_number, "pr_status": pr.status if pr else None, "pr_id": pr.id if pr else None, "position": t.position,
+            "assignee_student_id": t.assignee_student_id, "created_by_student_id": t.created_by_student_id,
+            "can_delete": can_delete_task(t, bool(pr or t.pr_number), viewer_student_id, is_trainer),
         })
     total = sum(t.story_points for t in tasks)
     done = sum(t.story_points for t in tasks if t.column_name == "done")
@@ -80,7 +106,11 @@ def build_board(db: Session, team: Team, now: Optional[datetime.datetime] = None
         return f"{hrs} hr{'s' if hrs != 1 else ''} ago" if hrs < 48 else f"{hrs // 24} days ago"
 
     return {
-        "team": {"id": team.id, "name": team.name, "project_title": team.project_title, "client": team.client_name, "repo": team.repo_full_name, "members": member_count},
+        "team": {"id": team.id, "name": team.name, "project_title": team.project_title, "client": team.client_name, "repo": team.repo_full_name,
+                 "members": member_count, "description": team.description,
+                 "goals": [g.strip(" -•\t") for g in (team.goals or "").splitlines() if g.strip(" -•\t")]},
+        "member_list": team_members(db, team),
+        "can_manage": is_trainer,
         "sprint": {"id": sprint.id, "number": sprint.number, "total": sprint.total_sprints, "ends_week": sprint.ends_week, "goal": sprint.goal} if sprint else None,
         "change_request": {"id": cr.id, "code": cr.code, "title": cr.title, "description": cr.description, "status": cr.status, "task_id": cr.task_id} if cr else None,
         "columns": [{"key": c, "label": COLUMN_LABEL[c], "tasks": columns[c]} for c in COLUMNS],

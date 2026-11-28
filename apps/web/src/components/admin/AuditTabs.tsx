@@ -14,12 +14,12 @@ export function AuditTabs() {
     { href: "/admin/audit/requests", label: t("admin_audit.tab_requests") },
   ];
   return (
-    <nav className="flex gap-1 border-b border-[#E2E8F0]" aria-label={t("admin_audit.tabs_label")}>
+    <nav className="flex gap-1 border-b border-line" aria-label={t("admin_audit.tabs_label")}>
       {tabs.map((tab) => {
         const on = path === tab.href;
         return (
           <Link key={tab.href} href={tab.href} aria-current={on ? "page" : undefined}
-            className={`px-3 py-2 text-xs font-bold border-b-2 -mb-px ${on ? "border-[#2B5CD0] text-[#2B5CD0]" : "border-transparent text-[#64748B] hover:text-[#0F1F3A]"}`}>
+            className={`px-3 py-2 text-xs font-semibold border-b-2 -mb-px ${on ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"}`}>
             {tab.label}
           </Link>
         );

@@ -8,7 +8,7 @@ test.describe("Screen 35: Trainer Message Hub (/trainer/messages)", () => {
 
     await expect(page.getByTestId("unread-th_lakshmi")).toHaveText("2");
     await expect(page.getByTestId("unread-th_kavitha")).toHaveText("1");
-    await expect(page.getByTestId("permission-matrix")).toContainText("Student ⇄ Student 1-1");
+    await expect(page.getByTestId("permission-matrix")).toHaveCount(0);   // the "who can message whom" card was removed
     await expect(page.getByTestId("mod-rep_seed_01")).toBeVisible();
     const queueBefore = Number(await page.getByTestId("queue-count").innerText());
 
@@ -50,7 +50,7 @@ test.describe("Screen 35: Trainer Message Hub (/trainer/messages)", () => {
   test("category filter and Tamil UI", async ({ page }) => {
     await loginAs(page, "trainer", { lang: "ta" });
     await page.goto("/trainer/messages");
-    await expect(page.getByText("யார் யாருக்கு செய்தி அனுப்பலாம்")).toBeVisible();
+    await expect(page.getByTestId("moderation-queue")).toBeVisible();   // Tamil UI loaded (the "who can message whom" card is gone)
     await page.getByTestId("cat-College").click();
     await expect(page.getByTestId("thread-th_kavitha")).toBeVisible();
     await expect(page.getByTestId("thread-th_ramesh")).toHaveCount(0);

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/AuthContext";
 import { useLanguage } from "@/lib/LanguageContext";
-import { fetchApi } from "@/lib/api";
+import { ApiError, fetchApi } from "@/lib/api";
 import {
   Clock, CheckCircle2, Bookmark, ArrowLeft, ArrowRight, Check,
   AlertTriangle, Maximize2, Minimize2, ShieldAlert, RotateCcw,
@@ -73,6 +73,17 @@ interface ResultData {
   questions_review: QuestionReview[];
 }
 
+function readLocal(attemptId: string): { answers: Record<string, string>; marked: number[] } | null {
+  try {
+    const raw = localStorage.getItem(`irep_test:${attemptId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function clearLocal(attemptId: string | null) {
+  if (!attemptId) return;
+  try { localStorage.removeItem(`irep_test:${attemptId}`); } catch { /* ignore */ }
+}
+
 export default function PracticeTestPage() {
   const params = useParams();
   const router = useRouter();
@@ -87,7 +98,7 @@ export default function PracticeTestPage() {
   const [testData, setTestData] = useState<TestData | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
 
-  const [currentQ, setCurrentQ] = useState(12);
+  const [currentQ, setCurrentQ] = useState(1);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [markedForReview, setMarkedForReview] = useState<number[]>([]);
   const [secondsLeft, setSecondsLeft] = useState<number>(1800);
@@ -95,6 +106,15 @@ export default function PracticeTestPage() {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [maxTabSwitches, setMaxTabSwitches] = useState(3);
+  const [tabWarning, setTabWarning] = useState<number | null>(null);      // shown when the student comes back
+  const [autoSubmitReason, setAutoSubmitReason] = useState<"tabs" | null>(null);
+  const [online, setOnline] = useState(true);
+  const [heartbeatSec, setHeartbeatSec] = useState(15);
+  const [maxPauseSec, setMaxPauseSec] = useState(600);
+  const [pausedSec, setPausedSec] = useState(0);
+  const [resumeNote, setResumeNote] = useState<string | null>(null);
+  const leftWhileTesting = useRef(false);
   const [showCopyNotice, setShowCopyNotice] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -105,6 +125,8 @@ export default function PracticeTestPage() {
   const [expandedExplanations, setExpandedExplanations] = useState<Record<number, boolean>>({});
 
   const dirtyRef = useRef(false);
+  const onlineRef = useRef(true);
+  onlineRef.current = online;
   const answersRef = useRef(answers);
   answersRef.current = answers;
   const reviewRef = useRef(markedForReview);
@@ -127,6 +149,7 @@ export default function PracticeTestPage() {
         time_remaining_sec: number;
         saved_answers: Record<string, string>;
         marked_for_review: number[];
+        heartbeat_sec?: number; max_pause_sec?: number; paused_seconds?: number; max_tab_switches?: number; tab_switches?: number;
       }>(`/student/tests/${testId}/attempts`, {
         method: "POST"
       });
@@ -134,9 +157,17 @@ export default function PracticeTestPage() {
       setAttemptId(attemptRes.attempt_id);
       setSecondsLeft(attemptRes.time_remaining_sec > 0 ? attemptRes.time_remaining_sec : data.time_remaining_sec || duration);
 
-      // Initialize saved answers
+      if (attemptRes.heartbeat_sec) setHeartbeatSec(attemptRes.heartbeat_sec);
+      if (attemptRes.max_pause_sec) setMaxPauseSec(attemptRes.max_pause_sec);
+      setPausedSec(attemptRes.paused_seconds || 0);
+      if (attemptRes.max_tab_switches) setMaxTabSwitches(attemptRes.max_tab_switches);
+      setTabSwitchCount(attemptRes.tab_switches || 0);
+
+      // Initialize saved answers: the server's, then anything kept on this device that never reached it (offline)
+      const local = readLocal(attemptRes.attempt_id);
+      if (local) dirtyRef.current = true;
       const initialAnswers: Record<number, string> = {};
-      const srcAnswers = { ...data.saved_answers, ...attemptRes.saved_answers };
+      const srcAnswers = { ...data.saved_answers, ...attemptRes.saved_answers, ...(local?.answers || {}) };
       Object.entries(srcAnswers).forEach(([k, v]) => {
         if (v) initialAnswers[parseInt(k, 10)] = v;
       });
@@ -144,13 +175,15 @@ export default function PracticeTestPage() {
 
       const combinedReview = Array.from(new Set([
         ...(data.marked_for_review || []),
-        ...(attemptRes.marked_for_review || [])
+        ...(attemptRes.marked_for_review || []),
+        ...(local?.marked || [])
       ]));
       setMarkedForReview(combinedReview);
 
-      // If Question 12 exists, default to 12 as per PDF 4 mockup, else Q1
-      const q12 = data.questions.find((q) => q.number === 12);
-      setCurrentQ(q12 ? 12 : 1);
+      // Resume on the first unanswered question (Q1 on a fresh attempt; the last one if all are answered)
+      const ordered = [...data.questions].sort((a, b) => a.number - b.number);
+      const firstOpen = ordered.find((q) => !initialAnswers[q.number]);
+      setCurrentQ(firstOpen ? firstOpen.number : ordered[ordered.length - 1]?.number ?? 1);
     } catch (err: any) {
       console.error("Failed to load test:", err);
       setError(err?.message || t("practice_test.error_loading"));
@@ -168,7 +201,7 @@ export default function PracticeTestPage() {
   // 2. Timer Countdown Engine
   // One interval for the whole attempt (not rebuilt every second). The updater
   // only counts down; submitting is a side effect, so it lives in its own effect.
-  const timerRunning = !loading && !isSubmitted && !!attemptId;
+  const timerRunning = !loading && !isSubmitted && !!attemptId && online;   // paused while the connection is lost
   useEffect(() => {
     if (!timerRunning) return;
     const timer = setInterval(() => {
@@ -187,7 +220,7 @@ export default function PracticeTestPage() {
 
   // 3. Background Autosave (Every 10 seconds if dirty)
   const saveAnswersBatch = useCallback(async () => {
-    if (!attemptId || !dirtyRef.current || isSubmitted) return;
+    if (!attemptId || !dirtyRef.current || isSubmitted || !onlineRef.current) return;
 
     try {
       await fetchApi(`/student/tests/attempts/${attemptId}/answers`, {
@@ -198,6 +231,7 @@ export default function PracticeTestPage() {
         })
       });
       dirtyRef.current = false;
+      clearLocal(attemptId);
     } catch (err) {
       console.warn("Autosave batch failed:", err);
     }
@@ -217,19 +251,20 @@ export default function PracticeTestPage() {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setTabSwitchCount((prev) => {
-          const next = prev + 1;
-          if (attemptId) {
-            fetchApi(`/student/tests/attempts/${attemptId}/proctor-events`, {
-              method: "POST",
-              body: JSON.stringify({
-                event_type: "tab_switch",
-                details: `Tab switch event #${next}`
-              })
-            }).catch(() => {});
-          }
-          return next;
-        });
+        saveAnswersBatch();                        // nothing typed is lost while the student is away
+        leftWhileTesting.current = true;
+        if (!attemptId) return;
+        fetchApi<{ tab_switches: number; max_tab_switches: number }>(`/student/tests/attempts/${attemptId}/proctor-events`, {
+          method: "POST",
+          body: JSON.stringify({ event_type: "tab_switch", details: "Left the test page" })
+        }).then((r) => {
+          setTabSwitchCount(r.tab_switches);
+          setMaxTabSwitches(r.max_tab_switches);
+          if (r.tab_switches > r.max_tab_switches) setAutoSubmitReason("tabs");
+        }).catch(() => setTabSwitchCount((n) => n + 1));
+      } else if (leftWhileTesting.current) {
+        leftWhileTesting.current = false;
+        setTabWarning(Date.now());
       }
     };
 
@@ -261,6 +296,54 @@ export default function PracticeTestPage() {
       setIsFullscreen(false);
     }
   };
+
+  // Answers are also kept on this device until the server has them (a lost connection or a closed tab loses nothing)
+  useEffect(() => {
+    if (!attemptId || isSubmitted || !dirtyRef.current) return;
+    try { localStorage.setItem(`irep_test:${attemptId}`, JSON.stringify({ answers, marked: markedForReview })); } catch { /* storage blocked */ }
+  }, [answers, markedForReview, attemptId, isSubmitted]);
+
+  // Connection: a heartbeat while online; going offline pauses the timer; coming back resumes it on the server's clock
+  const heartbeat = useCallback(async (): Promise<boolean> => {
+    if (!attemptId || isSubmitted) return true;
+    try {
+      const r = await fetchApi<{ time_remaining_sec: number; credited_sec: number; paused_seconds: number; tab_switches: number }>(
+        `/student/tests/attempts/${attemptId}/heartbeat`, { method: "POST" });
+      setSecondsLeft(r.time_remaining_sec);
+      setPausedSec(r.paused_seconds);
+      if (!onlineRef.current || r.credited_sec > 0) {
+        setResumeNote(r.credited_sec > 0 ? t("practice_test.resumed_credit").replace("{n}", String(Math.round(r.credited_sec / 60) || 1)) : t("practice_test.resumed"));
+        setTimeout(() => setResumeNote(null), 6000);
+      }
+      setOnline(true);
+      return true;
+    } catch (e) {
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) return true;   // answered: not a connection problem
+      setOnline(false);
+      return false;
+    }
+  }, [attemptId, isSubmitted, t]);
+
+  useEffect(() => {
+    if (!attemptId || isSubmitted) return;
+    const goOffline = () => setOnline(false);
+    const goOnline = () => { heartbeat().then((ok) => { if (ok) saveAnswersBatch(); }); };
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    // online: check in every heartbeat_sec; offline: retry every 5 s (navigator.onLine is not always right)
+    const id = setInterval(() => {
+      heartbeat().then((ok) => { if (ok && dirtyRef.current) saveAnswersBatch(); });
+    }, (online ? heartbeatSec : 5) * 1000);
+    return () => { clearInterval(id); window.removeEventListener("offline", goOffline); window.removeEventListener("online", goOnline); };
+  }, [attemptId, isSubmitted, online, heartbeatSec, heartbeat, saveAnswersBatch]);
+
+  // Too many tab switches: the test is submitted with what was answered
+  useEffect(() => {
+    if (autoSubmitReason === "tabs" && !isSubmitted && !submitting) {
+      autoSubmittedRef.current = true;
+      performSubmit();
+    }
+  }, [autoSubmitReason]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 5. User Actions
   const handleSelectOption = (opt: string) => {
@@ -317,6 +400,7 @@ export default function PracticeTestPage() {
       setResultData(res);
       setIsSubmitted(true);
       setShowSubmitModal(false);
+      clearLocal(attemptId);
     } catch (err: any) {
       // inline message instead of a blocking alert(); answers stay on screen for a retry
       setSubmitError(err?.detail || err?.message || "Submission failed. Please retry.");
@@ -336,20 +420,20 @@ export default function PracticeTestPage() {
   if (user && user.role !== "student") {
     return (
       <AppShell pageTitle={t("practice_test.title_default")}>
-        <div className="max-w-2xl mx-auto my-12 bg-white rounded-2xl border border-[#E2E8F0] p-8 shadow-sm text-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-[#FEE2E2] text-[#D93636] flex items-center justify-center mx-auto">
+        <div className="max-w-2xl mx-auto my-12 bg-white rounded-card border border-line p-8 shadow-card text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-danger-soft text-danger flex items-center justify-center mx-auto">
             <Lock className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-[#0F1F3A]">
+          <h2 className="text-xl font-semibold text-ink">
             {t("practice_test.unauthorized_role")}
           </h2>
-          <p className="text-sm text-[#64748B]">
+          <p className="text-sm text-muted">
             {t("practice_test.student_role_required")}
           </p>
           <div className="pt-2">
             <button
               onClick={logout}
-              className="px-6 py-2.5 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-xs rounded-xl shadow transition-all cursor-pointer"
+              className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white font-semibold text-xs rounded-card shadow-card transition-all cursor-pointer"
             >
               {t("practice_test.switch_to_student")}
             </button>
@@ -363,24 +447,24 @@ export default function PracticeTestPage() {
   if (loading) {
     return (
       <AppShell pageTitle={t("practice_test.title_default")}>
-        <div className="max-w-7xl mx-auto space-y-4">
-          <div className="flex items-center gap-3 text-xs text-[#64748B] pb-2 animate-pulse">
-            <Info className="w-4 h-4 text-[#2B5CD0]" />
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="flex items-center gap-3 text-xs text-muted pb-2 animate-pulse">
+            <Info className="w-4 h-4 text-brand" />
             <span>{t("practice_test.loading_test")}</span>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 bg-white rounded-xl border border-[#E2E8F0] p-6 space-y-6 shadow-sm animate-pulse">
-              <div className="h-4 bg-[#F1F5F9] rounded w-1/3" />
-              <div className="h-16 bg-[#F8FAFC] rounded w-full" />
+            <div className="lg:col-span-8 bg-white rounded-card border border-line p-6 space-y-6 shadow-card animate-pulse">
+              <div className="h-4 bg-line-soft rounded w-1/3" />
+              <div className="h-16 bg-surface-2 rounded w-full" />
               <div className="space-y-3">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-12 bg-[#F1F5F9] rounded-xl" />
+                  <div key={i} className="h-12 bg-line-soft rounded-card" />
                 ))}
               </div>
             </div>
             <div className="lg:col-span-4 space-y-4">
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 h-28 animate-pulse" />
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 h-56 animate-pulse" />
+              <div className="bg-white rounded-card border border-line p-6 h-28 animate-pulse" />
+              <div className="bg-white rounded-card border border-line p-6 h-56 animate-pulse" />
             </div>
           </div>
         </div>
@@ -392,22 +476,22 @@ export default function PracticeTestPage() {
   if (error || !testData) {
     return (
       <AppShell pageTitle={t("practice_test.title_default")}>
-        <div className="max-w-xl mx-auto my-12 bg-white rounded-2xl border border-[#E2E8F0] p-8 shadow-sm text-center space-y-4">
-          <div className="w-14 h-14 rounded-full bg-[#FEE2E2] text-[#D93636] flex items-center justify-center mx-auto">
+        <div className="max-w-xl mx-auto my-12 bg-white rounded-card border border-line p-8 shadow-card text-center space-y-6">
+          <div className="w-14 h-14 rounded-full bg-danger-soft text-danger flex items-center justify-center mx-auto">
             <AlertTriangle className="w-7 h-7" />
           </div>
-          <h2 className="text-lg font-bold text-[#0F1F3A]">{error || t("practice_test.not_found")}</h2>
+          <h2 className="text-lg font-semibold text-ink">{error || t("practice_test.not_found")}</h2>
           <div className="flex justify-center gap-3 pt-2">
             <button
               onClick={loadTestAndAttempt}
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-xl shadow cursor-pointer"
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-brand text-white text-xs font-semibold rounded-card shadow-card cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>{t("practice_test.retry")}</span>
             </button>
             <button
               onClick={() => router.push("/student")}
-              className="px-5 py-2.5 bg-[#F1F5F9] text-[#0F1F3A] text-xs font-bold rounded-xl cursor-pointer"
+              className="px-5 py-2.5 bg-line-soft text-ink text-xs font-semibold rounded-card cursor-pointer"
             >
               {t("practice_test.back_to_dashboard")}
             </button>
@@ -429,32 +513,32 @@ export default function PracticeTestPage() {
       <AppShell pageTitle={testData.title || t("practice_test.title_default")}>
         <div className="max-w-5xl mx-auto space-y-6 pb-12">
           {/* Header Card */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-[#DCFCE7] text-[#15803D] flex items-center justify-center mx-auto text-2xl font-black">
+          <div className="bg-white rounded-card border border-line p-6 shadow-card text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-success-soft text-success flex items-center justify-center mx-auto text-2xl font-semibold">
               ✓
             </div>
             <div>
-              <h2 className="text-xl font-black text-[#0F1F3A]">{t("practice_test.test_submitted")}</h2>
-              <p className="text-xs text-[#64748B] pt-1">{testData.title}</p>
+              <h2 className="text-xl font-semibold text-ink">{t("practice_test.test_submitted")}</h2>
+              <p className="text-xs text-muted pt-1">{testData.title}</p>
             </div>
 
             {/* Metrics Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto pt-2">
-              <div className="p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                <span className="text-xs font-medium text-[#64748B]">{t("practice_test.score")}</span>
-                <div className="text-2xl font-black text-[#2B5CD0] pt-1">
+              <div className="p-4 bg-surface-2 rounded-card border border-line">
+                <span className="text-xs font-medium text-muted">{t("practice_test.score")}</span>
+                <div className="text-2xl font-semibold text-brand pt-1">
                   {resultData.score} / {resultData.total}
                 </div>
               </div>
-              <div className="p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                <span className="text-xs font-medium text-[#64748B]">{t("practice_test.accuracy")}</span>
-                <div className="text-2xl font-black text-[#15803D] pt-1">
+              <div className="p-4 bg-surface-2 rounded-card border border-line">
+                <span className="text-xs font-medium text-muted">{t("practice_test.accuracy")}</span>
+                <div className="text-2xl font-semibold text-success pt-1">
                   {resultData.accuracy}
                 </div>
               </div>
-              <div className="p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                <span className="text-xs font-medium text-[#64748B]">{t("practice_test.time_taken")}</span>
-                <div className="text-2xl font-black text-[#0F1F3A] pt-1">
+              <div className="p-4 bg-surface-2 rounded-card border border-line">
+                <span className="text-xs font-medium text-muted">{t("practice_test.time_taken")}</span>
+                <div className="text-2xl font-semibold text-ink pt-1">
                   {resultData.time_taken}
                 </div>
               </div>
@@ -462,31 +546,31 @@ export default function PracticeTestPage() {
           </div>
 
           {/* Section Analysis Breakdown */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-[#0F1F3A] border-b border-[#E2E8F0] pb-2">
+          <div className="bg-white rounded-card border border-line p-6 shadow-card space-y-4">
+            <h3 className="text-sm font-semibold text-ink border-b border-line pb-2">
               {t("practice_test.section_analysis")}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {resultData.section_analysis.map((sec) => {
-                let badgeClass = "bg-[#DCFCE7] text-[#15803D]";
-                if (sec.status === "Needs Support") badgeClass = "bg-[#FEE2E2] text-[#D93636]";
-                else if (sec.status === "Good") badgeClass = "bg-[#EFF6FF] text-[#1D4ED8]";
+                let badgeClass = "bg-success-soft text-success";
+                if (sec.status === "Needs Support") badgeClass = "bg-danger-soft text-danger";
+                else if (sec.status === "Good") badgeClass = "bg-brand-soft text-info";
 
                 return (
-                  <div key={sec.section} className="p-4 rounded-xl border border-[#E2E8F0] space-y-2">
-                    <div className="flex items-center justify-between text-xs font-bold text-[#0F1F3A]">
+                  <div key={sec.section} className="p-4 rounded-card border border-line space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-ink">
                       <span>{sec.section}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${badgeClass}`}>
+                      <span className={`text-caption px-2 py-0.5 rounded-full font-semibold ${badgeClass}`}>
                         {sec.status}
                       </span>
                     </div>
                     <div className="flex items-baseline justify-between">
-                      <span className="text-xl font-black text-[#2B5CD0]">{sec.score}</span>
-                      <span className="text-xs text-[#64748B] font-semibold">{sec.percentage}%</span>
+                      <span className="text-xl font-semibold text-brand">{sec.score}</span>
+                      <span className="text-xs text-muted font-semibold">{sec.percentage}%</span>
                     </div>
-                    <div className="w-full bg-[#F1F5F9] h-1.5 rounded-full overflow-hidden">
+                    <div className="w-full bg-line-soft h-1.5 rounded-full overflow-hidden">
                       <div
-                        className="bg-[#2B5CD0] h-full rounded-full"
+                        className="bg-brand h-full rounded-full"
                         style={{ width: `${sec.percentage}%` }}
                       />
                     </div>
@@ -497,9 +581,9 @@ export default function PracticeTestPage() {
           </div>
 
           {/* Questions Review Section */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
-              <h3 className="text-sm font-bold text-[#0F1F3A]">
+          <div className="bg-white rounded-card border border-line p-6 shadow-card space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-3">
+              <h3 className="text-sm font-semibold text-ink">
                 {t("practice_test.review_solutions")} ({resultData.questions_review.length})
               </h3>
               <div className="flex items-center gap-1.5">
@@ -507,13 +591,13 @@ export default function PracticeTestPage() {
                   <button
                     key={filter}
                     onClick={() => setReviewFilter(filter)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-tile text-xs font-semibold transition-all cursor-pointer ${
                       reviewFilter === filter
-                        ? "bg-[#2B5CD0] text-white shadow-xs"
-                        : "bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"
+                        ? "bg-brand text-white shadow-card"
+                        : "bg-line-soft text-muted hover:bg-line"
                     }`}
                   >
-                    {filter === "all" ? "All (30)" : filter === "correct" ? `Correct (${resultData.score})` : `Incorrect (${30 - resultData.score})`}
+                    {filter === "all" ? `${t("practice_test.filter_all")} (${resultData.questions_review.length})` : filter === "correct" ? `${t("practice_test.filter_correct")} (${resultData.score})` : `${t("practice_test.filter_incorrect")} (${resultData.questions_review.length - resultData.score})`}
                   </button>
                 ))}
               </div>
@@ -525,29 +609,29 @@ export default function PracticeTestPage() {
                 return (
                   <div
                     key={q.number}
-                    className={`p-4 rounded-xl border transition-all ${
-                      q.is_correct ? "border-[#BBF7D0] bg-[#F0FDF4]/30" : "border-[#FECACA] bg-[#FEF2F2]/30"
+                    className={`p-4 rounded-card border transition-all ${
+                      q.is_correct ? "border-success-line bg-success-faint/30" : "border-danger-line bg-danger-faint/30"
                     }`}
                   >
                     <div className="flex items-center justify-between pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#64748B]">Q{q.number}</span>
-                        <span className="chip-blue text-[11px] font-semibold">{q.section} · {q.topic}</span>
+                        <span className="text-xs font-semibold text-muted">Q{q.number}</span>
+                        <span className="chip-blue text-caption font-semibold">{q.section} · {q.topic}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold">
                         {q.is_correct ? (
-                          <span className="flex items-center gap-1 text-[#15803D]">
+                          <span className="flex items-center gap-1 text-success">
                             <CheckCheck className="w-4 h-4" /> {t("practice_test.correct")}
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1 text-[#D93636]">
+                          <span className="flex items-center gap-1 text-danger">
                             <XCircle className="w-4 h-4" /> {t("practice_test.incorrect")}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <p className="text-sm font-medium text-[#0F1F3A] pt-1 leading-relaxed">
+                    <p className="text-sm font-medium text-ink pt-1 leading-relaxed">
                       {q.text}
                     </p>
 
@@ -556,24 +640,24 @@ export default function PracticeTestPage() {
                         const isChosen = q.selected_option === optKey;
                         const isCorrectOpt = q.correct_option === optKey;
 
-                        let style = "border-[#E2E8F0] bg-white text-[#0F1F3A]";
+                        let style = "border-line bg-white text-ink";
                         if (isCorrectOpt) {
-                          style = "border-[#86EFAC] bg-[#DCFCE7] text-[#15803D] font-bold";
+                          style = "border-success-line bg-success-soft text-success font-semibold";
                         } else if (isChosen && !q.is_correct) {
-                          style = "border-[#FCA5A5] bg-[#FEE2E2] text-[#B91C1C] font-bold";
+                          style = "border-danger-line bg-danger-soft text-danger font-semibold";
                         }
 
                         return (
                           <div
                             key={optKey}
-                            className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs ${style}`}
+                            className={`flex items-center gap-2 p-2.5 rounded-tile border text-xs ${style}`}
                           >
-                            <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold bg-white/70 shadow-xs">
+                            <span className="w-5 h-5 rounded-full flex items-center justify-center text-caption font-semibold bg-white/70 shadow-card">
                               {optKey}
                             </span>
                             <span>{optText}</span>
-                            {isCorrectOpt && <span className="ml-auto text-[10px] uppercase font-bold">✓ Key</span>}
-                            {isChosen && !isCorrectOpt && <span className="ml-auto text-[10px] uppercase font-bold">Your choice</span>}
+                            {isCorrectOpt && <span className="ml-auto text-caption font-semibold">✓ Key</span>}
+                            {isChosen && !isCorrectOpt && <span className="ml-auto text-caption font-semibold">Your choice</span>}
                           </div>
                         );
                       })}
@@ -581,16 +665,16 @@ export default function PracticeTestPage() {
 
                     {/* Explanation toggle */}
                     {q.explanation && (
-                      <div className="pt-3 border-t border-[#E2E8F0] mt-3">
+                      <div className="pt-3 border-t border-line mt-3">
                         <button
                           onClick={() => setExpandedExplanations((prev) => ({ ...prev, [q.number]: !prev[q.number] }))}
-                          className="flex items-center gap-1.5 text-xs font-bold text-[#2B5CD0] hover:text-[#1D4ED8] cursor-pointer"
+                          className="flex items-center gap-1.5 text-xs font-semibold text-brand hover:text-info cursor-pointer"
                         >
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           <span>{t("practice_test.explanation")}</span>
                         </button>
                         {isExpanded && (
-                          <div className="mt-2 p-3 bg-white rounded-lg border border-[#E2E8F0] text-xs text-[#334155] leading-relaxed">
+                          <div className="mt-2 p-3 bg-white rounded-tile border border-line text-xs text-ink-soft leading-relaxed">
                             {q.explanation}
                           </div>
                         )}
@@ -606,7 +690,7 @@ export default function PracticeTestPage() {
           <div className="text-center pt-2">
             <button
               onClick={() => router.push("/student")}
-              className="px-8 py-3 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white font-bold text-xs rounded-xl shadow cursor-pointer transition-all"
+              className="px-8 py-3 bg-brand hover:bg-brand-hover text-white font-semibold text-xs rounded-card shadow-card cursor-pointer transition-all"
             >
               {t("practice_test.done_and_return")}
             </button>
@@ -635,24 +719,24 @@ export default function PracticeTestPage() {
 
   return (
     <AppShell pageTitle={testData.title || t("practice_test.title_default")}>
-      <div className="space-y-4 max-w-7xl mx-auto" onContextMenu={(e) => e.preventDefault()}>
+      <div className="space-y-6 max-w-7xl mx-auto" onContextMenu={(e) => e.preventDefault()}>
 
         {/* Proctoring Banner & Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white border border-line rounded-card text-xs shadow-card">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-[#2B5CD0]" />
-            <span className="font-semibold text-[#0F1F3A]">{testData.category}</span>
+            <ShieldAlert className="w-4 h-4 text-brand" />
+            <span className="font-semibold text-ink">{testData.category}</span>
             {tabSwitchCount > 0 && (
-              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FEE2E2] text-[#B91C1C] font-bold text-[11px] animate-pulse">
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-danger-soft text-danger font-semibold text-caption" data-testid="tab-switch-count">
                 <AlertTriangle className="w-3 h-3" />
-                <span>Tab switches: {tabSwitchCount}</span>
+                <span>{t("practice_test.tab_switches").replace("{n}", String(tabSwitchCount)).replace("{max}", String(maxTabSwitches))}</span>
               </span>
             )}
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={toggleFullscreen}
-              className="flex items-center gap-1 text-[#64748B] hover:text-[#0F1F3A] font-bold cursor-pointer"
+              className="flex items-center gap-1 text-muted hover:text-ink font-semibold cursor-pointer"
             >
               {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               <span>{isFullscreen ? t("practice_test.exit_fullscreen") : t("practice_test.enter_fullscreen")}</span>
@@ -660,9 +744,38 @@ export default function PracticeTestPage() {
           </div>
         </div>
 
+        <p className="text-caption text-muted px-1" data-testid="test-rules">
+          {t("practice_test.rules").replace("{max}", String(maxTabSwitches)).replace("{pause}", String(Math.round(maxPauseSec / 60)))}
+        </p>
+
+        {!online && (
+          <div role="alert" data-testid="offline-banner" className="p-3 bg-warning-soft border border-warning-fill rounded-card text-xs text-warning font-medium flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{t("practice_test.offline").replace("{left}", String(Math.max(0, Math.round((maxPauseSec - pausedSec) / 60))))}</span>
+          </div>
+        )}
+        {online && resumeNote && (
+          <div role="status" data-testid="resumed-banner" className="p-3 bg-success-soft border border-success-line rounded-card text-xs text-success font-medium">{resumeNote}</div>
+        )}
+
+        {tabWarning !== null && !isSubmitted && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-labelledby="tab-warn-title" data-testid="tab-warning">
+            <div className="bg-white rounded-card border border-danger-line shadow-pop max-w-md w-full p-5 space-y-3">
+              <h2 id="tab-warn-title" className="text-heading font-semibold text-danger flex items-center gap-2"><AlertTriangle className="w-5 h-5" />{t("practice_test.tab_warn_title")}</h2>
+              <p className="text-body text-ink-soft">{t("practice_test.tab_warn_body")}</p>
+              <p className="text-body font-semibold text-ink" data-testid="tab-warning-count">
+                {t("practice_test.tab_warn_count").replace("{n}", String(tabSwitchCount)).replace("{max}", String(maxTabSwitches))}
+              </p>
+              <p className="text-label text-muted">{t("practice_test.tab_warn_saved")}</p>
+              <button type="button" autoFocus onClick={() => setTabWarning(null)} data-testid="tab-warning-ok"
+                className="w-full py-2 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-tile">{t("practice_test.tab_warn_ok")}</button>
+            </div>
+          </div>
+        )}
+
         {/* Copy Notice Toast */}
         {showCopyNotice && (
-          <div className="p-3 bg-[#FEF3C7] border border-[#F59E0B] rounded-xl text-xs text-[#B45309] font-medium flex items-center gap-2">
+          <div className="p-3 bg-warning-soft border border-warning-fill rounded-card text-xs text-warning font-medium flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{t("practice_test.copy_disabled")}</span>
           </div>
@@ -671,20 +784,20 @@ export default function PracticeTestPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
           {/* MAIN QUESTION CARD (8 cols) */}
-          <div className="lg:col-span-8 bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col justify-between space-y-6 min-h-[460px]">
+          <div className="lg:col-span-8 bg-white rounded-card border border-line shadow-card p-6 flex flex-col justify-between space-y-6 min-h-[460px]">
             <div className="space-y-4">
               {/* Top Bar with topic chip and question counter */}
-              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-                <span className="chip-blue font-bold text-xs">
+              <div className="flex items-center justify-between border-b border-line pb-3">
+                <span className="chip-blue font-semibold text-xs">
                   {currentQuestionData.section} · {currentQuestionData.topic}
                 </span>
-                <span className="text-xs font-bold text-[#64748B]">
+                <span className="text-xs font-semibold text-muted">
                   {t("practice_test.question")} {currentQ} {t("practice_test.of")} {totalQuestions}
                 </span>
               </div>
 
               {/* Question Statement */}
-              <p className="text-sm font-medium text-[#0F1F3A] leading-relaxed pt-2 select-none">
+              <p className="text-sm font-medium text-ink leading-relaxed pt-2 select-none">
                 {currentQuestionData.text}
               </p>
 
@@ -697,21 +810,21 @@ export default function PracticeTestPage() {
                       key={optKey}
                       type="button"
                       onClick={() => handleSelectOption(optKey)}
-                      className={`w-full flex items-center gap-3.5 p-3.5 rounded-xl border text-left text-xs font-medium transition-all cursor-pointer ${
+                      className={`w-full flex items-center gap-3.5 p-3.5 rounded-card border text-left text-xs font-medium transition-all cursor-pointer ${
                         isSelected
-                          ? "border-[#2B5CD0] bg-[#EFF6FF] text-[#1D4ED8] font-bold shadow-sm ring-1 ring-[#2B5CD0]"
-                          : "border-[#E2E8F0] bg-white text-[#0F1F3A] hover:bg-[#F8FAFC]"
+                          ? "border-brand bg-brand-soft text-info font-semibold shadow-card ring-1 ring-brand"
+                          : "border-line bg-white text-ink hover:bg-surface-2"
                       }`}
                     >
                       <span
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          isSelected ? "bg-[#2B5CD0] text-white" : "bg-[#F1F5F9] text-[#64748B]"
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
+                          isSelected ? "bg-brand text-white" : "bg-line-soft text-muted"
                         }`}
                       >
                         {optKey}
                       </span>
                       <span className="text-sm select-none">{optText}</span>
-                      {isSelected && <Check className="w-4 h-4 ml-auto text-[#2B5CD0]" />}
+                      {isSelected && <Check className="w-4 h-4 ml-auto text-brand" />}
                     </button>
                   );
                 })}
@@ -719,11 +832,11 @@ export default function PracticeTestPage() {
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="flex items-center justify-between border-t border-[#E2E8F0] pt-4">
+            <div className="flex items-center justify-between border-t border-line pt-4">
               <button
                 onClick={handlePrevious}
                 disabled={currentQ === 1}
-                className="flex items-center gap-1.5 px-4 py-2 border border-[#CBD5E1] text-[#0F1F3A] text-xs font-bold rounded-lg hover:bg-[#F1F5F9] disabled:opacity-40 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 border border-line-strong text-ink text-xs font-semibold rounded-tile hover:bg-line-soft disabled:opacity-40 transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>{t("practice_test.previous")}</span>
@@ -731,10 +844,10 @@ export default function PracticeTestPage() {
 
               <button
                 onClick={toggleReview}
-                className={`flex items-center gap-1.5 px-4 py-2 border rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-4 py-2 border rounded-tile text-xs font-semibold transition-all cursor-pointer ${
                   markedForReview.includes(currentQ)
-                    ? "bg-[#FEF3C7] border-[#F59E0B] text-[#B45309]"
-                    : "border-[#CBD5E1] text-[#64748B] hover:bg-[#F1F5F9]"
+                    ? "bg-warning-soft border-warning-fill text-warning"
+                    : "border-line-strong text-muted hover:bg-line-soft"
                 }`}
               >
                 <Bookmark className="w-3.5 h-3.5" />
@@ -747,7 +860,7 @@ export default function PracticeTestPage() {
 
               <button
                 onClick={handleNext}
-                className="flex items-center gap-1.5 px-5 py-2 bg-[#2B5CD0] hover:bg-[#1E46B0] text-white text-xs font-bold rounded-lg shadow transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-5 py-2 bg-brand hover:bg-brand-hover text-white text-xs font-semibold rounded-tile shadow-card transition-all cursor-pointer"
               >
                 <span>{currentQ === totalQuestions ? t("practice_test.submit_test") : t("practice_test.save_and_next")}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -759,27 +872,27 @@ export default function PracticeTestPage() {
           <div className="lg:col-span-4 space-y-4">
 
             {/* Time Remaining Card (PDF 4: Large Red 18:42) */}
-            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm space-y-2">
-              <div className="flex items-center justify-between text-xs text-[#64748B] font-medium">
+            <div className="bg-white rounded-card border border-line p-4 shadow-card space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted font-medium">
                 <span>{t("practice_test.time_remaining")}</span>
-                <Clock className="w-3.5 h-3.5 text-[#D93636]" />
+                <Clock className="w-3.5 h-3.5 text-danger" />
               </div>
-              <div className="text-3xl font-black text-[#D93636] tracking-tight">
+              <div className="text-3xl font-semibold text-danger tracking-tight" data-testid="test-timer" data-paused={online ? "false" : "true"}>
                 {formatTime(secondsLeft)}
               </div>
-              <div className="w-full bg-[#FEE2E2] h-1.5 rounded-full overflow-hidden">
+              <div className="w-full bg-danger-soft h-1.5 rounded-full overflow-hidden">
                 <div
-                  className="bg-[#D93636] h-full rounded-full transition-all duration-1000"
+                  className="bg-danger h-full rounded-full transition-all duration-1000"
                   style={{ width: `${Math.min(100, (secondsLeft / totalDurationSec) * 100)}%` }}
                 />
               </div>
             </div>
 
             {/* Question Palette (6 columns grid) */}
-            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold text-[#0F1F3A] border-b border-[#E2E8F0] pb-2">
+            <div className="bg-white rounded-card border border-line p-4 shadow-card space-y-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-ink border-b border-line pb-2">
                 <span>{t("practice_test.question_palette")}</span>
-                <span className="text-[11px] text-[#64748B]">
+                <span className="text-caption text-muted">
                   {totalQuestions} {t("practice_test.question")}s
                 </span>
               </div>
@@ -791,13 +904,13 @@ export default function PracticeTestPage() {
                   const isAnswered = !!answers[qNum];
                   const isReview = markedForReview.includes(qNum);
 
-                  let bgClass = "bg-[#F1F5F9] text-[#64748B] border-[#E2E8F0]";
+                  let bgClass = "bg-line-soft text-muted border-line";
                   if (isCurrent) {
-                    bgClass = "bg-[#2B5CD0] text-white border-[#2B5CD0] ring-2 ring-[#BFDBFE]";
+                    bgClass = "bg-brand text-white border-brand ring-2 ring-brand-line";
                   } else if (isReview) {
-                    bgClass = "bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]";
+                    bgClass = "bg-warning-soft text-warning border-warning-line";
                   } else if (isAnswered) {
-                    bgClass = "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]";
+                    bgClass = "bg-success-soft text-success border-success-line";
                   }
 
                   return (
@@ -808,7 +921,7 @@ export default function PracticeTestPage() {
                         saveAnswersBatch();
                         setCurrentQ(qNum);
                       }}
-                      className={`h-8 rounded-lg text-xs font-bold border flex items-center justify-center transition-all cursor-pointer ${bgClass}`}
+                      className={`h-8 rounded-tile text-xs font-semibold border flex items-center justify-center transition-all cursor-pointer ${bgClass}`}
                     >
                       {qNum}
                     </button>
@@ -817,7 +930,7 @@ export default function PracticeTestPage() {
               </div>
 
               {/* Palette Legend */}
-              <div className="flex items-center justify-between text-[11px] pt-3 border-t border-[#E2E8F0]">
+              <div className="flex items-center justify-between text-caption pt-3 border-t border-line">
                 <span className="chip-green">{t("practice_test.legend_answered")} {answeredCount}</span>
                 <span className="chip-amber">{t("practice_test.legend_review")} {reviewCount}</span>
                 <span className="chip-blue">{t("practice_test.legend_current")}</span>
@@ -825,15 +938,15 @@ export default function PracticeTestPage() {
             </div>
 
             {/* Sections Progress Card */}
-            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm space-y-2.5">
-              <div className="text-xs font-bold text-[#0F1F3A] border-b border-[#E2E8F0] pb-2">
+            <div className="bg-white rounded-card border border-line p-4 shadow-card space-y-2.5">
+              <div className="text-xs font-semibold text-ink border-b border-line pb-2">
                 {t("practice_test.sections")}
               </div>
               <div className="space-y-2 text-xs">
                 {Object.entries(sectionCounts).map(([secName, counts]) => (
                   <div key={secName} className="flex items-center justify-between">
-                    <span className="text-[#0F1F3A] font-medium">{secName}</span>
-                    <span className="font-bold text-[#2B5CD0]">
+                    <span className="text-ink font-medium">{secName}</span>
+                    <span className="font-semibold text-brand">
                       {counts.answered} / {counts.total}
                     </span>
                   </div>
@@ -842,7 +955,7 @@ export default function PracticeTestPage() {
 
               <button
                 onClick={() => { setSubmitError(null); setShowSubmitModal(true); }}
-                className="w-full mt-3 py-2.5 bg-[#2BB3A0] hover:bg-[#249B8A] text-white font-bold text-xs rounded-xl shadow transition-all cursor-pointer"
+                className="w-full mt-3 py-2.5 bg-teal hover:bg-teal-hover text-white font-semibold text-xs rounded-card shadow-card transition-all cursor-pointer"
               >
                 {t("practice_test.submit_test")}
               </button>
@@ -857,38 +970,38 @@ export default function PracticeTestPage() {
       {/* Submit Test Confirmation Modal */}
       {showSubmitModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-[#E2E8F0]">
-            <h3 className="text-base font-bold text-[#0F1F3A]">{t("practice_test.ready_to_submit")}</h3>
-            <p className="text-xs text-[#64748B]">{t("practice_test.submit_modal_sub")}</p>
-            <div className="space-y-1.5 text-xs text-[#64748B] p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+          <div className="bg-white rounded-card max-w-sm w-full p-6 space-y-4 shadow-pop border border-line">
+            <h3 className="text-base font-semibold text-ink">{t("practice_test.ready_to_submit")}</h3>
+            <p className="text-xs text-muted">{t("practice_test.submit_modal_sub")}</p>
+            <div className="space-y-1.5 text-xs text-muted p-3 bg-surface-2 rounded-card border border-line">
               <div className="flex justify-between">
                 <span>{t("practice_test.legend_answered")}:</span>
-                <strong className="text-[#15803D]">{answeredCount} {t("practice_test.question")}s</strong>
+                <strong className="text-success">{answeredCount} {t("practice_test.question")}s</strong>
               </div>
               <div className="flex justify-between">
                 <span>{t("practice_test.legend_review")}:</span>
-                <strong className="text-[#B45309]">{reviewCount} {t("practice_test.question")}s</strong>
+                <strong className="text-warning">{reviewCount} {t("practice_test.question")}s</strong>
               </div>
               <div className="flex justify-between">
                 <span>{t("practice_test.legend_unanswered")}:</span>
-                <strong className="text-[#D93636]">{unansweredCount} {t("practice_test.question")}s</strong>
+                <strong className="text-danger">{unansweredCount} {t("practice_test.question")}s</strong>
               </div>
             </div>
             {submitError && (
-              <div role="alert" data-testid="submit-error" className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium">{submitError}</div>
+              <div role="alert" data-testid="submit-error" className="p-2.5 bg-red-50 border border-red-200 rounded-tile text-xs text-red-700 font-medium">{submitError}</div>
             )}
             <div className="flex gap-2.5 pt-2">
               <button
                 onClick={() => setShowSubmitModal(false)}
                 disabled={submitting}
-                className="flex-1 py-2 bg-[#F1F5F9] text-[#0F1F3A] font-bold text-xs rounded-xl cursor-pointer"
+                className="flex-1 py-2 bg-line-soft text-ink font-semibold text-xs rounded-card cursor-pointer"
               >
                 {t("practice_test.back_to_test")}
               </button>
               <button
                 onClick={performSubmit}
                 disabled={submitting}
-                className="flex-1 py-2 bg-[#2BB3A0] hover:bg-[#249B8A] text-white font-bold text-xs rounded-xl shadow cursor-pointer disabled:opacity-50"
+                className="flex-1 py-2 bg-teal hover:bg-teal-hover text-white font-semibold text-xs rounded-card shadow-card cursor-pointer disabled:opacity-50"
               >
                 {submitting ? t("practice_test.submitting") : t("practice_test.confirm_submit")}
               </button>

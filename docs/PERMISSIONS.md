@@ -52,7 +52,9 @@ There is no public sign-up for any role:
 |---|---|---|---|---|---|---|
 | Own dashboard, courses, labs, tests | ✅ own | 👁 linked child, after consent | ✅ own batches | 👁 aggregates | ❌ | ❌ |
 | Trainer notes, chats | ❌ | ❌ | ✅ own | ❌ (rule 8) | ❌ | ❌ |
+| Earned certificates by student (name, register no, title, issuer, date; no proof files), each read audited (D1) | ✅ own | 👁 linked child | 👁 own batches | 👁 own college | ❌ | ❌ |
 | College structure, student import, trainers | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Invitations: list, resend, revoke (Phase 5) | ❌ | ❌ | ❌ | ✅ own college | ✅ any college (45) | ✅ |
 | Colleges: list, create, detail (45) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | College admins: create / invite (45) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | **MoU terms (incl. fees, quotas): create, activate** | ❌ | ❌ | ❌ | ❌ | 👁 | ✅ |

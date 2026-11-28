@@ -3,9 +3,9 @@ Thursday's RAG session (PDF 13). The meeting is not started; the trainer
 starts it from the room."""
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
-from models.schema import LiveMeeting, LivePoll, LivePollVote, QaQuestion, QaUpvote, Student, User
+from models.schema import JoinEvent, LiveMeeting, LivePoll, LivePollVote, QaQuestion, QaUpvote, SessionAttendance, Student, User
 
 SESSION = "sess_thu_rag"
 SHARED_CODE = """# Step 3: retrieve relevant notes, then ask the LLM
@@ -24,13 +24,44 @@ FLOW = [
 ]
 
 
+DEMO_STAGE = dict(provider="fake", external_meeting_id=f"irep-{SESSION}", is_recording=True, sharing_user_name="Arun K",
+                  shared_file="rag_demo.ipynb", shared_source="Shared via Virtual Labs", shared_code=SHARED_CODE,
+                  flow_title="RAG flow", flow_steps=FLOW, started_at=None, ended_at=None, finalized=False,
+                  join_url=None, share_grants=[])
+
+
 def seed_screen07(db, college_id: str = "col_demo_001") -> int:
-    if db.execute(select(LiveMeeting).filter_by(session_id=SESSION)).first():
-        return 0
-    db.add(LiveMeeting(id=f"lm_{SESSION}", college_id=college_id, session_id=SESSION, provider="fake",
-                       external_meeting_id=f"irep-{SESSION}", is_recording=True, sharing_user_name="Arun K",
-                       shared_file="rag_demo.ipynb", shared_source="Shared via Virtual Labs", shared_code=SHARED_CODE,
-                       flow_title="RAG flow", flow_steps=FLOW))
+    from core.config import settings
+    existing = db.execute(select(LiveMeeting).filter_by(session_id=SESSION)).scalars().first()
+    if existing is not None and existing.provider == "fake" and existing.shared_file == "rag_demo.ipynb":
+        # the demo room is intact unless a class run (a demo or the e2e) started it, voted or asked questions:
+        # then it is rebuilt below so the trainer finds the waiting room and the seeded poll again (rule 12)
+        polls = list(db.execute(select(LivePoll.id).where(LivePoll.session_id == SESSION)).scalars())
+        votes = db.execute(select(LivePollVote.id).where(LivePollVote.poll_id == "poll_rag_notes")).all()
+        questions = db.execute(select(QaQuestion.id).where(QaQuestion.session_id == SESSION)).all()
+        used = (existing.started_at or existing.ended_at or existing.finalized or existing.share_grants
+                or polls != ["poll_rag_notes"] or len(votes) != 30 or len(questions) != 3)
+        if not used:
+            return 0
+    elif existing is not None and (settings.LIVE_CLASS_ADAPTER or "fake").lower() != "fake":
+        return 0          # a developer is trying LiveKit / Teams on this room: leave their meeting alone
+    # the session is upcoming, so its join events and auto attendance only ever come from a class run
+    db.execute(delete(JoinEvent).where(JoinEvent.session_id == SESSION))
+    db.execute(delete(SessionAttendance).where(SessionAttendance.session_id == SESSION))
+    # the meeting is gone, or was replaced while trying LiveKit (provider livekit, no stage): a re-seed restores
+    # the demo room (rule 12), polls and Q&A included
+    qids = list(db.execute(select(QaQuestion.id).where(QaQuestion.session_id == SESSION)).scalars())
+    pids = list(db.execute(select(LivePoll.id).where(LivePoll.session_id == SESSION)).scalars())
+    db.execute(delete(QaUpvote).where(QaUpvote.question_id.in_(qids or ["_"])))
+    db.execute(delete(QaQuestion).where(QaQuestion.session_id == SESSION))
+    db.execute(delete(LivePollVote).where(LivePollVote.poll_id.in_(pids or ["_"])))
+    db.execute(delete(LivePoll).where(LivePoll.session_id == SESSION))
+    db.flush()
+    if existing is not None:
+        for k, v in DEMO_STAGE.items():
+            setattr(existing, k, v)
+    else:
+        db.add(LiveMeeting(id=f"lm_{SESSION}", college_id=college_id, session_id=SESSION, **DEMO_STAGE))
     poll = LivePoll(id="poll_rag_notes", college_id=college_id, session_id=SESSION,
                     question="If the answer is not in the notes, the model should...",
                     options=[{"key": "a", "text": "Make up an answer", "color": "red"},

@@ -29,6 +29,7 @@ test.describe("Screen 30: Sprint Board (/student/projects/:teamId/board)", () =>
     // drag "Accessibility review" from To Do into In Progress
     const card = page.getByTestId("card-task_03").getByText("Accessibility review");
     const target = page.getByTestId("col-in_progress");
+    await page.getByTestId("col-todo").scrollIntoViewIfNeeded();      // the project details panel sits above the columns
     const from = await card.boundingBox();
     const to = await target.boundingBox();
     await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);

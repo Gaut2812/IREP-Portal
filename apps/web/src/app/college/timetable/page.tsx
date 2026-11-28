@@ -3,6 +3,7 @@
 /** Screen 06 · Timetable (college): approve schedule changes with clash warnings (link L11 down). */
 import React, { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { RoleGuard } from "@/components/RoleGuard";
 import { ClashList, Clash, WeekSession, WeekView, isoDate } from "@/components/schedule/WeekView";
 import { useLanguage } from "@/lib/LanguageContext";
@@ -55,28 +56,29 @@ export default function CollegeTimetablePage() {
   return (
     <RoleGuard allowedRoles={["college"]}>
       <AppShell pageTitle={t("schedule.college_title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <HowItWorks topic="timetable" steps={4} className="mb-4 max-w-6xl" />
+        <div className="space-y-6 max-w-6xl">
           {error && <p className="text-xs text-red-600" role="alert" data-testid="timetable-error">{error}</p>}
-          <section className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-2" data-testid="pending-requests">
-            <h2 className="text-sm font-black text-[#0F1F3A]">{t("schedule.pending")} ({pending.length})</h2>
-            {pending.length === 0 && <p className="text-xs text-[#64748B]">{t("schedule.no_pending")}</p>}
-            <ul className="divide-y divide-[#F1F5F9]">
+          <section className="bg-white rounded-card border border-line p-4 space-y-2" data-testid="pending-requests">
+            <h2 className="text-sm font-semibold text-ink">{t("schedule.pending")} ({pending.length})</h2>
+            {pending.length === 0 && <p className="text-xs text-muted">{t("schedule.no_pending")}</p>}
+            <ul className="divide-y divide-line-soft">
               {pending.map((r) => (
                 <li key={r.id} className="py-2 text-xs space-y-1" data-testid="pending-request">
                   <div className="flex flex-wrap justify-between gap-2">
                     <div>
-                      <span className="font-bold">{t(`schedule.kind_${r.kind}`)}</span> · {r.batch} · {r.title || r.session_title}
-                      <div className="text-[11px] text-[#64748B]">
+                      <span className="font-semibold">{t(`schedule.kind_${r.kind}`)}</span> · {r.batch} · {r.title || r.session_title}
+                      <div className="text-caption text-muted">
                         {r.kind === "reschedule" && `${when(r.current_start)} → `}{when(r.start)}{r.room ? ` · ${r.room}` : ""}{r.substitute ? ` · ${t("schedule.sub")}: ${r.substitute}` : ""} · {t("schedule.by")} {r.requested_by}
                       </div>
-                      <div className="text-[11px] text-[#475569]">{r.reason}</div>
+                      <div className="text-caption text-ink-soft">{r.reason}</div>
                     </div>
                     <div className="flex gap-2 items-start">
                       <button type="button" disabled={busy} onClick={() => approve(r)} data-testid="request-approve"
-                        className={`px-2.5 py-1 font-bold rounded text-white ${r.clashes.length ? "bg-[#B45309]" : "bg-[#2B5CD0]"}`}>
+                        className={`px-2.5 py-1 font-semibold rounded text-white ${r.clashes.length ? "bg-warning" : "bg-brand"}`}>
                         {r.clashes.length ? t("schedule.approve_anyway") : t("schedule.approve")}
                       </button>
-                      <button type="button" disabled={busy} onClick={() => reject(r)} data-testid="request-reject" className="px-2.5 py-1 border border-[#CBD5E1] font-bold rounded">{t("schedule.reject")}</button>
+                      <button type="button" disabled={busy} onClick={() => reject(r)} data-testid="request-reject" className="px-2.5 py-1 border border-line-strong font-semibold rounded">{t("schedule.reject")}</button>
                     </div>
                   </div>
                   <ClashList clashes={r.clashes} />
@@ -85,7 +87,7 @@ export default function CollegeTimetablePage() {
             </ul>
           </section>
           {data && <WeekView week={data.week} sessions={data.sessions} onWeek={setWeek} />}
-          {data && data.rooms.length > 0 && <p className="text-[11px] text-[#64748B]">{t("schedule.rooms")}: {data.rooms.join(", ")}</p>}
+          {data && data.rooms.length > 0 && <p className="text-caption text-muted">{t("schedule.rooms")}: {data.rooms.join(", ")}</p>}
         </div>
       </AppShell>
     </RoleGuard>

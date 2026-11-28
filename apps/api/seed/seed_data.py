@@ -4,6 +4,7 @@ import datetime
 from sqlalchemy import select
 from core.database import SessionLocal, engine, Base
 from core.security import get_password_hash
+from services.code_harness import make_stub
 from models.schema import (
     College, User, Student, Trainer, ParentStudent,
     SessionItem, SessionAttendance, CodingProblem, TestCase, CodingSubmission, SubmissionResult,
@@ -13,6 +14,10 @@ from models.schema import (
     ProctorEvent, TopicScore, StudentProject, StudentSkill, ProjectDemoEvent,
     PullRequest, PullRequestFile, PullRequestComment
 )
+
+# The reference answer: checks the hidden tests (tests/test_code_harness.py); students get make_stub() of it.
+CONNECTED_COMPONENTS_REFERENCE = "class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        parent = list(range(n))\n        \n        def find(x):\n            if parent[x] != x:\n                parent[x] = find(parent[x])\n            return parent[x]\n            \n        def union(x, y):\n            rx, ry = find(x), find(y)\n            if rx != ry:\n                parent[rx] = ry\n                return 1\n            return 0\n            \n        return n - sum(union(u, v) for u, v in edges)"
+
 
 def get_screen24_test_cases():
     cases = [
@@ -255,6 +260,21 @@ def seed_portfolio_data(db, college_id="col_demo_001"):
             db.add(ev)
 
     db.commit()
+
+def fix_pr_authors(db, college_id="col_demo_001") -> int:
+    """Seeded PRs were all credited to Priya's student id whatever the author's name: point each one at the
+    student who wrote it (review decisions notify the author). Idempotent; runs after the cohort exists."""
+    from models.schema import Student, User
+    changed = 0
+    for pr in db.execute(select(PullRequest).where(PullRequest.college_id == college_id)).scalars().all():
+        sid = db.execute(select(Student.id).join(User, User.id == Student.user_id)
+                         .where(Student.college_id == college_id, User.name == pr.author_name)
+                         .order_by(Student.id)).scalars().first()
+        if sid and pr.author_id != sid:
+            pr.author_id, changed = sid, changed + 1
+    db.flush()
+    return changed
+
 
 def seed_reviews_data(db, college_id="col_demo_001"):
     now = datetime.datetime.utcnow()
@@ -674,6 +694,8 @@ def init_db_and_seed():
             seed_screen41(db, college_id="col_demo_001")
             db.commit()
 
+            fix_pr_authors(db, "col_demo_001")
+
             # keep at-risk flags consistent with the latest attendance history
             from services.at_risk import run_rules
             new_flags = run_rules(db, "col_demo_001")
@@ -790,7 +812,9 @@ def init_db_and_seed():
             constraints="1 <= n <= 2000\n0 <= edges.length <= 5000\nedges[i].length == 2\n0 <= ai <= bi < n\nai != bi\nThere are no repeated edges.",
             time_limit_ms=2000,
             memory_limit_mb=256,
-            starter_code="class Solution:\n    def countComponents(self, n: int, edges: list[list[int]]) -> int:\n        parent = list(range(n))\n        \n        def find(x):\n            if parent[x] != x:\n                parent[x] = find(parent[x])\n            return parent[x]\n            \n        def union(x, y):\n            rx, ry = find(x), find(y)\n            if rx != ry:\n                parent[rx] = ry\n                return 1\n            return 0\n            \n        return n - sum(union(u, v) for u, v in edges)",
+            starter_code=make_stub(CONNECTED_COMPONENTS_REFERENCE),
+            starter_codes={"python": make_stub(CONNECTED_COMPONENTS_REFERENCE)},
+            io_mode="function",
             trainer_notes="Notice how path compression in find() flattens the tree. For best worst-case complexity, add union-by-rank.",
             trainer_author="Arun K."
         )
@@ -1287,6 +1311,8 @@ def init_db_and_seed():
         from seed.seed_screen41 import seed_screen41
         seed_screen41(db, college_id="col_demo_001")
         db.flush()
+
+        fix_pr_authors(db, "col_demo_001")
 
         # same as the re-seed path: open at-risk flags for the seeded history
         from services.at_risk import run_rules

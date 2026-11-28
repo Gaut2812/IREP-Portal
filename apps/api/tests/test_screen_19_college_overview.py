@@ -109,3 +109,13 @@ def test_report_download_and_generate():
         assert run.status == "ready" and run.generated_at and run.data_as_of
     finally:
         db.close()
+
+
+def test_upcoming_events_leave_out_events_that_already_happened():
+    """The seeded mock drive 5 days ago must not be listed under "Upcoming events"."""
+    import datetime
+    d = client.get("/api/v1/college/overview", headers=ADMIN).json()
+    today = datetime.datetime.combine(datetime.date.today(), datetime.time.min)
+    assert d["upcoming_events"], "seed has upcoming events"
+    assert all(datetime.datetime.fromisoformat(e["starts_at"]) >= today for e in d["upcoming_events"])
+    assert "Mock drive: service-company pattern" not in [e["title"] for e in d["upcoming_events"]]

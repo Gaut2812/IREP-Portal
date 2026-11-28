@@ -43,38 +43,38 @@ export default function ParentReportsPage() {
   return (
     <RoleGuard allowedRoles={["parent"]}>
       <AppShell pageTitle={t("reports.parent_title")}>
-        <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-6">
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           {data?.consent_required && (
-            <div className="bg-white rounded-2xl border border-[#BFDBFE] p-4 text-xs" data-testid="reports-consent">
-              {t("reports.consent_needed")} <Link href="/parent" className="text-[#2B5CD0] font-bold">{t("reports.open_overview")}</Link>
+            <div className="bg-white rounded-card border border-brand-line p-4 text-xs" data-testid="reports-consent">
+              {t("reports.consent_needed")} <Link href="/parent" className="text-brand font-semibold">{t("reports.open_overview")}</Link>
             </div>
           )}
-          {data && !data.consent_required && <p className="text-xs text-[#64748B]">{t("reports.for_child")} {data.ward.name}</p>}
-          {data && !data.consent_required && data.cards.length === 0 && <p className="text-xs text-[#64748B] bg-white rounded-2xl border border-dashed border-[#CBD5E1] p-6 text-center">{t("reports.no_cards")}</p>}
+          {data && !data.consent_required && <p className="text-xs text-muted">{t("reports.for_child")} {data.ward.name}</p>}
+          {data && !data.consent_required && data.cards.length === 0 && <p className="text-xs text-muted bg-white rounded-card border border-dashed border-line-strong p-6 text-center">{t("reports.no_cards")}</p>}
           <ul className="space-y-3" data-testid="report-cards">
             {data?.cards.map((c) => (
-              <li key={c.id} className="bg-white rounded-2xl border border-[#E2E8F0]" data-testid="report-card">
+              <li key={c.id} className="bg-white rounded-card border border-line" data-testid="report-card">
                 <button type="button" onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}
-                  className="w-full text-left px-4 py-3 flex items-center gap-2 text-sm font-black text-[#0F1F3A]">
-                  <FileText className="w-4 h-4 text-[#2B5CD0]" />{c.month_label}
+                  className="w-full text-left px-4 py-3 flex items-center gap-2 text-sm font-semibold text-ink">
+                  <FileText className="w-4 h-4 text-brand" />{c.month_label}
                 </button>
                 {open === c.id && (
                   <div className="px-4 pb-4 space-y-3">
                     <table className="w-full text-xs">
-                      <thead><tr className="text-left text-[#64748B]"><th className="py-1">{t("reports.area")}</th><th>{t("reports.last_month")}</th><th>{t("reports.this_month")}</th></tr></thead>
+                      <thead><tr className="text-left text-muted"><th className="py-1">{t("reports.area")}</th><th>{t("reports.last_month")}</th><th>{t("reports.this_month")}</th></tr></thead>
                       <tbody>
                         {c.rows.map((r) => (
-                          <tr key={r.area} className="border-t border-[#F1F5F9]">
-                            <td className="py-1.5 font-semibold">{r.area}<div className={`text-[10px] ${r.color === "green" ? "text-[#166534]" : "text-[#B45309]"}`}>{r.status}</div></td>
-                            <td>{r.prev}</td><td className="font-bold">{r.curr}</td>
+                          <tr key={r.area} className="border-t border-line-soft">
+                            <td className="py-1.5 font-semibold">{r.area}<div className={`text-caption ${r.color === "green" ? "text-success" : "text-warning"}`}>{r.status}</div></td>
+                            <td>{r.prev}</td><td className="font-semibold">{r.curr}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {c.trainer_remark && <p className="text-xs text-[#334155]" data-testid="report-remark"><b>{t("reports.remark")}{c.trainer_name ? ` (${c.trainer_name})` : ""}:</b> {c.trainer_remark}</p>}
-                    {c.how_to_help && <p className="text-xs bg-[#ECFDF5] border border-[#A7F3D0] rounded-lg p-2.5 text-[#065F46]"><b>{t("reports.how_to_help")}:</b> {c.how_to_help}</p>}
-                    <button type="button" onClick={() => download(c)} data-testid="report-pdf" className="px-3 py-1.5 border border-[#CBD5E1] text-xs font-bold rounded-lg inline-flex items-center gap-1">
+                    {c.trainer_remark && <p className="text-xs text-ink-soft" data-testid="report-remark"><b>{t("reports.remark")}{c.trainer_name ? ` (${c.trainer_name})` : ""}:</b> {c.trainer_remark}</p>}
+                    {c.how_to_help && <p className="text-xs bg-success-faint border border-success-line rounded-tile p-2.5 text-success"><b>{t("reports.how_to_help")}:</b> {c.how_to_help}</p>}
+                    <button type="button" onClick={() => download(c)} data-testid="report-pdf" className="px-3 py-1.5 border border-line-strong text-xs font-semibold rounded-tile inline-flex items-center gap-1">
                       <Download className="w-3.5 h-3.5" />{t("reports.pdf")}
                     </button>
                   </div>

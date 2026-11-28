@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from core.security import PLATFORM_TENANT, TokenPayload, require_role
 from core.tenant import get_trainer_batch_ids, get_trainer_for_user, get_user_name
-from models.schema import (Batch, CodingProblem, CodingSubmission, PracticeQuestion, PracticeTest, Student, TestAttempt, TestCase,
-                           User)
+from models.schema import (Batch, CodingHintUsage, CodingProblem, CodingSubmission, DriveRound, PracticeQuestion, PracticeTest, ProctorEvent, Student,
+                           TestAttempt, TestCase, User)
 from services.audit import record_audit
 from services.notifications import notify_user
 
@@ -120,7 +120,7 @@ def _copy(db: Session, kind: str, src, college_id: str):
         p = CodingProblem(id=f"prob_{uuid.uuid4().hex[:16]}", college_id=college_id, status="draft", batch_ids=[], source_id=src.id,
                           **{k: getattr(src, k) for k in ("title", "difficulty", "topic", "company_tags", "week_info", "statement", "example_input",
                                                           "example_output", "constraints", "time_limit_ms", "memory_limit_mb", "starter_codes",
-                                                          "starter_code", "trainer_notes", "trainer_author")})
+                                                          "starter_code", "trainer_notes", "trainer_author", "io_mode")})
         p.slug = p.id
         db.add(p)
         db.flush()
@@ -160,18 +160,26 @@ def _item(db: Session, kind: str, item_id: str, user: TokenPayload):
     model = KINDS.get(kind)
     if model is None:
         raise HTTPException(status_code=404, detail="Not found")
-    item = db.execute(select(model).where(model.id == item_id, model.college_id == user.college_id)).scalar_one_or_none()
+    item = db.execute(select(model).where(model.id == item_id, model.college_id == user.college_id,
+                                          model.status != DELETED)).scalar_one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="Not found")
     return item
+
+
+# "Delete" keeps what other records need (decision D2): an item students used is hidden (status "deleted") so
+# results, readiness and reports stay correct; an item nobody used is removed for good.
+DELETED = "deleted"
 
 
 @router.get("/trainer/assessments")
 def list_assessments(current_user: TokenPayload = Depends(TRAINER), db: Session = Depends(get_db)):
     mine = _mine(db, current_user)
     names = dict(db.execute(select(Batch.id, Batch.name).where(Batch.college_id == current_user.college_id)).all())
-    probs = db.execute(select(CodingProblem).where(CodingProblem.college_id == current_user.college_id).order_by(CodingProblem.title)).scalars().all()
-    tests = db.execute(select(PracticeTest).where(PracticeTest.college_id == current_user.college_id).order_by(PracticeTest.title)).scalars().all()
+    probs = db.execute(select(CodingProblem).where(CodingProblem.college_id == current_user.college_id, CodingProblem.status != DELETED)
+                       .order_by(CodingProblem.title)).scalars().all()
+    tests = db.execute(select(PracticeTest).where(PracticeTest.college_id == current_user.college_id, PracticeTest.status != DELETED)
+                       .order_by(PracticeTest.title)).scalars().all()
     return {"batches": [{"id": b, "name": names.get(b, b)} for b in mine],
             "problems": [_row("problem", p, names) for p in probs], "tests": [_row("test", t, names) for t in tests]}
 
@@ -253,6 +261,42 @@ def unpublish(kind: str, item_id: str, current_user: TokenPayload = Depends(TRAI
     return _row(kind, item, names)
 
 
+@router.delete("/trainer/assessments/{kind}/{item_id}")
+def delete_item(kind: str, item_id: str, current_user: TokenPayload = Depends(TRAINER), db: Session = Depends(get_db)):
+    """Delete a coding problem or practice test of my college.
+
+    409 while it is published to batches that are not mine, used by a mock drive, or a student is mid-attempt.
+    Never used by a student: removed for good. Used: hidden from every list, kept for results and reports."""
+    item = _item(db, kind, item_id, current_user)
+    mine = set(_mine(db, current_user))
+    if item.status == "published" and (item.batch_ids is None or not set(item.batch_ids) <= mine):
+        raise HTTPException(status_code=409, detail="It is published to other trainers' batches; they must unpublish it first")
+    if kind == "test":
+        if db.execute(select(DriveRound.id).where(DriveRound.test_id == item.id)).first():
+            raise HTTPException(status_code=409, detail="A mock drive uses this test; remove it from the drive first")
+        attempts = db.execute(select(TestAttempt.status).where(TestAttempt.test_id == item.id)).scalars().all()
+        if any(a != "submitted" for a in attempts):
+            raise HTTPException(status_code=409, detail="A student is taking this test right now; try again after it is submitted")
+        used = bool(attempts)
+    else:
+        used = bool(db.execute(select(CodingSubmission.id).where(CodingSubmission.problem_id == item.id)).first()
+                    or db.execute(select(CodingHintUsage.id).where(CodingHintUsage.problem_id == item.id)).first())
+    if used:
+        item.status, item.batch_ids = DELETED, []
+        mode = "hidden"
+    else:
+        child = TestCase if kind == "problem" else PracticeQuestion
+        parent_col = TestCase.problem_id if kind == "problem" else PracticeQuestion.test_id
+        for row in db.execute(select(child).where(parent_col == item.id)).scalars():
+            db.delete(row)
+        db.flush()
+        db.delete(item)
+        mode = "removed"
+    record_audit(db, current_user, "assessment.deleted", kind, item_id, {"mode": mode, "title": item.title})
+    db.commit()
+    return {"success": True, "mode": mode}
+
+
 @router.get("/trainer/assessments/{kind}/{item_id}/results")
 def results(kind: str, item_id: str, current_user: TokenPayload = Depends(TRAINER), db: Session = Depends(get_db)):
     """L13 results back: the trainer's students that the item reaches."""
@@ -282,12 +326,18 @@ def results(kind: str, item_id: str, current_user: TokenPayload = Depends(TRAINE
         by = {}
         for a in atts:
             by.setdefault(a.student_id, []).append(a)
+        # integrity signals for the trainer: tab switches and time added back for a lost connection (practice test)
+        switches = dict(db.execute(select(ProctorEvent.attempt_id, func.count(ProctorEvent.id))
+                                   .where(ProctorEvent.attempt_id.in_([a.id for a in atts] or ["_"]), ProctorEvent.event_type == "tab_switch")
+                                   .group_by(ProctorEvent.attempt_id)).all())
         for st, name in rows:
             mine_atts = by.get(st.id, [])
             best = max(mine_atts, key=lambda a: a.score or 0, default=None)
             out.append({"student_id": st.id, "name": name, "batch": st.batch_name, "attempts": len(mine_atts),
                         "result": f"{round(best.accuracy_pct or 0)}%" if best else None,
-                        "score": f"{best.score}/{best.total_questions}" if best else None, "done": bool(best)})
+                        "score": f"{best.score}/{best.total_questions}" if best else None, "done": bool(best),
+                        "tab_switches": switches.get(best.id, 0) if best else None,
+                        "paused_min": round((best.paused_seconds or 0) / 60, 1) if best else None})
     done = sum(1 for r in out if r["done"])
     return {"item": _row(kind, item, {}), "students": out,
             "summary": {"students": len(out), "attempted": sum(1 for r in out if r["attempts"]), "done": done}}
@@ -303,8 +353,10 @@ def _bank_rows() -> tuple:
 @router.get("/trainer/bank")
 def bank_for_trainer(current_user: TokenPayload = Depends(TRAINER), db: Session = Depends(get_db)):
     qp, qt = _bank_rows()
-    imported = {s for s in db.execute(select(CodingProblem.source_id).where(CodingProblem.college_id == current_user.college_id)).scalars() if s}
-    imported |= {s for s in db.execute(select(PracticeTest.source_id).where(PracticeTest.college_id == current_user.college_id)).scalars() if s}
+    imported = {s for s in db.execute(select(CodingProblem.source_id).where(CodingProblem.college_id == current_user.college_id,
+                                                                             CodingProblem.status != DELETED)).scalars() if s}
+    imported |= {s for s in db.execute(select(PracticeTest.source_id).where(PracticeTest.college_id == current_user.college_id,
+                                                                             PracticeTest.status != DELETED)).scalars() if s}
     return {"problems": [{**_row("problem", p, {}), "imported": p.id in imported} for p in db.execute(qp).scalars()],
             "tests": [{**_row("test", t, {}), "imported": t.id in imported} for t in db.execute(qt).scalars()]}
 
@@ -315,7 +367,8 @@ def import_from_bank(kind: str, bank_id: str, current_user: TokenPayload = Depen
     src = db.execute(select(model).where(model.id == bank_id, model.college_id == PLATFORM_TENANT, model.status == "published")).scalar_one_or_none() if model else None
     if src is None:
         raise HTTPException(status_code=404, detail="Bank item not found")
-    existing = db.execute(select(model).where(model.college_id == current_user.college_id, model.source_id == src.id)).scalars().first()
+    existing = db.execute(select(model).where(model.college_id == current_user.college_id, model.source_id == src.id,
+                                              model.status != DELETED)).scalars().first()
     if existing:
         raise HTTPException(status_code=409, detail=f"Already imported as {existing.id}")
     item = _copy(db, kind, src, current_user.college_id)

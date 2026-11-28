@@ -40,17 +40,17 @@ export default function AuthCallbackPage() {
   }, [login, setLanguage]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FDE8E8] p-6">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-[#E2E8F0] p-8 text-center space-y-4" data-testid="auth-callback">
+    <div className="min-h-screen flex items-center justify-center bg-danger-soft p-6">
+      <div className="w-full max-w-sm bg-white rounded-card shadow-pop border border-line p-8 text-center space-y-4" data-testid="auth-callback">
         {failed ? (
           <>
-            <p className="text-sm font-bold text-[#881337]" role="alert">{t("auth.callback_failed")}</p>
-            <Link href="/login" className="inline-block px-4 py-2.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-xl">
+            <p className="text-sm font-semibold text-danger" role="alert">{t("auth.callback_failed")}</p>
+            <Link href="/login" className="inline-block px-4 py-2.5 bg-brand text-white text-xs font-semibold rounded-card">
               {t("auth.back_to_login")}
             </Link>
           </>
         ) : (
-          <p className="text-sm font-medium text-[#0F1F3A]">{t("auth.signing_in")}</p>
+          <p className="text-sm font-medium text-ink">{t("auth.signing_in")}</p>
         )}
       </div>
     </div>

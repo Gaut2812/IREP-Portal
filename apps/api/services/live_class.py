@@ -1,6 +1,7 @@
 """Screen 07 live classroom: video-platform adapter, presence and auto attendance.
 
-`LIVE_CLASS_ADAPTER=fake` (default) keeps the whole classroom inside the
+`LIVE_CLASS_ADAPTER=livekit` adds open-source audio and video inside the same
+page (services/livekit.py). `LIVE_CLASS_ADAPTER=fake` (default) keeps the whole classroom inside the
 portal: the stage (shared notebook + flow panel), polls, Q&A and presence
 all come from our tables. `LIVE_CLASS_ADAPTER=bbb` returns signed
 BigBlueButton join URLs (BBB_URL / BBB_SECRET); BBB then calls
@@ -93,10 +94,25 @@ class TeamsAdapter(LiveClassAdapter):
         return None                           # router returns LiveMeeting.join_url
 
 
+class LiveKitAdapter(LiveClassAdapter):
+    """Open-source LiveKit (services/livekit.py): the room is drawn inside the portal.
+    The join route mints a token; there is no URL to open."""
+    name = "livekit"
+
+    def create_meeting(self, session: SessionItem) -> str:
+        from services.livekit import room_name
+        return room_name(session)            # tenant in the name: a token never reaches another college's room
+
+    def join_url(self, meeting_id, user_id, full_name, role):
+        return None
+
+
 def get_live_adapter() -> LiveClassAdapter:
     name = (getattr(settings, "LIVE_CLASS_ADAPTER", None) or "fake").lower()
     if name == "teams":
         return TeamsAdapter()
+    if name == "livekit":
+        return LiveKitAdapter()
     if name == "bbb" and settings.BBB_SECRET:
         return BBBAdapter(settings.BBB_URL, settings.BBB_SECRET)
     return FakeLiveClassAdapter()
@@ -161,8 +177,8 @@ def session_window(session: SessionItem, meeting: Optional[LiveMeeting]) -> Tupl
 def user_presence(db: Session, session: SessionItem, user_id: str, now: datetime.datetime,
                   meeting: Optional[LiveMeeting] = None) -> dict:
     q = select(JoinEvent.event, JoinEvent.at).where(JoinEvent.session_id == session.id, JoinEvent.user_id == user_id)
-    if meeting is not None and meeting.provider == "teams":
-        q = q.where(JoinEvent.source == "teams")     # a "Join in Teams" click is not attendance
+    if meeting is not None and meeting.provider in ("teams", "livekit"):
+        q = q.where(JoinEvent.source == meeting.provider)   # a join click is not attendance; the provider's record is
     events = db.execute(q).all()
     start, end = session_window(session, meeting)
     until = min(now, meeting.ended_at) if meeting and meeting.ended_at else now

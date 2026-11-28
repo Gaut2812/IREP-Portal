@@ -17,6 +17,7 @@ from core.database import get_db
 from core.security import TokenPayload, get_password_hash, keycloak_mode, require_role
 from models.schema import College, Student, User
 from services.audit import record_audit
+from services.invitations import INVITE_HOURS, create_invitation, get_invitation, list_invitations, resend_invitation, revoke_invitation
 from services.outbox import emit
 
 router = APIRouter(prefix="/college", tags=["Screen 02 · College settings"])
@@ -85,21 +86,37 @@ def add_user(req: CollegeUserIn, current_user: TokenPayload = Depends(COLLEGE), 
     if db.execute(select(User.id).where(func.lower(User.email) == email)).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists")
     name = req.name.strip()
-    temp = None if keycloak_mode() else secrets.token_urlsafe(9)
     u = User(id=f"usr_{uuid.uuid4().hex[:16]}", college_id=cid, email=email, name=name, phone=(req.phone or "").strip() or None,
              role=req.role, avatar_initials="".join(p[0] for p in name.split()[:2]).upper() or "CU", language_pref="en",
-             hashed_password=get_password_hash(temp or secrets.token_urlsafe(32)))
+             hashed_password=get_password_hash(secrets.token_urlsafe(32)))
     db.add(u)
     db.flush()
     record_audit(db, current_user, "college.user_created", "user", u.id, {"role": req.role})
-    if keycloak_mode():
-        emit(db, "identity.invite_user", {"user_id": u.id}, college_id=cid, entity_type="user", entity_id=u.id)
+    invite = create_invitation(db, u, current_user)       # Phase 5: a set-password link, not a temporary password
     db.commit()
-    out = {"id": u.id, "email": email, "role": u.role}
-    if temp:
-        out["temporary_password"] = temp           # shown once, stored hashed
-    else:
-        out["invite"] = "Keycloak will email a link to set a password"
+    return {"id": u.id, "email": email, "role": u.role, **invite}
+
+
+@router.get("/invitations")
+def college_invitations(current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
+    """Who was invited to this college, by whom, and whether they accepted."""
+    return {"items": list_invitations(db, current_user.college_id), "valid_hours": INVITE_HOURS}
+
+
+@router.post("/invitations/{invitation_id}/resend")
+def college_resend_invitation(invitation_id: str, current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
+    out = resend_invitation(db, get_invitation(db, current_user.college_id, invitation_id), current_user)
+    db.commit()
+    return out
+
+
+@router.post("/invitations/{invitation_id}/revoke")
+def college_revoke_invitation(invitation_id: str, current_user: TokenPayload = Depends(COLLEGE), db: Session = Depends(get_db)):
+    inv = get_invitation(db, current_user.college_id, invitation_id)
+    if inv.user_id == current_user.sub:
+        raise HTTPException(status_code=409, detail="You cannot revoke your own invitation")
+    out = revoke_invitation(db, inv, current_user)
+    db.commit()
     return out
 
 

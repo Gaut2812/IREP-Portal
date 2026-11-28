@@ -47,6 +47,9 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  // lets CSS (html:lang(ta)) give Tamil text more line height
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
+
   const toggleLanguage = () => {
     const next = language === "en" ? "ta" : "en";
     setLanguage(next);

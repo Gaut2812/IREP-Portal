@@ -94,6 +94,16 @@ def normalize_role(role: Optional[str]) -> Optional[str]:
     return ROLE_ALIASES.get(role, role)
 
 
+# "demo" (the public demo server, infra/demo) is deliberately not here: everyone there signs in
+DEMO_AUTH_ENVIRONMENTS = {"development", "dev", "local", "test"}
+
+
+def demo_auth_allowed() -> bool:
+    """Anonymous requests may fall back to a demo profile only in local development with local sign-in."""
+    return (settings.ENVIRONMENT or "").strip().lower() in DEMO_AUTH_ENVIRONMENTS \
+        and (settings.AUTH_PROVIDER or "local").strip().lower() == "local"
+
+
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
     x_demo_role: Optional[str] = Header(default=None, alias="X-Demo-Role"),
@@ -119,7 +129,9 @@ async def get_current_user(
     # A token that is present but invalid or expired is always a 401, even in
     # development: falling back to the demo student would show one user
     # another user's data (e.g. notifications).
-    if token or settings.ENVIRONMENT.lower() == "production":
+    # The demo fallback is an allow-list, not a deny-list: staging, a mistyped ENVIRONMENT ("prod") or
+    # Keycloak mode must not turn an anonymous request into a demo student, trainer, college admin or parent.
+    if token or not demo_auth_allowed():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",

@@ -20,9 +20,9 @@ interface CollegeRow {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  active: "bg-[#DCFCE7] text-[#166534]",
-  onboarding: "bg-[#FEF3C7] text-[#92400E]",
-  suspended: "bg-[#FEE2E2] text-[#991B1B]",
+  active: "bg-success-soft text-success",
+  onboarding: "bg-warning-soft text-warning",
+  suspended: "bg-danger-soft text-danger",
 };
 
 const EMPTY: NewCollege = { name: "", code: "", city: "", state: "Tamil Nadu" };
@@ -78,45 +78,45 @@ export default function AdminCollegesPage() {
 
   const field = (key: keyof typeof EMPTY, label: string) => (
     <div>
-      <label className="block text-xs font-bold text-[#0F1F3A] mb-1" htmlFor={`college-${key}`}>{label}</label>
+      <label className="block text-xs font-semibold text-ink mb-1" htmlFor={`college-${key}`}>{label}</label>
       <input
         id={`college-${key}`}
         data-testid={`college-${key}`}
         value={form[key]}
         onChange={(e) => setForm({ ...form, [key]: e.target.value })}
         aria-invalid={!!fieldErrors[key]}
-        className={`w-full px-3 py-2 bg-[#F8FAFC] border ${fieldErrors[key] ? "border-red-400" : "border-[#E2E8F0]"} rounded-lg text-xs focus:outline-none focus:border-[#2B5CD0]`}
+        className={`w-full px-3 py-2 bg-surface-2 border ${fieldErrors[key] ? "border-red-400" : "border-line"} rounded-tile text-xs focus:outline-none focus:border-brand`}
       />
-      {fieldErrors[key] && <p className="text-[11px] text-red-600 mt-1">{fieldErrors[key]}</p>}
+      {fieldErrors[key] && <p className="text-caption text-red-600 mt-1">{fieldErrors[key]}</p>}
     </div>
   );
 
   return (
     <RoleGuard allowedRoles={["admin"]}>
       <AppShell pageTitle={t("admin_colleges.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-6 max-w-6xl">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             {/* the shell renders the page title as the only h1 */}
-            <p className="text-xs text-[#64748B] mt-1 max-w-2xl">{t("admin_colleges.subtitle")}</p>
+            <p className="text-xs text-muted mt-1 max-w-2xl">{t("admin_colleges.subtitle")}</p>
             <button
               type="button"
               data-testid="new-college"
               onClick={() => setShowForm((v) => !v)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-brand text-white text-xs font-semibold rounded-tile"
             >
               <Plus className="w-3.5 h-3.5" /> {t("admin_colleges.new_college")}
             </button>
           </div>
 
           {showForm && (
-            <form onSubmit={create} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-4 grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="college-form">
+            <form onSubmit={create} noValidate className="bg-white rounded-card border border-line p-4 grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="college-form">
               {field("name", t("admin_colleges.name"))}
               {field("code", t("admin_colleges.code"))}
               {field("city", t("admin_colleges.city"))}
               {field("state", t("admin_colleges.state"))}
               {formError && <p className="md:col-span-2 text-xs text-red-600 font-medium" role="alert" data-testid="college-form-error">{formError}</p>}
               <div className="md:col-span-2 flex justify-end">
-                <button type="submit" disabled={saving} data-testid="college-save" className="px-4 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50">
+                <button type="submit" disabled={saving} data-testid="college-save" className="px-4 py-2 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50">
                   {t("admin_colleges.create")}
                 </button>
               </div>
@@ -126,13 +126,13 @@ export default function AdminCollegesPage() {
           {loadError && <p className="text-xs text-red-600" role="alert">{loadError}</p>}
 
           {rows && rows.length === 0 && (
-            <div className="bg-white rounded-xl border border-dashed border-[#CBD5E1] p-8 text-center text-xs text-[#64748B]">{t("admin_colleges.empty")}</div>
+            <div className="bg-white rounded-card border border-dashed border-line-strong p-8 text-center text-xs text-muted">{t("admin_colleges.empty")}</div>
           )}
 
           {rows && rows.length > 0 && (
-            <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-x-auto">
+            <div className="bg-white rounded-card border border-line overflow-x-auto">
               <table className="w-full text-xs" data-testid="colleges-table">
-                <thead className="bg-[#F8FAFC] text-[#64748B]">
+                <thead className="bg-surface-2 text-muted">
                   <tr>
                     <th className="text-left font-semibold px-4 py-2.5">{t("admin_colleges.name")}</th>
                     <th className="text-left font-semibold px-4 py-2.5">{t("admin_colleges.code")}</th>
@@ -144,16 +144,16 @@ export default function AdminCollegesPage() {
                 </thead>
                 <tbody>
                   {rows.map((c) => (
-                    <tr key={c.id} className="border-t border-[#F1F5F9]" data-testid={`college-row-${c.code}`}>
+                    <tr key={c.id} className="border-t border-line-soft" data-testid={`college-row-${c.code}`}>
                       <td className="px-4 py-2.5">
-                        <Link href={`/admin/colleges/${c.id}`} className="font-bold text-[#2B5CD0] hover:underline inline-flex items-center gap-1.5">
+                        <Link href={`/admin/colleges/${c.id}`} className="font-semibold text-brand hover:underline inline-flex items-center gap-1.5">
                           <Building2 className="w-3.5 h-3.5" /> {c.name}
                         </Link>
                       </td>
                       <td className="px-4 py-2.5 font-mono">{c.code}</td>
                       <td className="px-4 py-2.5">{[c.city, c.state].filter(Boolean).join(", ")}</td>
                       <td className="px-4 py-2.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_STYLE[c.status] || ""}`}>{t(`admin_colleges.status_${c.status}`)}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-caption font-semibold ${STATUS_STYLE[c.status] || ""}`}>{t(`admin_colleges.status_${c.status}`)}</span>
                       </td>
                       <td className="px-4 py-2.5 text-right">{c.students}{c.students_cap ? ` / ${c.students_cap}` : ""}</td>
                       <td className="px-4 py-2.5">{c.mou_ends_on ?? "—"}</td>

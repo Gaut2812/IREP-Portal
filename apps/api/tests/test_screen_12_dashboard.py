@@ -101,3 +101,28 @@ def test_compute_snapshot_persists_and_updates_student():
 
 def test_readiness_job_requires_staff_role():
     assert client.post("/api/v1/admin/jobs/readiness", headers=_token("usr_priya_01", "student")).status_code == 403
+
+
+def test_current_project_matches_my_team_board():
+    """The project card counts my team's active sprint only (it used to count every task in the college),
+    and "my open tasks" are the ones assigned to me, not matched by initials."""
+    d = client.get("/api/v1/student/dashboard", headers=_token("usr_priya_01", "student")).json()
+    board = client.get("/api/v1/teams/team_phoenix/board", headers=_token("usr_priya_01", "student")).json()
+    assert d["current_project"]["progress_pct"] == board["metrics"]["progress_pct"]
+    mine_open = [t for col in board["columns"] if col["key"] != "done" for t in col["tasks"] if t["assignee_name"] == "Priya R"]
+    assert d["current_project"]["open_tasks"] == len(mine_open)
+
+
+def test_resume_practice_opens_a_real_unsolved_problem():
+    res = client.get("/api/v1/student/coding/resume", headers=_token("usr_priya_01", "student"))
+    assert res.status_code == 200
+    pid = res.json()["problem_id"]
+    listed = client.get("/api/v1/student/coding", headers=_token("usr_priya_01", "student")).json()["problems"]
+    row = next(p for p in listed if p["id"] == pid)            # one of my published problems
+    assert not row["is_solved"] or all(p["is_solved"] for p in listed)
+
+
+def test_resume_practice_role_and_tenant_guard():
+    assert client.get("/api/v1/student/coding/resume", headers=_token("usr_arun_01", "trainer")).status_code == 403
+    # a student token for another college finds no student profile there: 404, never this college's data
+    assert client.get("/api/v1/student/coding/resume", headers=_token("usr_priya_01", "student", "col_other_999")).status_code == 404

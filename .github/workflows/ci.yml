@@ -128,6 +128,9 @@ jobs:
       - name: Typecheck
         working-directory: apps/web
         run: pnpm exec tsc --noEmit
+      - name: UI standards (tokens, type scale, weights; docs/UI_STANDARDS.md)
+        working-directory: apps/web
+        run: python scripts/ui_codemod.py --check src
       - name: Build
         working-directory: apps/web
         run: pnpm build

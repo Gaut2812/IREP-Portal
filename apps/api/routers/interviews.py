@@ -14,7 +14,8 @@ from core.security import require_role, TokenPayload
 from core.tenant import get_student_for_user, get_trainer_for_user, get_trainer_batch_ids
 from models.schema import (Batch, DriveRound, Event, Interview, InterviewBooking, InterviewComment, InterviewRubricScore,
                            InterviewSlot, MockDrive, Student, User)
-from services.interviews import ROUND_LABEL, build_student_interviews, book_slot, cancel_booking, rubric_config, recording_url
+from services.interviews import (ROUND_LABEL, SCALE_HELP, build_student_interviews, book_slot, cancel_booking, criterion_help, rubric_config,
+                                 recording_url)
 from services.notifications import notify_user
 from services.audit import record_audit
 
@@ -55,12 +56,16 @@ def book(slot_id: str, current_user: TokenPayload = Depends(require_role(["stude
     booking = book_slot(db, student, slot_id)
     slot = db.execute(select(InterviewSlot).filter_by(id=slot_id)).scalar_one()
     when = slot.starts_at.strftime("%a %b %d, %I:%M %p")
-    notify_user(db, current_user.sub, "Mock interview booked", f"Your {slot.round_type.replace('_', ' ')} round is on {when}.",
-                title_ta="மாதிரி நேர்காணல் பதிவு செய்யப்பட்டது", kind="reminder", link="/student/interviews", college_id=student.college_id)
+    label = ROUND_LABEL.get(slot.round_type, ROUND_LABEL["technical"])
+    round_en, round_ta = label["en"], label["ta"]
+    notify_user(db, current_user.sub, "Mock interview booked", f"Your mock interview ({round_en}) is on {when}.",
+                title_ta="மாதிரி நேர்காணல் பதிவு செய்யப்பட்டது", body_ta=f"உங்கள் மாதிரி நேர்காணல் ({round_ta}): {when}.",
+                kind="reminder", link="/student/interviews", college_id=student.college_id)
     from models.schema import Trainer
     tr = db.execute(select(Trainer).filter_by(id=slot.trainer_id)).scalar_one_or_none()
     if tr:
-        notify_user(db, tr.user_id, f"Interview booked by {current_user.name}", f"{when} · {slot.round_type.replace('_', ' ')}", kind="info",
+        notify_user(db, tr.user_id, f"Interview booked by {current_user.name}", f"{when} · {round_en}",
+                    title_ta=f"{current_user.name} நேர்காணலைப் பதிவு செய்தார்", body_ta=f"{when} · {round_ta}", kind="info",
                     link="/trainer", college_id=student.college_id)
     record_audit(db, current_user, "interview.book", "interview_slot", slot.id)
     db.commit()
@@ -174,7 +179,10 @@ def trainer_interviews(lang: str = "en", current_user: TokenPayload = Depends(TR
                 "drive": drive_titles.get(slot_drive.get(i.slot_id)) if i.slot_id else None}
 
     return {
-        "rubric": {"max": cfg.max_score, "criteria": [{"key": c["key"], "label": c["label_ta"] if lang == "ta" else c["label_en"]} for c in cfg.criteria]},
+        "rubric": {"max": cfg.max_score, "scale": SCALE_HELP["ta" if lang == "ta" else "en"],
+                   "service_ready_min": cfg.service_ready_min, "product_ready_min": cfg.product_ready_min,
+                   "criteria": [{"key": c["key"], "label": c["label_ta"] if lang == "ta" else c["label_en"], "help": criterion_help(c, lang)}
+                                for c in cfg.criteria]},
         "batches": [{"id": b, "name": n} for b, n in db.execute(select(Batch.id, Batch.name).where(Batch.id.in_(batch_ids or ["_"]))).all()],
         "slots": [{"id": sl.id, "starts_at": sl.starts_at.isoformat(), "duration_min": sl.duration_min, "round_type": sl.round_type,
                    "round_label": _round_label(sl.round_type, lang), "batch_id": sl.batch_id,
@@ -243,3 +251,18 @@ async def add_recording(interview_id: str, file: UploadFile = File(...), current
     record_audit(db, current_user, "interview.recording_added", "interview", iv.id, {"size_mb": size_mb})
     db.commit()
     return {"success": True, "has_recording": True}
+
+
+@router.delete("/trainer/interviews/{interview_id}/recording")
+def delete_recording(interview_id: str, current_user: TokenPayload = Depends(TRAINER), db: Session = Depends(get_db)):
+    """Remove an interview's recording: the student's link stops working and the file is deleted after commit."""
+    from services.file_cleanup import delete_file_later
+    trainer = get_trainer_for_user(current_user, db)
+    iv = db.execute(select(Interview).filter_by(id=interview_id, trainer_id=trainer.id, college_id=trainer.college_id)).scalar_one_or_none()
+    if iv is None or not iv.recording_key:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    delete_file_later(db, iv.recording_key, college_id=iv.college_id, entity_type="interview", entity_id=iv.id)
+    iv.recording_key = None
+    record_audit(db, current_user, "interview.recording_deleted", "interview", iv.id, {})
+    db.commit()
+    return {"success": True, "has_recording": False}

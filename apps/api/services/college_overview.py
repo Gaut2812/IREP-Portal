@@ -85,7 +85,7 @@ def build_college_overview(db: Session, college_id: str, semester: Optional[int]
 
     # Upcoming events visible to the college
     events = db.execute(
-        select(Event).where(Event.college_id == college_id, Event.status == "published", Event.starts_at >= datetime.datetime.combine(today, datetime.time.min) - datetime.timedelta(days=30),
+        select(Event).where(Event.college_id == college_id, Event.status == "published", Event.starts_at >= datetime.datetime.combine(today, datetime.time.min),
                             Event.audience.in_(["all", "college", "parents", "students"]), Event.student_id.is_(None))
         .order_by(Event.starts_at).limit(6)
     ).scalars().all()

@@ -2,19 +2,20 @@
 
 /** Screen 22 · Assessments (trainer): publish problems (24) and tests (23) to batches, read results back (L13);
  *  import from the IREP bank (46, L37). */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useLanguage } from "@/lib/LanguageContext";
 import { ApiError, fetchApi } from "@/lib/api";
 import { Download, Plus, Send, Undo2 } from "lucide-react";
+import { ConfirmDelete, DeleteButton } from "@/components/ui";
 
 type Kind = "problem" | "test";
 interface Item {
   kind: Kind; id: string; title: string; status: string; batch_ids: string[] | null; batches: "all" | string[]; due_at: string | null;
   source_id: string | null; difficulty?: string; topic?: string; trainer_notes?: string | null; questions?: number; imported?: boolean;
 }
-interface Results { students: { student_id: string; name: string; batch: string | null; attempts: number; result: string | null; score: string | null; done: boolean }[]; summary: { students: number; attempted: number; done: number } }
+interface Results { students: { student_id: string; name: string; batch: string | null; attempts: number; result: string | null; score: string | null; done: boolean; tab_switches?: number | null; paused_min?: number | null }[]; summary: { students: number; attempted: number; done: number } }
 interface Q { question_text: string; option_a: string; option_b: string; option_c: string; option_d: string; correct_option: string }
 
 const EMPTY_P = { title: "", statement: "", constraints: "", difficulty: "Easy", topic: "", trainer_notes: "", sample_in: "", sample_out: "", hidden_in: "", hidden_out: "" };
@@ -36,6 +37,7 @@ export default function AssessmentsPage() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +47,22 @@ export default function AssessmentsPage() {
     }
   }, [t]);
   useEffect(() => { load(); }, [load]);
+
+  // Deep links from the trainer dashboard: ?tab=tests&new=1 opens the create form,
+  // ?problem=<id> (or ?test=<id>) opens that item's results. Read once, after the list loads.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (!data || deepLinked.current) return;
+    deepLinked.current = true;
+    const q = new URLSearchParams(window.location.search);
+    const wantTab = q.get("tab");
+    if (wantTab === "problems" || wantTab === "tests" || wantTab === "bank") setTab(wantTab);
+    if (q.get("new") === "1" && wantTab !== "bank") { setCreating(true); setSel(null); return; }
+    const problemId = q.get("problem"), testId = q.get("test");
+    const it = problemId ? data.problems.find((x) => x.id === problemId) : testId ? data.tests.find((x) => x.id === testId) : undefined;
+    if (it) { setTab(it.kind === "problem" ? "problems" : "tests"); pick(it); }
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { if (tab === "bank") fetchApi<{ problems: Item[]; tests: Item[] }>("/trainer/bank").then(setBank).catch(() => setError(t("assess.load_failed"))); }, [tab, t]);
 
   const pick = async (it: Item) => {
@@ -84,6 +102,16 @@ export default function AssessmentsPage() {
     await refreshSel(sel.kind, sel.id);
     setMsg(t("assess.unpublished"));
   });
+
+  // Delete: removed for good if no student used it, else hidden and its results kept (the API decides; 409 says why not)
+  const removeSel = async () => {
+    if (!sel) return;
+    const r = await fetchApi<{ mode: "removed" | "hidden" }>(`/trainer/assessments/${sel.kind}/${sel.id}`, { method: "DELETE" });
+    setSel(null);
+    setResults(null);
+    setData(await fetchApi("/trainer/assessments"));
+    setMsg(r.mode === "hidden" ? t("assess.deleted_hidden") : t("assess.deleted"));
+  };
 
   const saveNotes = () => sel && run(async () => {
     await fetchApi(`/trainer/assessments/problem/${sel.id}/notes`, { method: "PUT", body: JSON.stringify({ trainer_notes: notes }) });
@@ -127,36 +155,36 @@ export default function AssessmentsPage() {
     setMsg(t("assess.imported"));
   });
 
-  const cls = "w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs";
-  const chip = (s: string) => s === "published" ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#F1F5F9] text-[#475569]";
+  const cls = "w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-tile text-xs";
+  const chip = (s: string) => s === "published" ? "bg-success-soft text-success" : "bg-line-soft text-ink-soft";
   const list = tab === "problems" ? data?.problems : tab === "tests" ? data?.tests : null;
   const setQ = (i: number, patch: Partial<Q>) => setTf({ ...tf, questions: tf.questions.map((q, j) => (j === i ? { ...q, ...patch } : q)) });
 
   return (
     <RoleGuard allowedRoles={["trainer"]}>
       <AppShell pageTitle={t("assess.title")}>
-        <div className="p-4 md:p-6 space-y-4 max-w-6xl">
+        <div className="space-y-6 max-w-6xl">
           <div className="flex flex-wrap gap-2 items-center" role="tablist">
             {(["problems", "tests", "bank"] as const).map((k) => (
               <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setSel(null); setCreating(false); }} data-testid={`assess-tab-${k}`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold ${tab === k ? "bg-[#2B5CD0] text-white" : "border border-[#CBD5E1]"}`}>{t(`assess.tab_${k}`)}</button>
+                className={`px-3 py-1.5 rounded-tile text-xs font-semibold ${tab === k ? "bg-brand text-white" : "border border-line-strong"}`}>{t(`assess.tab_${k}`)}</button>
             ))}
             {tab !== "bank" && (
-              <button type="button" onClick={() => { setCreating(true); setSel(null); }} data-testid="assess-new" className="ml-auto px-3 py-1.5 border border-[#2B5CD0] text-[#2B5CD0] text-xs font-bold rounded-lg inline-flex items-center gap-1">
+              <button type="button" onClick={() => { setCreating(true); setSel(null); }} data-testid="assess-new" className="ml-auto px-3 py-1.5 border border-brand text-brand text-xs font-semibold rounded-tile inline-flex items-center gap-1">
                 <Plus className="w-3.5 h-3.5" />{tab === "problems" ? t("assess.new_problem") : t("assess.new_test")}
               </button>
             )}
           </div>
-          {msg && <p className="text-xs text-[#166534] font-bold" role="status" data-testid="assess-msg">{msg}</p>}
+          {msg && <p className="text-xs text-success font-semibold" role="status" data-testid="assess-msg">{msg}</p>}
           {error && <p className="text-xs text-red-600" role="alert" data-testid="assess-error">{error}</p>}
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <ul className="lg:col-span-2 bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] max-h-[70vh] overflow-y-auto" data-testid="assess-list">
+            <ul className="lg:col-span-2 bg-white rounded-card border border-line divide-y divide-line-soft max-h-[70vh] overflow-y-auto" data-testid="assess-list">
               {tab === "bank" && bank && [...bank.problems, ...bank.tests].map((it) => (
                 <li key={it.id} className="px-3 py-2 flex items-center justify-between gap-2" data-testid="bank-row">
-                  <div className="min-w-0"><div className="text-xs font-bold truncate">{it.title}</div><div className="text-[11px] text-[#64748B]">{t(`assess.kind_${it.kind}`)}{it.difficulty ? ` · ${it.difficulty}` : ""}{it.questions ? ` · ${it.questions} ${t("assess.questions")}` : ""}</div></div>
-                  {it.imported ? <span className="text-[11px] text-[#64748B]">{t("assess.already")}</span> : (
-                    <button type="button" disabled={busy} onClick={() => importItem(it)} data-testid="bank-import" className="px-2.5 py-1 border border-[#CBD5E1] text-[11px] font-bold rounded-lg inline-flex items-center gap-1 shrink-0">
+                  <div className="min-w-0"><div className="text-xs font-semibold truncate">{it.title}</div><div className="text-caption text-muted">{t(`assess.kind_${it.kind}`)}{it.difficulty ? ` · ${it.difficulty}` : ""}{it.questions ? ` · ${it.questions} ${t("assess.questions")}` : ""}</div></div>
+                  {it.imported ? <span className="text-caption text-muted">{t("assess.already")}</span> : (
+                    <button type="button" disabled={busy} onClick={() => importItem(it)} data-testid="bank-import" className="px-2.5 py-1 border border-line-strong text-caption font-semibold rounded-tile inline-flex items-center gap-1 shrink-0">
                       <Download className="w-3.5 h-3.5" />{t("assess.import")}
                     </button>
                   )}
@@ -165,12 +193,12 @@ export default function AssessmentsPage() {
               {list?.map((it) => (
                 <li key={it.id}>
                   <button type="button" onClick={() => pick(it)} aria-pressed={sel?.id === it.id} data-testid="assess-row"
-                    className={`w-full text-left px-3 py-2 ${sel?.id === it.id ? "bg-[#EFF6FF]" : "hover:bg-[#F8FAFC]"}`}>
+                    className={`w-full text-left px-3 py-2 ${sel?.id === it.id ? "bg-brand-soft" : "hover:bg-surface-2"}`}>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold truncate">{it.title}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chip(it.status)}`}>{t(`assess.status_${it.status}`)}</span>
+                      <span className="text-xs font-semibold truncate">{it.title}</span>
+                      <span className={`text-caption font-semibold px-2 py-0.5 rounded-full ${chip(it.status)}`}>{t(`assess.status_${it.status}`)}</span>
                     </div>
-                    <div className="text-[11px] text-[#64748B] truncate">{it.batches === "all" ? t("assess.all_batches") : it.batches.join(", ") || "—"}</div>
+                    <div className="text-caption text-muted truncate">{it.batches === "all" ? t("assess.all_batches") : it.batches.join(", ") || "—"}</div>
                   </button>
                 </li>
               ))}
@@ -178,7 +206,7 @@ export default function AssessmentsPage() {
 
             <section className="lg:col-span-3 space-y-3">
               {creating && tab === "problems" && (
-                <form onSubmit={createProblem} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-4 grid grid-cols-1 md:grid-cols-2 gap-2" data-testid="problem-form">
+                <form onSubmit={createProblem} noValidate className="bg-white rounded-card border border-line p-4 grid grid-cols-1 md:grid-cols-2 gap-2" data-testid="problem-form">
                   <input className={`${cls} md:col-span-2`} placeholder={t("assess.p_title")} value={pf.title} onChange={(e) => setPf({ ...pf, title: e.target.value })} data-testid="p-title" />
                   <textarea className={`${cls} md:col-span-2`} rows={4} placeholder={t("assess.p_statement")} value={pf.statement} onChange={(e) => setPf({ ...pf, statement: e.target.value })} data-testid="p-statement" />
                   <select className={cls} value={pf.difficulty} onChange={(e) => setPf({ ...pf, difficulty: e.target.value })} aria-label={t("assess.difficulty")}>
@@ -190,82 +218,85 @@ export default function AssessmentsPage() {
                   <textarea className={cls} rows={2} placeholder={t("assess.hidden_in")} value={pf.hidden_in} onChange={(e) => setPf({ ...pf, hidden_in: e.target.value })} />
                   <textarea className={cls} rows={2} placeholder={t("assess.hidden_out")} value={pf.hidden_out} onChange={(e) => setPf({ ...pf, hidden_out: e.target.value })} />
                   <textarea className={`${cls} md:col-span-2`} rows={2} placeholder={t("assess.notes_ph")} value={pf.trainer_notes} onChange={(e) => setPf({ ...pf, trainer_notes: e.target.value })} />
-                  <button type="submit" disabled={busy} className="md:col-span-2 px-3 py-2 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50" data-testid="p-save">{t("assess.save_draft")}</button>
+                  <button type="submit" disabled={busy} className="md:col-span-2 px-3 py-2 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="p-save">{t("assess.save_draft")}</button>
                 </form>
               )}
               {creating && tab === "tests" && (
-                <form onSubmit={createTest} noValidate className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-2" data-testid="test-form">
+                <form onSubmit={createTest} noValidate className="bg-white rounded-card border border-line p-4 space-y-2" data-testid="test-form">
                   <div className="grid grid-cols-3 gap-2">
                     <input className={`${cls} col-span-2`} placeholder={t("assess.t_title")} value={tf.title} onChange={(e) => setTf({ ...tf, title: e.target.value })} data-testid="t-title" />
                     <input className={cls} type="number" min={5} max={180} value={tf.duration_min} onChange={(e) => setTf({ ...tf, duration_min: e.target.value })} aria-label={t("assess.minutes")} />
                   </div>
                   {tf.questions.map((q, i) => (
-                    <fieldset key={i} className="border border-[#E2E8F0] rounded-lg p-2 space-y-1.5" data-testid="t-question">
-                      <legend className="text-[11px] font-bold px-1">{t("assess.question")} {i + 1}</legend>
+                    <fieldset key={i} className="border border-line rounded-tile p-2 space-y-1.5" data-testid="t-question">
+                      <legend className="text-caption font-semibold px-1">{t("assess.question")} {i + 1}</legend>
                       <input className={cls} placeholder={t("assess.q_text")} value={q.question_text} onChange={(e) => setQ(i, { question_text: e.target.value })} data-testid="q-text" />
                       <div className="grid grid-cols-2 gap-1.5">
                         {(["a", "b", "c", "d"] as const).map((o) => (
                           <input key={o} className={cls} placeholder={`${t("assess.option")} ${o.toUpperCase()}`} value={q[`option_${o}`]} onChange={(e) => setQ(i, { [`option_${o}`]: e.target.value } as Partial<Q>)} data-testid={`q-opt-${o}`} />
                         ))}
                       </div>
-                      <label className="text-[11px] text-[#475569] flex items-center gap-2">{t("assess.correct")}
-                        <select value={q.correct_option} onChange={(e) => setQ(i, { correct_option: e.target.value })} className="px-2 py-1 border border-[#CBD5E1] rounded text-xs" data-testid="q-correct">
+                      <label className="text-caption text-ink-soft flex items-center gap-2">{t("assess.correct")}
+                        <select value={q.correct_option} onChange={(e) => setQ(i, { correct_option: e.target.value })} className="px-2 py-1 border border-line-strong rounded text-xs" data-testid="q-correct">
                           {["A", "B", "C", "D"].map((o) => <option key={o}>{o}</option>)}
                         </select>
                       </label>
                     </fieldset>
                   ))}
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setTf({ ...tf, questions: [...tf.questions, { ...EMPTY_Q }] })} className="px-3 py-1.5 border border-[#CBD5E1] text-xs font-bold rounded-lg">{t("assess.add_question")}</button>
-                    <button type="submit" disabled={busy} className="px-3 py-1.5 bg-[#2B5CD0] text-white text-xs font-bold rounded-lg disabled:opacity-50" data-testid="t-save">{t("assess.save_draft")}</button>
+                    <button type="button" onClick={() => setTf({ ...tf, questions: [...tf.questions, { ...EMPTY_Q }] })} className="px-3 py-1.5 border border-line-strong text-xs font-semibold rounded-tile">{t("assess.add_question")}</button>
+                    <button type="submit" disabled={busy} className="px-3 py-1.5 bg-brand text-white text-xs font-semibold rounded-tile disabled:opacity-50" data-testid="t-save">{t("assess.save_draft")}</button>
                   </div>
                 </form>
               )}
 
               {sel && !creating && (
-                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3" data-testid="assess-detail">
+                <div className="bg-white rounded-card border border-line p-4 space-y-3" data-testid="assess-detail">
                   <div className="flex items-start justify-between gap-2">
-                    <h2 className="text-sm font-black text-[#0F1F3A]" data-testid="assess-heading">{sel.title}</h2>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chip(sel.status)}`} data-testid="assess-status">{t(`assess.status_${sel.status}`)}</span>
+                    <h2 className="text-sm font-semibold text-ink" data-testid="assess-heading">{sel.title}</h2>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-caption font-semibold px-2 py-0.5 rounded-full ${chip(sel.status)}`} data-testid="assess-status">{t(`assess.status_${sel.status}`)}</span>
+                      <DeleteButton onClick={() => setConfirmDel(true)} testId="assess-delete" />
+                    </div>
                   </div>
                   <div>
-                    <div className="text-[11px] font-bold text-[#64748B] mb-1">{t("assess.publish_to")}</div>
+                    <div className="text-caption font-semibold text-muted mb-1">{t("assess.publish_to")}</div>
                     <div className="flex flex-wrap gap-2">
                       {data?.batches.map((b) => (
-                        <label key={b.id} className="text-xs inline-flex items-center gap-1 border border-[#E2E8F0] rounded-lg px-2 py-1">
+                        <label key={b.id} className="text-xs inline-flex items-center gap-1 border border-line rounded-tile px-2 py-1">
                           <input type="checkbox" checked={sel.batch_ids === null || chosen.includes(b.id)} disabled={sel.batch_ids === null}
                             onChange={(e) => setChosen(e.target.checked ? [...chosen, b.id] : chosen.filter((x) => x !== b.id))} data-testid={`batch-${b.id}`} />{b.name}
                         </label>
                       ))}
                     </div>
-                    {sel.batch_ids === null && <p className="text-[11px] text-[#64748B] mt-1">{t("assess.college_wide")}</p>}
+                    {sel.batch_ids === null && <p className="text-caption text-muted mt-1">{t("assess.college_wide")}</p>}
                   </div>
-                  <label className="text-[11px] text-[#475569] block">{t("assess.due")}
+                  <label className="text-caption text-ink-soft block">{t("assess.due")}
                     <input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className={cls} data-testid="assess-due" />
                   </label>
                   <div className="flex gap-2">
-                    <button type="button" disabled={busy} onClick={publish} data-testid="assess-publish" className="px-3 py-1.5 bg-[#166534] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1 disabled:opacity-50"><Send className="w-3.5 h-3.5" />{t("assess.publish")}</button>
-                    {sel.status === "published" && <button type="button" disabled={busy} onClick={unpublish} data-testid="assess-unpublish" className="px-3 py-1.5 border border-[#CBD5E1] text-xs font-bold rounded-lg inline-flex items-center gap-1 disabled:opacity-50"><Undo2 className="w-3.5 h-3.5" />{t("assess.unpublish")}</button>}
+                    <button type="button" disabled={busy} onClick={publish} data-testid="assess-publish" className="px-3 py-1.5 bg-success text-white text-xs font-semibold rounded-tile inline-flex items-center gap-1 disabled:opacity-50"><Send className="w-3.5 h-3.5" />{t("assess.publish")}</button>
+                    {sel.status === "published" && <button type="button" disabled={busy} onClick={unpublish} data-testid="assess-unpublish" className="px-3 py-1.5 border border-line-strong text-xs font-semibold rounded-tile inline-flex items-center gap-1 disabled:opacity-50"><Undo2 className="w-3.5 h-3.5" />{t("assess.unpublish")}</button>}
                   </div>
                   {sel.kind === "problem" && (
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#64748B]">{t("assess.notes")}</label>
+                      <label className="text-caption font-semibold text-muted">{t("assess.notes")}</label>
                       <textarea rows={2} className={cls} value={notes} onChange={(e) => setNotes(e.target.value)} data-testid="assess-notes" />
-                      <button type="button" disabled={busy} onClick={saveNotes} data-testid="assess-notes-save" className="px-3 py-1 border border-[#CBD5E1] text-[11px] font-bold rounded-lg">{t("assess.save_notes")}</button>
+                      <button type="button" disabled={busy} onClick={saveNotes} data-testid="assess-notes-save" className="px-3 py-1 border border-line-strong text-caption font-semibold rounded-tile">{t("assess.save_notes")}</button>
                     </div>
                   )}
                   {results && (
                     <div>
-                      <div className="text-[11px] font-bold text-[#64748B]">{t("assess.results")}: {results.summary.attempted}/{results.summary.students} {t("assess.attempted")} · {results.summary.done} {t("assess.done")}</div>
+                      <div className="text-caption font-semibold text-muted">{t("assess.results")}: {results.summary.attempted}/{results.summary.students} {t("assess.attempted")} · {results.summary.done} {t("assess.done")}</div>
                       <table className="w-full text-xs mt-1" data-testid="assess-results">
-                        <thead><tr className="text-left text-[#64748B]"><th className="py-1">{t("assess.student")}</th><th>{t("assess.attempts")}</th><th>{t("assess.result")}</th><th>{t("assess.score")}</th></tr></thead>
+                        <thead><tr className="text-left text-muted"><th className="py-1">{t("assess.student")}</th><th>{t("assess.attempts")}</th><th>{t("assess.result")}</th><th>{t("assess.score")}</th>{sel?.kind === "test" && <><th>{t("assess.tab_switches")}</th><th>{t("assess.paused_min")}</th></>}</tr></thead>
                         <tbody>
                           {results.students.filter((r) => r.attempts > 0).slice(0, 50).map((r) => (
-                            <tr key={r.student_id} className="border-t border-[#F1F5F9]" data-testid="result-row"><td className="py-1">{r.name}</td><td>{r.attempts}</td><td>{r.result}</td><td>{r.score}</td></tr>
+                            <tr key={r.student_id} className="border-t border-line-soft" data-testid="result-row"><td className="py-1">{r.name}</td><td>{r.attempts}</td><td>{r.result}</td><td>{r.score}</td>{sel?.kind === "test" && <><td className={r.tab_switches ? "text-danger font-semibold" : ""} data-testid="result-tab-switches">{r.tab_switches ?? "—"}</td><td>{r.paused_min ? r.paused_min : "—"}</td></>}</tr>
                           ))}
                         </tbody>
                       </table>
-                      {results.summary.attempted === 0 && <p className="text-[11px] text-[#94A3B8] mt-1">{t("assess.no_attempts")}</p>}
+                      {results.summary.attempted === 0 && <p className="text-caption text-subtle mt-1">{t("assess.no_attempts")}</p>}
                     </div>
                   )}
                 </div>
@@ -273,6 +304,9 @@ export default function AssessmentsPage() {
             </section>
           </div>
         </div>
+        {confirmDel && sel && (
+          <ConfirmDelete itemName={sel.title} note={t("assess.delete_note")} onConfirm={removeSel} onClose={() => setConfirmDel(false)} />
+        )}
       </AppShell>
     </RoleGuard>
   );

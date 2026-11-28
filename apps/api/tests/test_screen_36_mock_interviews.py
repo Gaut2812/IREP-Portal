@@ -70,7 +70,9 @@ def test_payload_matches_pdf7():
         ("Core CS knowledge", 4), ("Project explanation", 4), ("Communication & confidence", 3)]
     assert li["feedback"].startswith("Strong on DSA")
     assert [t["label"] for t in d["trend"]] == ["#1 · 3.0", "#2 · 3.8"] and d["target"] == 4.2
-    assert [s["type_label"] for s in d["available_slots"]] == ["Technical", "HR round", "AI-allowed coding"]
+    # the PDF's three demo slots, in order (the booking calendar adds more open slots around them)
+    demo = {"slot_demo_tech": "Technical", "slot_demo_hr": "HR round", "slot_demo_ai": "AI-allowed coding"}
+    assert [s["type_label"] for s in d["available_slots"] if s["id"] in demo] == ["Technical", "HR round", "AI-allowed coding"]
     assert len(li["comments"]) == 5 and li["comments"][1]["label"] == "9:00"
 
 
@@ -150,3 +152,16 @@ def test_guards():
     finally:
         db.close()
     assert client.post("/api/v1/student/interview-slots/slot_does_not_exist/book", headers=PRIYA).status_code == 404
+
+
+def test_booking_notification_reads_well_in_english_and_tamil():
+    bid = client.post("/api/v1/student/interview-slots/slot_demo_hr/book", headers=PRIYA).json()["booking_id"]
+    try:
+        en = client.get("/api/v1/notifications?lang=en", headers=PRIYA).json()["items"]
+        ta = client.get("/api/v1/notifications?lang=ta", headers=PRIYA).json()["items"]
+        booked_en = next(n for n in en if n["title"] == "Mock interview booked")
+        booked_ta = next(n for n in ta if n["title"] == "மாதிரி நேர்காணல் பதிவு செய்யப்பட்டது")
+        assert booked_en["body"].startswith("Your mock interview (HR round) is on ")
+        assert booked_ta["body"].startswith("உங்கள் மாதிரி நேர்காணல் (HR சுற்று)")
+    finally:
+        client.delete(f"/api/v1/student/bookings/{bid}", headers=PRIYA)

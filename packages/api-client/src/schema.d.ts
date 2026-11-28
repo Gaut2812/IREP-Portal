@@ -25,6 +25,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Token For Api Docs
+         * @description OAuth2 password form for the API docs' "Authorize" button (the scheme's tokenUrl), local sign-in only.
+         *     Same checks as /auth/login (lockout, IP limit, audit, 410 in Keycloak mode); the role comes from the account.
+         */
+        post: operations["token_for_api_docs_api_v1_auth_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/parent/otp/request": {
         parameters: {
             query?: never;
@@ -58,6 +79,46 @@ export interface paths {
         put?: never;
         /** Verify Parent Otp */
         post: operations["verify_parent_otp_api_v1_auth_parent_otp_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/invitations/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invitation Lookup
+         * @description Phase 5 (local mode): who the link is for, so /auth/set-password can greet them.
+         */
+        post: operations["invitation_lookup_api_v1_auth_invitations_lookup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invitation Accept
+         * @description Set the password from the one-time link and sign in.
+         */
+        post: operations["invitation_accept_api_v1_auth_invitations_accept_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -143,6 +204,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/student/dashboard/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard Details
+         * @description What is behind each dashboard tile: problems by topic, the practice heat map and streaks, all badges, skill tips.
+         */
+        get: operations["get_dashboard_details_api_v1_student_dashboard_details_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/student/dashboard/why-score": {
         parameters: {
             query?: never;
@@ -177,6 +258,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/student/coding/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resume Coding Problem
+         * @description Where "Resume practice" goes: the last problem the student worked on if it is not solved yet,
+         *     else the first unsolved problem in curriculum order, else the first problem. None if nothing is published.
+         */
+        get: operations["resume_coding_problem_api_v1_student_coding_resume_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/student/coding/{problem_id}": {
         parameters: {
             query?: never;
@@ -188,6 +290,27 @@ export interface paths {
         get: operations["get_coding_problem_api_v1_student_coding__problem_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/student/coding/{problem_id}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Execute Program
+         * @description The terminal: run the code as a program on the student's own input (any of the four languages) and show
+         *     stdout, stderr and compiler output, like VS Code's Run. Nothing is graded or saved.
+         */
+        post: operations["execute_program_api_v1_student_coding__problem_id__execute_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -290,6 +413,27 @@ export interface paths {
         put?: never;
         /** Start Or Resume Attempt */
         post: operations["start_or_resume_attempt_api_v1_student_tests__test_id__attempts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/student/tests/attempts/{attempt_id}/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attempt Heartbeat
+         * @description The test page checks in every HEARTBEAT_SEC while online, and at once when the connection comes back.
+         *     A check-in after a gap is the resume: the lost time is added back (capped) and the new clock returned.
+         */
+        post: operations["attempt_heartbeat_api_v1_student_tests_attempts__attempt_id__heartbeat_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -643,6 +787,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/trainer/mentors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mentor Choices
+         * @description Trainers of my college who can mentor a student (me first).
+         */
+        get: operations["mentor_choices_api_v1_trainer_mentors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trainer/flags/{flag_id}/mentor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign Mentor
+         * @description Assign (or remove) the student's mentor: the mentor and the student are told; the mentor sees the student
+         *     under My mentees. Recorded in the flag's history and the audit log.
+         */
+        post: operations["assign_mentor_api_v1_trainer_flags__flag_id__mentor_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trainer/mentees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Mentees
+         * @description Students I mentor (open flags where I am the mentor), any batch of my college.
+         */
+        get: operations["my_mentees_api_v1_trainer_mentees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/trainer/flags/{flag_id}/resolve": {
         parameters: {
             query?: never;
@@ -830,6 +1035,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/college/reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Report
+         * @description Remove a generated report and its PDF (the audit log keeps that it existed and who made it).
+         */
+        delete: operations["delete_report_api_v1_college_reports__report_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/college/reports/{report_id}/download": {
         parameters: {
             query?: never;
@@ -929,6 +1154,158 @@ export interface paths {
         put?: never;
         /** Submit Portfolio Rsvp */
         post: operations["submit_portfolio_rsvp_api_v1_parent_portfolio_rsvp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Live Chat
+         * @description In-class chat. The college's moderation words apply, as in discussion groups.
+         */
+        post: operations["live_chat_api_v1_live__session_id__chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/chat/{message_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pin Chat */
+        post: operations["pin_chat_api_v1_live__session_id__chat__message_id__pin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/hand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Raise Hand
+         * @description Raise or lower my hand; the trainer sees the queue in the order hands went up.
+         */
+        post: operations["raise_hand_api_v1_live__session_id__hand_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/hands/{user_id}/lower": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lower Hand */
+        post: operations["lower_hand_api_v1_live__session_id__hands__user_id__lower_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/react": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live React */
+        post: operations["live_react_api_v1_live__session_id__react_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/spotlight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spotlight
+         * @description Put one participant on the main stage for everyone (or clear it with user_id null).
+         */
+        post: operations["spotlight_api_v1_live__session_id__spotlight_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/mute-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mute All
+         * @description Mute every student in the room (LiveKit is told through the outbox after commit).
+         */
+        post: operations["mute_all_api_v1_live__session_id__mute_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trainer/live/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trainer Live Sessions
+         * @description The trainer's live classroom hub: classes of my batches from two weeks back to two weeks ahead, each with its
+         *     meeting state, so a class can be started, rejoined or reviewed (the sidebar used to open one fixed class).
+         */
+        get: operations["trainer_live_sessions_api_v1_trainer_live_sessions_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1116,6 +1493,47 @@ export interface paths {
         put?: never;
         /** Mark Answered */
         post: operations["mark_answered_api_v1_live__session_id__qa__question_id__answered_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/live/{session_id}/participants/{user_id}/moderate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Moderate Participant
+         * @description Trainer controls on a LiveKit class: mute, remove, allow or revoke screen share.
+         *     Recorded and audited here; LiveKit is told by the outbox after commit.
+         */
+        post: operations["moderate_participant_api_v1_live__session_id__participants__user_id__moderate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/livekit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Livekit Webhook
+         * @description LiveKit server callbacks, signed with LIVEKIT_API_SECRET (JWT with the body's sha256).
+         */
+        post: operations["livekit_webhook_api_v1_webhooks_livekit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1356,6 +1774,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{team_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Task
+         * @description Any team member (or the team's trainer) adds a card to To do of the active sprint.
+         */
+        post: operations["add_task_api_v1_teams__team_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Task
+         * @description A student deletes a card they created or own while it is open; the trainer any card. A card with a pull request
+         *     stays (the review history points at it).
+         */
+        delete: operations["delete_task_api_v1_tasks__task_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit Task
+         * @description Team members edit any card of their team (title, tag, points, assignee): it is a shared board.
+         */
+        patch: operations["edit_task_api_v1_tasks__task_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/trainer/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trainer Projects
+         * @description Project teams that include a student from my batches, and the students I can put in a team.
+         */
+        get: operations["trainer_projects_api_v1_trainer_projects_get"];
+        put?: never;
+        /** Create Project */
+        post: operations["create_project_api_v1_trainer_projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trainer/projects/{team_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit Project */
+        put: operations["edit_project_api_v1_trainer_projects__team_id__put"];
+        post?: never;
+        /**
+         * Delete Project
+         * @description Delete a project with no work on record yet (no pull requests, no stand-ups). Otherwise it is kept.
+         */
+        delete: operations["delete_project_api_v1_trainer_projects__team_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trainer/projects/{team_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Project Members */
+        put: operations["set_project_members_api_v1_trainer_projects__team_id__members_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trainer/projects/{team_id}/next-sprint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Next Sprint
+         * @description Close the active sprint (its velocity = points done) and start the next; unfinished cards move along.
+         */
+        post: operations["next_sprint_api_v1_trainer_projects__team_id__next_sprint_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/move": {
         parameters: {
             query?: never;
@@ -1589,7 +2131,11 @@ export interface paths {
          * @description Store the interview recording (storage interface) for the student's signed link on 36 (L16).
          */
         post: operations["add_recording_api_v1_trainer_interviews__interview_id__recording_post"];
-        delete?: never;
+        /**
+         * Delete Recording
+         * @description Remove an interview's recording: the student's link stops working and the file is deleted after commit.
+         */
+        delete: operations["delete_recording_api_v1_trainer_interviews__interview_id__recording_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1656,12 +2202,40 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** React */
+        /**
+         * React
+         * @description React with one of REACTIONS (default 👍). The same emoji again takes the reaction back; another one replaces it.
+         */
         post: operations["react_api_v1_messages__message_id__react_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Message
+         * @description The sender deletes their own message: everyone sees "This message was deleted"; moderators keep the text
+         *     (a report or a moderation review can still read it).
+         */
+        delete: operations["delete_message_api_v1_messages__message_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit Message
+         * @description The sender fixes a message within EDIT_WINDOW_MIN. Moderation checks the new text; the first version is kept.
+         */
+        patch: operations["edit_message_api_v1_messages__message_id__patch"];
         trace?: never;
     };
     "/api/v1/messages/{message_id}/mark-answer": {
@@ -1826,6 +2400,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/direct-messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Thread Message
+         * @description Delete for everyone: both sides see "This message was deleted". The text is kept for audit, not shown.
+         */
+        delete: operations["delete_thread_message_api_v1_direct_messages__message_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit Thread Message
+         * @description The sender edits their message within DM_EDIT_WINDOW_MIN; the other side sees "edited". First text kept (audit).
+         */
+        patch: operations["edit_thread_message_api_v1_direct_messages__message_id__patch"];
+        trace?: never;
+    };
     "/api/v1/direct-messages/{message_id}/translate": {
         parameters: {
             query?: never;
@@ -1940,7 +2538,12 @@ export interface paths {
         get: operations["college_detail_api_v1_admin_colleges__college_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete College
+         * @description Delete a college that holds no people or records yet (for example, one created by mistake). A college
+         *     with users, students, structure or invoices is refused: personal data leaves only through a deletion request.
+         */
+        delete: operations["delete_college_api_v1_admin_colleges__college_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1997,6 +2600,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/colleges/{college_id}/mou/{mou_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Mou
+         * @description Delete a draft or superseded MoU. The active one sets quotas and billing: activate another one first.
+         *     An MoU an invoice was billed against stays (the invoice must keep its terms).
+         */
+        delete: operations["delete_mou_api_v1_admin_colleges__college_id__mou__mou_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/colleges/{college_id}/admins": {
         parameters: {
             query?: never;
@@ -2008,6 +2632,57 @@ export interface paths {
         put?: never;
         /** Create College Admin */
         post: operations["create_college_admin_api_v1_admin_colleges__college_id__admins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/colleges/{college_id}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** College Invitations For Staff */
+        get: operations["college_invitations_for_staff_api_v1_admin_colleges__college_id__invitations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/colleges/{college_id}/invitations/{invitation_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Staff Resend Invitation */
+        post: operations["staff_resend_invitation_api_v1_admin_colleges__college_id__invitations__invitation_id__resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/colleges/{college_id}/invitations/{invitation_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Staff Revoke Invitation */
+        post: operations["staff_revoke_invitation_api_v1_admin_colleges__college_id__invitations__invitation_id__revoke_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2466,6 +3141,60 @@ export interface paths {
         put?: never;
         /** Add User */
         post: operations["add_user_api_v1_college_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * College Invitations
+         * @description Who was invited to this college, by whom, and whether they accepted.
+         */
+        get: operations["college_invitations_api_v1_college_invitations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/invitations/{invitation_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** College Resend Invitation */
+        post: operations["college_resend_invitation_api_v1_college_invitations__invitation_id__resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/college/invitations/{invitation_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** College Revoke Invitation */
+        post: operations["college_revoke_invitation_api_v1_college_invitations__invitation_id__revoke_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2944,7 +3673,12 @@ export interface paths {
         /** Update Course */
         put: operations["update_course_api_v1_admin_content_courses__course_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Course
+         * @description Unpublish first (students would lose it mid-course). No student progress: removed with its lessons.
+         *     With progress: hidden (status "deleted") so skill bars and reports keep their history.
+         */
+        delete: operations["delete_course_api_v1_admin_content_courses__course_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2980,6 +3714,45 @@ export interface paths {
         post?: never;
         /** Delete Lesson */
         delete: operations["delete_lesson_api_v1_admin_content_lessons__lesson_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/content/courses/{course_id}/media/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Course Media
+         * @description A course thumbnail (PNG, JPG or WebP, up to 2 MB) or intro video (MP4 or WebM, up to 200 MB). Scanned first.
+         */
+        post: operations["upload_course_media_api_v1_admin_content_courses__course_id__media__kind__post"];
+        /** Delete Course Media */
+        delete: operations["delete_course_media_api_v1_admin_content_courses__course_id__media__kind__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/content/lessons/{lesson_id}/video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Lesson Video */
+        post: operations["upload_lesson_video_api_v1_admin_content_lessons__lesson_id__video_post"];
+        /** Delete Lesson Video */
+        delete: operations["delete_lesson_video_api_v1_admin_content_lessons__lesson_id__video_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3134,7 +3907,12 @@ export interface paths {
         /** Update Event */
         put: operations["update_event_api_v1_college_events__event_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Event
+         * @description Delete a draft for good (nobody was told about it). A published event is cancelled instead, so the
+         *     people who replied are told and the RSVPs stay on record.
+         */
+        delete: operations["delete_event_api_v1_college_events__event_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3528,6 +4306,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/trainer/assessments/{kind}/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Item
+         * @description Delete a coding problem or practice test of my college.
+         *
+         *     409 while it is published to batches that are not mine, used by a mock drive, or a student is mid-attempt.
+         *     Never used by a student: removed for good. Used: hidden from every list, kept for results and reports.
+         */
+        delete: operations["delete_item_api_v1_trainer_assessments__kind___item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/trainer/assessments/{kind}/{item_id}/results": {
         parameters: {
             query?: never;
@@ -3833,15 +4634,74 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** History */
+        /**
+         * History
+         * @description Messages of one conversation (or, without an id, the older chat from before conversations), the list of
+         *     conversations and the courses a conversation can be about.
+         */
         get: operations["history_api_v1_student_buddy_get"];
         put?: never;
         post?: never;
         /**
          * Clear
-         * @description The student can delete their own chat (usage counts stay: they are metering, not content).
+         * @description The student can delete all their chats (usage counts stay: they are metering, not content).
          */
         delete: operations["clear_api_v1_student_buddy_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/student/buddy/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New Conversation */
+        post: operations["new_conversation_api_v1_student_buddy_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/student/buddy/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Conversation
+         * @description The student's own chat: removed for good (usage counts stay; they are metering, not content).
+         */
+        delete: operations["delete_conversation_api_v1_student_buddy_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Conversation */
+        patch: operations["rename_conversation_api_v1_student_buddy_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/student/buddy/messages/{message_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer Feedback */
+        post: operations["answer_feedback_api_v1_student_buddy_messages__message_id__feedback_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3858,6 +4718,27 @@ export interface paths {
         put?: never;
         /** Ask */
         post: operations["ask_api_v1_student_buddy_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/student/buddy/explain-submission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain Submission
+         * @description From the coding lab: a new conversation that asks why my last failed submission failed. The question is built
+         *     here from the submission (status, error, code) so the student does not have to paste anything.
+         */
+        post: operations["explain_submission_api_v1_student_buddy_explain_submission_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3901,6 +4782,64 @@ export interface paths {
          */
         post: operations["add_proof_api_v1_student_certificates__cert_id__proof_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/student/certificates/{cert_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download My Certificate
+         * @description Download an earned certificate as a PDF (pending, scheduled and rejected ones have nothing to download yet).
+         */
+        get: operations["download_my_certificate_api_v1_student_certificates__cert_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parent/certificates/{cert_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Child Certificate */
+        get: operations["download_child_certificate_api_v1_parent_certificates__cert_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/student/certificates/{cert_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete External
+         * @description A student removes an external certificate they added, while it waits for the trainer or after a rejection.
+         *     Earned, scheduled and IREP-issued certificates stay (they are records, not the student's own upload).
+         */
+        delete: operations["delete_external_api_v1_student_certificates__cert_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3957,6 +4896,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/college/certifications/holders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * College Certificate Holders
+         * @description D1 (27 Nov 2026): who holds which earned certificate, for placement. Names, register numbers, title, issuer and
+         *     date only: never proof files, decision notes or anything a trainer wrote (rule 8). Each read is audited.
+         */
+        get: operations["college_certificate_holders_api_v1_college_certifications_holders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/college/certifications": {
         parameters: {
             query?: never;
@@ -3966,7 +4926,7 @@ export interface paths {
         };
         /**
          * College Certifications
-         * @description Counts only: no names, files or notes.
+         * @description Aggregates (names are in /college/certifications/holders): no files or notes.
          */
         get: operations["college_certifications_api_v1_college_certifications_get"];
         put?: never;
@@ -4741,6 +5701,8 @@ export interface components {
             question: string;
             /** Topic */
             topic?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
         };
         /** AuthResponse */
         AuthResponse: {
@@ -4811,6 +5773,40 @@ export interface components {
         };
         /** Body_import_students_api_v1_college_students_import_post */
         Body_import_students_api_v1_college_students_import_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_token_for_api_docs_api_v1_auth_token_post */
+        Body_token_for_api_docs_api_v1_auth_token_post: {
+            /** Grant Type */
+            grant_type?: string | null;
+            /** Username */
+            username: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
+            /**
+             * Scope
+             * @default
+             */
+            scope: string;
+            /** Client Id */
+            client_id?: string | null;
+            /**
+             * Client Secret
+             * Format: password
+             */
+            client_secret?: string | null;
+        };
+        /** Body_upload_course_media_api_v1_admin_content_courses__course_id__media__kind__post */
+        Body_upload_course_media_api_v1_admin_content_courses__course_id__media__kind__post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_lesson_video_api_v1_admin_content_lessons__lesson_id__video_post */
+        Body_upload_lesson_video_api_v1_admin_content_lessons__lesson_id__video_post: {
             /** File */
             file: string;
         };
@@ -4895,6 +5891,11 @@ export interface components {
              * @default 3
              */
             story_points: number;
+        };
+        /** ChatIn */
+        ChatIn: {
+            /** Text */
+            text: string;
         };
         /** CheckIn */
         CheckIn: {
@@ -4989,10 +5990,26 @@ export interface components {
             /** Student Id */
             student_id?: string | null;
         };
+        /** ConversationIn */
+        ConversationIn: {
+            /** Title */
+            title?: string | null;
+            /** Course Id */
+            course_id?: string | null;
+            /**
+             * Mode
+             * @default tutor
+             */
+            mode: string;
+        };
         /** CourseIn */
         CourseIn: {
             /** Title En */
             title_en: string;
+            /** Description En */
+            description_en?: string | null;
+            /** Description Ta */
+            description_ta?: string | null;
             /** Title Ta */
             title_ta?: string | null;
             /**
@@ -5075,6 +6092,13 @@ export interface components {
              * @default true
              */
             rsvp_enabled: boolean;
+            /** Rsvp Deadline */
+            rsvp_deadline?: string | null;
+        };
+        /** ExplainIn */
+        ExplainIn: {
+            /** Problem Id */
+            problem_id: string;
         };
         /** FeaturesIn */
         FeaturesIn: {
@@ -5083,12 +6107,19 @@ export interface components {
                 [key: string]: boolean;
             };
         };
+        /** FeedbackIn */
+        FeedbackIn: {
+            /** Value */
+            value?: string | null;
+        };
         /** FlagActionRequest */
         FlagActionRequest: {
             /** Action Type */
             action_type: string;
             /** Note */
             note?: string | null;
+            /** Outcome */
+            outcome?: string | null;
         };
         /** FlagResolveRequest */
         FlagResolveRequest: {
@@ -5115,6 +6146,14 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HandIn */
+        HandIn: {
+            /**
+             * Raised
+             * @default true
+             */
+            raised: boolean;
+        };
         /** HintRequest */
         HintRequest: {
             /**
@@ -5131,6 +6170,18 @@ export interface components {
             line_number?: number | null;
             /** Comment Text */
             comment_text: string;
+        };
+        /** InviteAccept */
+        InviteAccept: {
+            /** Token */
+            token: string;
+            /** Password */
+            password: string;
+        };
+        /** InviteToken */
+        InviteToken: {
+            /** Token */
+            token: string;
         };
         /** LabAccessRequest */
         LabAccessRequest: {
@@ -5201,12 +6252,29 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MembersIn */
+        MembersIn: {
+            /** Member Ids */
+            member_ids?: unknown[];
+            /** Lead Id */
+            lead_id?: string | null;
+        };
+        /** MentorRequest */
+        MentorRequest: {
+            /** User Id */
+            user_id?: string | null;
+        };
         /** ModerateIn */
         ModerateIn: {
             /** Action */
             action: string;
             /** Reason */
             reason?: string | null;
+        };
+        /** ModerateRequest */
+        ModerateRequest: {
+            /** Action */
+            action: string;
         };
         /** MonthIn */
         MonthIn: {
@@ -5261,6 +6329,11 @@ export interface components {
             column: string;
             /** Position */
             position?: number | null;
+        };
+        /** NextSprintIn */
+        NextSprintIn: {
+            /** Goal */
+            goal?: string | null;
         };
         /** NoteIn */
         NoteIn: {
@@ -5368,6 +6441,21 @@ export interface components {
             /** Details */
             details?: string | null;
         };
+        /** ProgramRunRequest */
+        ProgramRunRequest: {
+            /**
+             * Language
+             * @default python
+             */
+            language: string;
+            /** Code */
+            code: string;
+            /**
+             * Stdin
+             * @default
+             */
+            stdin: string;
+        };
         /** ProjectCreateRequest */
         ProjectCreateRequest: {
             /** Title */
@@ -5414,6 +6502,52 @@ export interface components {
              * @default false
              */
             is_featured: boolean;
+        };
+        /** ProjectEdit */
+        ProjectEdit: {
+            /** Name */
+            name?: string | null;
+            /** Project Title */
+            project_title?: string | null;
+            /** Client Name */
+            client_name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Goals */
+            goals?: string | null;
+            /** Repo Full Name */
+            repo_full_name?: string | null;
+            /** Sprint Goal */
+            sprint_goal?: string | null;
+        };
+        /** ProjectIn */
+        ProjectIn: {
+            /** Name */
+            name: string;
+            /** Project Title */
+            project_title: string;
+            /**
+             * Client Name
+             * @default Trainer
+             */
+            client_name: string;
+            /** Description */
+            description?: string | null;
+            /** Goals */
+            goals?: string | null;
+            /** Repo Full Name */
+            repo_full_name?: string | null;
+            /**
+             * Total Sprints
+             * @default 3
+             */
+            total_sprints: number;
+            /** Sprint Goal */
+            sprint_goal?: string | null;
+            /** Member Ids */
+            member_ids?: unknown[];
+            /** Lead Id */
+            lead_id?: string | null;
         };
         /** ProjectUpdateRequest */
         ProjectUpdateRequest: {
@@ -5488,6 +6622,13 @@ export interface components {
              * @default 1
              */
             guest_count: number;
+            /** Child Id */
+            child_id?: string | null;
+        };
+        /** RenameIn */
+        RenameIn: {
+            /** Title */
+            title: string;
         };
         /** ReportIn */
         ReportIn: {
@@ -5579,6 +6720,8 @@ export interface components {
             guests: number;
             /** Child Id */
             child_id?: string | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** SandboxIn */
         SandboxIn: {
@@ -5630,6 +6773,11 @@ export interface components {
             url: string;
             /** Label */
             label?: string | null;
+        };
+        /** SpotlightIn */
+        SpotlightIn: {
+            /** User Id */
+            user_id?: string | null;
         };
         /** StaffIn */
         StaffIn: {
@@ -5710,6 +6858,39 @@ export interface components {
             closes_on?: string | null;
             /** Questions */
             questions: components["schemas"]["routers__surveys__QuestionIn"][];
+        };
+        /** TaskEdit */
+        TaskEdit: {
+            /** Title */
+            title?: string | null;
+            /** Tag Type */
+            tag_type?: string | null;
+            /** Story Points */
+            story_points?: number | null;
+            /** Assignee Student Id */
+            assignee_student_id?: string | null;
+            /**
+             * Unassign
+             * @default false
+             */
+            unassign: boolean;
+        };
+        /** TaskIn */
+        TaskIn: {
+            /** Title */
+            title: string;
+            /**
+             * Tag Type
+             * @default feature
+             */
+            tag_type: string;
+            /**
+             * Story Points
+             * @default 3
+             */
+            story_points: number;
+            /** Assignee Student Id */
+            assignee_student_id?: string | null;
         };
         /** TemplateIn */
         TemplateIn: {
@@ -5840,6 +7021,11 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** EditIn */
+        routers__discussions__EditIn: {
+            /** Message Text */
+            message_text: string;
+        };
         /** MessageIn */
         routers__discussions__MessageIn: {
             /** Message Text */
@@ -5847,12 +7033,30 @@ export interface components {
             /** Code Snippet */
             code_snippet?: string | null;
         };
+        /** ReactIn */
+        routers__discussions__ReactIn: {
+            /**
+             * Emoji
+             * @default 👍
+             */
+            emoji: string;
+        };
         /** DecisionIn */
         routers__leave_approvals__DecisionIn: {
             /** Decision */
             decision: string;
             /** Note */
             note?: string | null;
+        };
+        /** ReactIn */
+        routers__live__ReactIn: {
+            /** Emoji */
+            emoji: string;
+        };
+        /** EditIn */
+        routers__messages_hub__EditIn: {
+            /** Text */
+            text: string;
         };
         /** DecisionIn */
         routers__schedule__DecisionIn: {
@@ -5929,6 +7133,39 @@ export interface operations {
             };
         };
     };
+    token_for_api_docs_api_v1_auth_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Body_token_for_api_docs_api_v1_auth_token_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     request_parent_otp_api_v1_auth_parent_otp_request_post: {
         parameters: {
             query?: never;
@@ -5972,6 +7209,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ParentOTPVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invitation_lookup_api_v1_auth_invitations_lookup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteToken"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invitation_accept_api_v1_auth_invitations_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteAccept"];
             };
         };
         responses: {
@@ -6114,6 +7417,39 @@ export interface operations {
             };
         };
     };
+    get_dashboard_details_api_v1_student_dashboard_details_get: {
+        parameters: {
+            query?: {
+                lang?: string;
+            };
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_why_score_api_v1_student_dashboard_why_score_get: {
         parameters: {
             query?: {
@@ -6178,6 +7514,37 @@ export interface operations {
             };
         };
     };
+    resume_coding_problem_api_v1_student_coding_resume_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_coding_problem_api_v1_student_coding__problem_id__get: {
         parameters: {
             query?: never;
@@ -6190,6 +7557,43 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_program_api_v1_student_coding__problem_id__execute_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                problem_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramRunRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -6400,6 +7804,39 @@ export interface operations {
             };
             path: {
                 test_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_heartbeat_api_v1_student_tests_attempts__attempt_id__heartbeat_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                attempt_id: string;
             };
             cookie?: never;
         };
@@ -7143,6 +8580,107 @@ export interface operations {
             };
         };
     };
+    mentor_choices_api_v1_trainer_mentors_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_mentor_api_v1_trainer_flags__flag_id__mentor_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                flag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MentorRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_mentees_api_v1_trainer_mentees_get: {
+        parameters: {
+            query?: {
+                lang?: string;
+            };
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     resolve_flag_api_v1_trainer_flags__flag_id__resolve_post: {
         parameters: {
             query?: never;
@@ -7525,6 +9063,39 @@ export interface operations {
             };
         };
     };
+    delete_report_api_v1_college_reports__report_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     download_report_api_v1_college_reports__report_id__download_get: {
         parameters: {
             query?: never;
@@ -7706,6 +9277,289 @@ export interface operations {
                 "application/json": components["schemas"]["RSVPRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    live_chat_api_v1_live__session_id__chat_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pin_chat_api_v1_live__session_id__chat__message_id__pin_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    raise_hand_api_v1_live__session_id__hand_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lower_hand_api_v1_live__session_id__hands__user_id__lower_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    live_react_api_v1_live__session_id__react_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["routers__live__ReactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spotlight_api_v1_live__session_id__spotlight_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpotlightIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mute_all_api_v1_live__session_id__mute_all_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trainer_live_sessions_api_v1_trainer_live_sessions_get: {
+        parameters: {
+            query?: {
+                days_back?: number;
+                days_ahead?: number;
+            };
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -8084,6 +9938,75 @@ export interface operations {
                 session_id: string;
                 question_id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    moderate_participant_api_v1_live__session_id__participants__user_id__moderate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                session_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    livekit_webhook_api_v1_webhooks_livekit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -8539,6 +10462,323 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_task_api_v1_teams__team_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_task_api_v1_tasks__task_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_task_api_v1_tasks__task_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trainer_projects_api_v1_trainer_projects_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_project_api_v1_trainer_projects_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_project_api_v1_trainer_projects__team_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project_api_v1_trainer_projects__team_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_project_members_api_v1_trainer_projects__team_id__members_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    next_sprint_api_v1_trainer_projects__team_id__next_sprint_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NextSprintIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -9043,6 +11283,39 @@ export interface operations {
             };
         };
     };
+    delete_recording_api_v1_trainer_interviews__interview_id__recording_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                interview_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_groups_api_v1_student_discussions_groups_get: {
         parameters: {
             query?: never;
@@ -9190,7 +11463,81 @@ export interface operations {
             };
             cookie?: never;
         };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["routers__discussions__ReactIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_message_api_v1_messages__message_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_message_api_v1_messages__message_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["routers__discussions__EditIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -9583,6 +11930,76 @@ export interface operations {
             };
         };
     };
+    delete_thread_message_api_v1_direct_messages__message_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_thread_message_api_v1_direct_messages__message_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["routers__messages_hub__EditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     translate_message_api_v1_direct_messages__message_id__translate_post: {
         parameters: {
             query?: {
@@ -9851,6 +12268,39 @@ export interface operations {
             };
         };
     };
+    delete_college_api_v1_admin_colleges__college_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                college_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_features_api_v1_admin_colleges__college_id__features_put: {
         parameters: {
             query?: never;
@@ -9959,6 +12409,40 @@ export interface operations {
             };
         };
     };
+    delete_mou_api_v1_admin_colleges__college_id__mou__mou_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                college_id: string;
+                mou_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_college_admin_api_v1_admin_colleges__college_id__admins_post: {
         parameters: {
             query?: never;
@@ -9978,6 +12462,107 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    college_invitations_for_staff_api_v1_admin_colleges__college_id__invitations_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                college_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_resend_invitation_api_v1_admin_colleges__college_id__invitations__invitation_id__resend_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                college_id: string;
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_revoke_invitation_api_v1_admin_colleges__college_id__invitations__invitation_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                college_id: string;
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10972,6 +13557,103 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    college_invitations_api_v1_college_invitations_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    college_resend_invitation_api_v1_college_invitations__invitation_id__resend_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    college_revoke_invitation_api_v1_college_invitations__invitation_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12012,6 +14694,39 @@ export interface operations {
             };
         };
     };
+    delete_course_api_v1_admin_content_courses__course_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_lesson_api_v1_admin_content_courses__course_id__lessons_post: {
         parameters: {
             query?: never;
@@ -12087,6 +14802,148 @@ export interface operations {
         };
     };
     delete_lesson_api_v1_admin_content_lessons__lesson_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_course_media_api_v1_admin_content_courses__course_id__media__kind__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                course_id: string;
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_course_media_api_v1_admin_content_courses__course_id__media__kind__post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_course_media_api_v1_admin_content_courses__course_id__media__kind__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                course_id: string;
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_lesson_video_api_v1_admin_content_lessons__lesson_id__video_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_lesson_video_api_v1_admin_content_lessons__lesson_id__video_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_lesson_video_api_v1_admin_content_lessons__lesson_id__video_delete: {
         parameters: {
             query?: never;
             header?: {
@@ -12469,6 +15326,39 @@ export interface operations {
                 "application/json": components["schemas"]["EventIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_event_api_v1_college_events__event_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -13319,6 +16209,40 @@ export interface operations {
             };
         };
     };
+    delete_item_api_v1_trainer_assessments__kind___item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                kind: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     results_api_v1_trainer_assessments__kind___item_id__results_get: {
         parameters: {
             query?: never;
@@ -13877,7 +16801,9 @@ export interface operations {
     };
     history_api_v1_student_buddy_get: {
         parameters: {
-            query?: never;
+            query?: {
+                conversation_id?: string | null;
+            };
             header?: {
                 "X-Demo-Role"?: string | null;
             };
@@ -13937,6 +16863,148 @@ export interface operations {
             };
         };
     };
+    new_conversation_api_v1_student_buddy_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_conversation_api_v1_student_buddy_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_conversation_api_v1_student_buddy_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_feedback_api_v1_student_buddy_messages__message_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     ask_api_v1_student_buddy_ask_post: {
         parameters: {
             query?: never;
@@ -13949,6 +17017,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    explain_submission_api_v1_student_buddy_explain_submission_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainIn"];
             };
         };
         responses: {
@@ -14110,6 +17213,107 @@ export interface operations {
             };
         };
     };
+    download_my_certificate_api_v1_student_certificates__cert_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                cert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_child_certificate_api_v1_parent_certificates__cert_id__download_get: {
+        parameters: {
+            query?: {
+                child_id?: string | null;
+            };
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                cert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_external_api_v1_student_certificates__cert_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path: {
+                cert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     trainer_proof_api_v1_trainer_certificates__cert_id__proof_get: {
         parameters: {
             query?: never;
@@ -14185,6 +17389,42 @@ export interface operations {
             query?: {
                 child_id?: string | null;
                 lang?: string;
+            };
+            header?: {
+                "X-Demo-Role"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    college_certificate_holders_api_v1_college_certifications_holders_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                batch?: string | null;
+                issuer?: string | null;
+                page?: number;
             };
             header?: {
                 "X-Demo-Role"?: string | null;
